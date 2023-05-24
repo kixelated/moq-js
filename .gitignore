@@ -1,3 +1,4 @@
-*.mp4
-logs/
+node_modules
 .DS_Store
+.parcel-cache
+dist

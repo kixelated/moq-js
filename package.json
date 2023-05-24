@@ -2,7 +2,7 @@
 	"license": "Apache-2.0",
 	"source": "src/index.html",
 	"scripts": {
-		"serve": "parcel serve --https --cert ../cert/localhost.crt --key ../cert/localhost.key --port 4444 --open",
+		"serve": "parcel serve --https --port 4444 --open",
 		"build": "parcel build",
 		"check": "tsc --noEmit",
 		"lint": "eslint .",
