@@ -3,7 +3,10 @@ import * as Interface from "./interface"
 
 export interface Config {
 	url: string
-	fingerprint?: WebTransportHash // the certificate fingerprint, temporarily needed for local development
+
+	// If set, the server fingerprint will be fetched from this URL.
+	// This is required to use self-signed certificates with Chrome (May 2023)
+	fingerprintUrl?: string
 }
 
 export default class Transport {
@@ -27,11 +30,34 @@ export default class Transport {
 		;(await this.quic).close()
 	}
 
+	private async fingerprint(url: string): Promise<WebTransportHash> {
+		// TODO remove this fingerprint when Chrome WebTransport accepts the system CA
+		const response = await fetch(url)
+		const hexString = await response.text()
+
+		const hexBytes = new Uint8Array(hexString.length / 2)
+		for (let i = 0; i < hexBytes.length; i += 1) {
+			hexBytes[i] = parseInt(hexString.slice(2 * i, 2 * i + 2), 16)
+		}
+
+		return {
+			algorithm: "sha-256",
+			value: hexBytes,
+		}
+	}
+
 	// Helper function to make creating a promise easier
 	private async connect(config: Config): Promise<WebTransport> {
 		const options: WebTransportOptions = {}
-		if (config.fingerprint) {
-			options.serverCertificateHashes = [config.fingerprint]
+
+		if (config.fingerprintUrl) {
+			try {
+				const fingerprint = await this.fingerprint(config.fingerprintUrl)
+				console.log(fingerprint)
+				options.serverCertificateHashes = [fingerprint]
+			} catch (e) {
+				console.warn("failed to fetch fingerprint: ", e)
+			}
 		}
 
 		const quic = new WebTransport(config.url, options)
