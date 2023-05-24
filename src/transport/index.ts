@@ -27,19 +27,17 @@ export default class Transport {
 	}
 
 	async close() {
-		(await this.quic).close()
+		;(await this.quic).close()
 	}
 
 	private async fingerprint(url: string): Promise<WebTransportHash> {
 		// TODO remove this fingerprint when Chrome WebTransport accepts the system CA
-		const response = await fetch(url);
-		const hexString = await response.text();
+		const response = await fetch(url)
+		const hexString = await response.text()
 
-		console.log(hexString);
-
-		let hexBytes = new Uint8Array(hexString.length / 2);
+		const hexBytes = new Uint8Array(hexString.length / 2)
 		for (let i = 0; i < hexBytes.length; i += 1) {
-			hexBytes[i] = parseInt(hexString.slice(2*i, 2*i + 2), 16);
+			hexBytes[i] = parseInt(hexString.slice(2 * i, 2 * i + 2), 16)
 		}
 
 		return {
@@ -54,9 +52,9 @@ export default class Transport {
 
 		if (config.fingerprintUrl) {
 			try {
-				const fingerprint = await this.fingerprint(config.fingerprintUrl);
+				const fingerprint = await this.fingerprint(config.fingerprintUrl)
 				console.log(fingerprint)
-				options.serverCertificateHashes = [ fingerprint ]
+				options.serverCertificateHashes = [fingerprint]
 			} catch (e) {
 				console.warn("failed to fetch fingerprint: ", e)
 			}
