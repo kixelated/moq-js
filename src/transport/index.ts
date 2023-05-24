@@ -53,7 +53,6 @@ export default class Transport {
 		if (config.fingerprintUrl) {
 			try {
 				const fingerprint = await this.fingerprint(config.fingerprintUrl)
-				console.log(fingerprint)
 				options.serverCertificateHashes = [fingerprint]
 			} catch (e) {
 				console.warn("failed to fetch fingerprint: ", e)
