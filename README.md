@@ -8,8 +8,8 @@ It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
 
 ## Requirements
 
--   _Chrome_: currently (May 2023) the only browser to support both WebTransport and WebCodecs.
--   _yarn_: required to install dependencies.
+-   **Chrome**: currently (May 2023) the only browser to support both WebTransport and WebCodecs.
+-   **yarn**: required to install dependencies.
 
 ```
 yarn install
