@@ -6,18 +6,28 @@ See the [Warp draft](https://datatracker.ietf.org/doc/draft-lcurley-warp/).
 This repository is a Typescript library that supports both contribution (ingest) and distribution (playback).
 It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
 
-## Requirements
+## Setup
 
--   **Chrome**: currently (May 2023) the only browser to support both WebTransport and WebCodecs.
--   **yarn**: required to install dependencies.
+### Node
+
+Install node dependencies using [yarn](https://yarnpkg.com/) (or `npm` if you prefer).
 
 ```
 yarn install
 ```
 
-## Demo
+### Certificates
 
-Hosts a simple demo on `https://localhost:4444`
+Use [mkcert](https://github.com/FiloSottile/mkcert) to generate a self-signed certificate.
+This is merely for convinence to avoid TLS errors when using parcel.
+
+```
+yarn cert
+```
+
+## Usage
+
+Host a simple demo on `https://localhost:4444`.
 
 ```
 yarn serve

@@ -2,11 +2,12 @@
 	"license": "Apache-2.0",
 	"source": "src/index.html",
 	"scripts": {
-		"serve": "parcel serve --https --port 4444 --open",
+		"serve": "parcel serve --https --cert localhost.crt --key localhost.key  --port 4444 --open",
 		"build": "parcel build",
 		"check": "tsc --noEmit",
 		"lint": "eslint .",
-		"fmt": "prettier --write ."
+		"fmt": "prettier --write .",
+		"cert": "mkcert --install && mkcert -ecdsa -cert-file localhost.crt -key-file localhost.key localhost 127.0.0.1 ::1"
 	},
 	"devDependencies": {
 		"@parcel/transformer-inline-string": "2.8.3",
