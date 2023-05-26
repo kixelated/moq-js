@@ -1,8 +1,11 @@
-import * as Ring from "./ring"
+import * as Ring from "./renderer/ring"
 
 export interface Config {
-	// video stuff
+	// Video canvas to render
 	canvas: OffscreenCanvas
+
+	// Ring buffer used for the audio worklet
+	ring: Ring.Buffer
 }
 
 export interface Init {
@@ -16,6 +19,6 @@ export interface Segment {
 }
 
 export interface Play {
-	timestamp?: number
-	buffer: Ring.Buffer
+	// Start playback once the minimum buffer size has been reached.
+	minBuffer: number
 }

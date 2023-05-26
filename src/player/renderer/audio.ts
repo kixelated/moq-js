@@ -1,18 +1,23 @@
-import * as Message from "./message"
 import { Ring } from "./ring"
+import * as Message from "../message"
+import Frame from "../frame"
 
 export default class Audio {
 	ring?: Ring
 	queue: Array<AudioData>
 
-	render?: number // non-zero if requestAnimationFrame has been called
+	interval?: number
 	last?: number // the timestamp of the last rendered frame, in microseconds
 
 	constructor(_config: Message.Config) {
 		this.queue = []
 	}
 
-	push(frame: AudioData) {
+	push(_frame: Frame) {
+		// TODO
+	}
+
+	render(frame: AudioData) {
 		// Drop any old frames
 		if (this.last && frame.timestamp <= this.last) {
 			frame.close()
@@ -65,15 +70,7 @@ export default class Audio {
 		}
 	}
 
-	play(play: Message.Play) {
-		this.ring = new Ring(play.buffer)
-
-		if (!this.render) {
-			const sampleRate = 44100 // TODO dynamic
-
-			// Refresh every half buffer
-			const refresh = ((play.buffer.capacity / sampleRate) * 1000) / 2
-			this.render = setInterval(this.emit.bind(this), refresh)
-		}
+	play(_play: Message.Play) {
+		// TODO
 	}
 }

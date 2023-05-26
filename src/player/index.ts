@@ -1,5 +1,4 @@
 import * as Message from "./message"
-import * as Ring from "./ring"
 import Transport from "../transport"
 
 export interface Config {
@@ -45,7 +44,7 @@ export default class Player {
 		return worker
 	}
 
-	private async setupWorklet(_config: Config): Promise<AudioWorkletNode> {
+	private async setupWorklet(config: Config): Promise<AudioWorkletNode> {
 		// Load the worklet source code.
 		const url = new URL("worklet.ts", import.meta.url)
 		await this.context.audioWorklet.addModule(url)
@@ -63,6 +62,8 @@ export default class Player {
 		worklet.connect(volume)
 		volume.connect(this.context.destination)
 
+		worklet.port.postMessage({ config })
+
 		return worklet
 	}
 
@@ -76,13 +77,5 @@ export default class Player {
 
 	async play() {
 		this.context.resume()
-
-		const play = {
-			buffer: new Ring.Buffer(2, 44100 / 10), // 100ms of audio
-		}
-
-		const worklet = await this.worklet
-		worklet.port.postMessage({ play })
-		this.worker.postMessage({ play })
 	}
 }
