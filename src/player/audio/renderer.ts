@@ -1,20 +1,18 @@
 import { Ring } from "./ring"
-import * as Message from "../message"
-import Frame from "../frame"
+import { Config } from "./config"
+import * as Timeline from "../timeline"
 
-export default class Audio {
+export class Renderer {
 	ring?: Ring
-	queue: Array<AudioData>
+	timeline: Timeline.Component
 
+	queue: Array<AudioData>
 	interval?: number
 	last?: number // the timestamp of the last rendered frame, in microseconds
 
-	constructor(_config: Message.Config) {
+	constructor(config: Config, timeline: Timeline.Component) {
+		this.timeline = timeline
 		this.queue = []
-	}
-
-	push(_frame: Frame) {
-		// TODO
 	}
 
 	render(frame: AudioData) {
@@ -68,9 +66,5 @@ export default class Audio {
 			frame.close()
 			this.queue.shift()
 		}
-	}
-
-	play(_play: Message.Play) {
-		// TODO
 	}
 }

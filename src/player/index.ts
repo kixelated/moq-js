@@ -1,81 +1,46 @@
-import * as Message from "./message"
-import Transport from "../transport"
-
-export interface Config {
-	transport: Transport
-	canvas: OffscreenCanvas
-}
+import * as Audio from "./audio"
+import * as Thread from "./thread"
+import * as Transport from "../transport"
 
 // This class must be created on the main thread due to AudioContext.
-export default class Player {
-	context: AudioContext
-	worker: Worker
-	worklet: Promise<AudioWorkletNode>
+export class Player {
+	connection: Transport.Connection
+	context: Audio.Context
+	main: Thread.Main
 
-	transport: Transport
-
-	constructor(config: Config) {
-		this.transport = config.transport
-		this.transport.callback = this
-
-		this.context = new AudioContext({
-			latencyHint: "interactive",
-			sampleRate: 44100,
-		})
-
-		this.worker = this.setupWorker(config)
-		this.worklet = this.setupWorklet(config)
-	}
-
-	private setupWorker(config: Config): Worker {
-		const url = new URL("worker.ts", import.meta.url)
-
-		const worker = new Worker(url, {
-			type: "module",
-			name: "media",
-		})
-
-		const msg = {
-			canvas: config.canvas,
+	constructor(connection: Transport.Connection, canvas: OffscreenCanvas) {
+		// TODO refactor audio and video configuation
+		const config = {
+			audio: {
+				channels: 2,
+				sampleRate: 44100,
+				ring: new Audio.Buffer(2, 44100),
+			},
+			video: {
+				canvas,
+			},
 		}
 
-		worker.postMessage({ config: msg }, [msg.canvas])
+		this.context = new Audio.Context(config.audio)
+		this.main = new Thread.Main(config)
 
-		return worker
+		this.connection = connection
+		this.connection.callback = this
 	}
 
-	private async setupWorklet(config: Config): Promise<AudioWorkletNode> {
-		// Load the worklet source code.
-		const url = new URL("worklet.ts", import.meta.url)
-		await this.context.audioWorklet.addModule(url)
-
-		const volume = this.context.createGain()
-		volume.gain.value = 2.0
-
-		// Create a worklet
-		const worklet = new AudioWorkletNode(this.context, "renderer")
-		worklet.onprocessorerror = (e: Event) => {
-			console.error("Audio worklet error:", e)
-		}
-
-		// Connect the worklet to the volume node and then to the speakers
-		worklet.connect(volume)
-		volume.connect(this.context.destination)
-
-		worklet.port.postMessage({ config })
-
-		return worklet
+	// An init stream was received over the network.
+	onInit(stream: Transport.Stream) {
+		this.main.sendInit(stream)
 	}
 
-	onInit(init: Message.Init) {
-		this.worker.postMessage({ init }, [init.buffer.buffer, init.reader])
+	// A segment stream was received over the network.
+	onSegment(stream: Transport.Stream) {
+		this.main.sendSegment(stream)
 	}
 
-	onSegment(segment: Message.Segment) {
-		this.worker.postMessage({ segment }, [segment.buffer.buffer, segment.reader])
-	}
-
-	async play() {
+	// TODO support arguments
+	play() {
 		this.context.resume()
+		this.main.sendPlay({ minBuffer: 0.2 }) // TODO
 	}
 }

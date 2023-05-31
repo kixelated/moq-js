@@ -1,10 +1,7 @@
-// This is an AudioWorklet that acts as a media source.
-// The renderer copies audio samples to a ring buffer read by this worklet.
-// The worklet then outputs those samples to emit audio.
-
-import * as Message from "../message"
-
 import { Ring } from "./ring"
+import { Config } from "./config"
+
+export const NAME = "renderer"
 
 class Renderer extends AudioWorkletProcessor {
 	ring?: Ring
@@ -18,7 +15,7 @@ class Renderer extends AudioWorkletProcessor {
 		this.port.onmessage = this.onMessage.bind(this)
 	}
 
-	onConfig(config: Message.Config) {
+	onConfig(config: Config) {
 		this.ring = new Ring(config.ring)
 	}
 
@@ -50,4 +47,4 @@ class Renderer extends AudioWorkletProcessor {
 	}
 }
 
-registerProcessor("renderer", Renderer)
+registerProcessor(NAME, Renderer)

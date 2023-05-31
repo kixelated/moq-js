@@ -1,5 +1,5 @@
 // Writer wraps a stream and writes chunks of data
-export default class Writer {
+export class Writer {
 	buffer: ArrayBuffer
 	writer: WritableStreamDefaultWriter
 

@@ -1,27 +1,25 @@
-import * as Message from "./message"
-import * as MP4 from "../mp4"
-import * as Stream from "../stream"
+import * as MP4 from "../../mp4"
+import * as Stream from "../../stream"
+import * as Timeline from "../timeline"
 
-import Timeline from "./timeline"
-import Deferred from "../util/deferred"
+import Deferred from "../../util/deferred"
 
 // Decoder receives a QUIC stream, parsing the MP4 container, and passing samples to the Timeline.
-export default class Decoder {
-	timeline: Timeline
-	moov: Deferred<MP4.ArrayBuffer[]>
-	group: number
+export class Decoder {
+	timeline: Timeline.Sync
 
-	constructor(timeline: Timeline) {
-		this.moov = new Deferred()
+	moov: Deferred<MP4.ArrayBuffer[]>
+
+	constructor(timeline: Timeline.Sync) {
 		this.timeline = timeline
-		this.group = 0
+		this.moov = new Deferred()
 	}
 
-	async init(msg: Message.Init) {
+	async init(buffer: Stream.Buffer) {
 		const init = new Array<MP4.ArrayBuffer>()
 		let offset = 0
 
-		const stream = new Stream.Reader(msg.reader, msg.buffer)
+		const stream = new Stream.Reader(buffer)
 		for (;;) {
 			const data = await stream.read()
 			if (!data) break
@@ -43,23 +41,19 @@ export default class Decoder {
 		this.moov.resolve(init)
 	}
 
-	async segment(msg: Message.Segment) {
-		// Compute a unique ID for the group
-		const group = this.group
-		this.group += 1
-
+	async segment(buffer: Stream.Buffer) {
 		// Wait for the init segment to be fully received and parsed
 		const input = MP4.New()
 
 		input.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
 			for (const sample of samples) {
-				const timestamp = sample.dts / track.timescale
-				this.timeline.push({
-					group,
+				const frame = {
 					track,
-					timestamp,
 					sample,
-				})
+					timestamp: sample.dts / track.timescale,
+				}
+
+				this.timeline.push(frame)
 			}
 		}
 
@@ -81,7 +75,7 @@ export default class Decoder {
 			offset = input.appendBuffer(raw)
 		}
 
-		const stream = new Stream.Reader(msg.reader, msg.buffer)
+		const stream = new Stream.Reader(buffer)
 
 		// For whatever reason, mp4box doesn't work until you read an atom at a time.
 		while (!(await stream.done())) {
