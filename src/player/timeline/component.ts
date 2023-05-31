@@ -56,8 +56,6 @@ export class Component {
 
 		this.index = index
 		this.start = sync
-
-		console.log(index, sync)
 	}
 
 	next(): Frame | undefined {

@@ -1,5 +1,4 @@
 import { Config } from "./config"
-import { NAME } from "./worklet"
 
 // NOTE: This must be on the main thread
 export class Context {
@@ -27,7 +26,7 @@ export class Context {
 		volume.gain.value = 2.0
 
 		// Create the worklet
-		const worklet = new AudioWorkletNode(this.context, NAME)
+		const worklet = new AudioWorkletNode(this.context, "renderer")
 
 		worklet.port.addEventListener("message", this.on.bind(this))
 		worklet.onprocessorerror = (e: Event) => {

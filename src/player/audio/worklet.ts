@@ -1,8 +1,6 @@
 import { Ring } from "./ring"
 import { Config } from "./config"
 
-export const NAME = "renderer"
-
 class Renderer extends AudioWorkletProcessor {
 	ring?: Ring
 	base: number
@@ -47,4 +45,4 @@ class Renderer extends AudioWorkletProcessor {
 	}
 }
 
-registerProcessor(NAME, Renderer)
+registerProcessor("renderer", Renderer)

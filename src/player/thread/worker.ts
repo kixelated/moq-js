@@ -29,7 +29,7 @@ class Worker {
 	}
 
 	on(e: MessageEvent) {
-		const msg = e as Message.ToWorker
+		const msg = e.data as Message.ToWorker
 
 		if (msg.config) {
 			throw new Error("tried to reconfigure worker")
@@ -72,7 +72,7 @@ function setup(e: MessageEvent) {
 
 	// Pass all events to the worker from now on.
 	const worker = new Worker(msg.config)
-	self.addEventListener("message", worker.on)
+	self.addEventListener("message", worker.on.bind(worker))
 }
 
 self.addEventListener("message", setup)
