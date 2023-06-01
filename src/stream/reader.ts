@@ -1,11 +1,13 @@
-// Reader wraps a stream and provides convience methods for reading pieces from a stream
-export default class Reader {
-	reader: ReadableStream
-	buffer: Uint8Array
+import { Buffer } from "./buffer"
 
-	constructor(reader: ReadableStream, buffer: Uint8Array = new Uint8Array(0)) {
-		this.reader = reader
-		this.buffer = buffer
+// Reader wraps a stream and provides convience methods for reading pieces from a stream
+export class Reader {
+	private reader: ReadableStream
+	private buffer: Uint8Array
+
+	constructor(buffer: Buffer) {
+		this.reader = buffer.reader
+		this.buffer = buffer.buffer
 	}
 
 	// Returns any number of bytes
@@ -191,5 +193,10 @@ export default class Reader {
 		} catch (err) {
 			return true // Assume EOF
 		}
+	}
+
+	// Stop reading from the stream, returning the unread parts
+	release(): Buffer {
+		return new Buffer(this.reader, this.buffer)
 	}
 }

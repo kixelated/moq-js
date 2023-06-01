@@ -10,21 +10,15 @@
 	<body>
 		<div id="player">
 			<div id="screen">
+				<div id="timeline">
+					<div class="audio component"></div>
+					<div class="video component"></div>
+					<div class="playhead"></div>
+					<div class="legend"></div>
+				</div>
+
 				<div id="play"><span>click to play</span></div>
-				<canvas id="video" width="1280" height="720"></canvas>
-			</div>
-
-			<div id="controls">
-				<button type="button" id="live">Go Live</button>
-				<button type="button" id="throttle">Throttle: None</button>
-			</div>
-
-			<div id="stats">
-				<label>Audio Buffer:</label>
-				<div class="audio buffer"></div>
-
-				<label>Video Buffer:</label>
-				<div class="video buffer"></div>
+				<canvas id="video" width="854" height="480"></canvas>
 			</div>
 		</div>
 
