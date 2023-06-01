@@ -5,16 +5,17 @@ import * as Stream from "../../stream"
 
 // Any top level messages that can be sent to the worker.
 export interface ToWorker {
-	// Sent to the worker to configure on startup.
+	// Sent to configure on startup.
 	config?: Config
 
-	// Sent to the worker on each init/data stream
+	// Sent on each init/data stream
 	// TODO combine into a single message
 	init?: Stream.Buffer
 	segment?: Stream.Buffer
 
-	// Sent to the worker to start playback
+	// Sent to control playback
 	play?: Play
+	seek?: Seek
 }
 
 // Any top-level messages that can be sent from the worker.
@@ -44,11 +45,14 @@ export interface Play {
 	minBuffer: number
 }
 
-export interface Info {
-	buffer: BufferInfo
+export interface Seek {
+	timestamp: number
 }
 
-export interface BufferInfo {
-	audio?: Timeline.Range
-	video?: Timeline.Range
+export interface Info {
+	epoch: number // increases by 1 each update
+
+	timestamp?: number
+	audio: Timeline.Range[]
+	video: Timeline.Range[]
 }

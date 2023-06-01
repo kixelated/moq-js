@@ -4,13 +4,13 @@ import * as Timeline from "../timeline"
 
 export class Renderer {
 	ring?: Ring
-	timeline: Timeline.Component
+	timeline: Timeline.Sync
 
 	queue: Array<AudioData>
 	interval?: number
 	last?: number // the timestamp of the last rendered frame, in microseconds
 
-	constructor(config: Config, timeline: Timeline.Component) {
+	constructor(config: Config, timeline: Timeline.Sync) {
 		this.timeline = timeline
 		this.queue = []
 	}

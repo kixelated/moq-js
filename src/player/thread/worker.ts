@@ -17,6 +17,10 @@ class Worker {
 	audio: Audio.Renderer
 	video: Video.Renderer
 
+	// Send buffer updates every so often
+	infoEpoch: number
+	infoInterval: number
+
 	constructor(config: Message.Config) {
 		this.timeline = new Timeline.Sync()
 
@@ -24,8 +28,12 @@ class Worker {
 		this.decoder = new Decoder(this.timeline)
 
 		// Render samples from the timeline as we receive them.
-		this.audio = new Audio.Renderer(config.audio, this.timeline.audio)
-		this.video = new Video.Renderer(config.video, this.timeline.video)
+		this.audio = new Audio.Renderer(config.audio, this.timeline)
+		this.video = new Video.Renderer(config.video, this.timeline)
+
+		// Send updates every 100ms
+		this.infoEpoch = 0
+		this.infoInterval = setInterval(this.sendInfo.bind(this), 100)
 	}
 
 	on(e: MessageEvent) {
@@ -39,24 +47,34 @@ class Worker {
 			this.decoder.segment(msg.segment)
 		} else if (msg.play) {
 			this.timeline.play(msg.play.minBuffer)
+		} else if (msg.seek) {
+			this.timeline.seek(msg.seek.timestamp)
+		} else {
+			throw new Error(`unknown message ${msg}`)
 		}
 	}
 
 	// Mostly for type safety
-	send(msg: Message.FromWorker, ...transfer: Transferable[]) {
-		self.postMessage(msg, "", transfer)
+	send(msg: Message.FromWorker) {
+		postMessage(msg)
 	}
 
 	sendInfo() {
 		// TODO support gaps
-		const audio = this.timeline.audio.span()
-		const video = this.timeline.video.span()
+		const audio = this.timeline.audio.ranges()
+		const video = this.timeline.video.ranges()
 
-		const info = {
-			buffer: {
-				audio,
-				video,
-			},
+		// TODO send on each update, not at an interval
+		const info: Message.Info = {
+			epoch: this.infoEpoch++,
+			audio,
+			video,
+		}
+
+		const ref = this.timeline.sync(0)
+		if (ref) {
+			const now = performance.now() / 1000
+			info.timestamp = now - ref
 		}
 
 		this.send({ info })

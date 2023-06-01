@@ -2,18 +2,27 @@ import * as MP4 from "../../mp4"
 
 import { Component } from "./component"
 import { Frame } from "./frame"
+import { Range } from "./range"
 
 export class Sync {
+	// Maintain audio and video seprarately
 	audio: Component
 	video: Component
 
+	// Convert from the wall clock timestamp to the media timestamp
+	#sync?: number
+
 	// The play message, if it has been received but the conditions have not been met yet.
-	private targetLatency?: number
+	#target?: number
+
+	// A counter that increases by 1 each time there's a seek
+	#continuity: number
 
 	// Construct a timeline
 	constructor() {
 		this.audio = new Component()
 		this.video = new Component()
+		this.#continuity = 0
 	}
 
 	push(frame: Frame) {
@@ -21,36 +30,67 @@ export class Sync {
 		component.push(frame)
 
 		// Try to start playback when we get new samples.
-		this.tryPlay()
+		this.#tryPlay()
 	}
 
 	// Start playback once the conditions have been met
-	play(targetLatency: number) {
+	play(target: number) {
 		// If we can't start playback immediately, save the message and retry.
-		this.targetLatency = targetLatency
-		this.tryPlay()
+		this.#target = target
+		this.#tryPlay()
 	}
 
-	// Try starting playback if the conditions are met.
-	private tryPlay() {
-		if (this.targetLatency === undefined) return
+	seek(timestamp: number) {
+		this.#sync = performance.now() / 1000 - timestamp
+		this.#continuity += 1
 
-		// Return the first and last sample in both component queues.
+		this.audio.reset(timestamp)
+		this.video.reset(timestamp)
+	}
+
+	// Convert a media timestamp to a wall clock timestamp.
+	sync(pts: number): number | undefined {
+		if (!this.#sync) return
+		return pts + this.#sync
+	}
+
+	continuity(): number {
+		return this.#continuity
+	}
+
+	// Return the minimum and maximum timestamp for both components.
+	span(): Range | undefined {
 		const audio = this.audio.span()
 		const video = this.video.span()
 		if (!audio || !video) return
 
-		// Make sure both components are buffered enough.
-		if (audio.end - audio.start < this.targetLatency) return
-		if (video.end - video.start < this.targetLatency) return
+		return {
+			start: Math.max(audio.start, video.start),
+			end: Math.min(audio.end, video.end),
+		}
+	}
 
-		// Start back target from the desired timestamp.
+	// Try starting playback if the conditions are met.
+	#tryPlay() {
+		if (this.#target === undefined) return
+
+		// Return the first and last sample in both component queues.
+		const combined = this.span()
+		const audio = this.audio.span()
+		const video = this.video.span()
+
+		// Set our timestamp to be relative to the max value we have buffered.
+		const min = combined || audio || video
+		if (!min) return
+
 		// NOTE: This could be in an unbuffered range.
-		const timestamp = Math.min(audio.end - this.targetLatency, video.end - this.targetLatency)
+		// Make sure both components are buffered enough before actually playing.
+		if (!combined || combined.end - combined.start < this.#target) return
 
-		const sync = performance.now() / 1000 - timestamp
-		this.video.play(timestamp, sync)
+		// Set the timestamp to be relative to the end.
+		const timestamp = min.end - this.#target
+		this.seek(timestamp)
 
-		this.targetLatency = undefined // we did it
+		this.#target = undefined // we did it
 	}
 }

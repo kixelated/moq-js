@@ -4,13 +4,14 @@ import { Config } from "./config"
 
 export class Renderer {
 	private canvas: OffscreenCanvas
-	private timeline: Timeline.Component
+	private timeline: Timeline.Sync
 
 	private queue: Array<VideoFrame>
 	private decoder?: VideoDecoder
-	private last?: number // the timestamp of the last rendered frame
+	private continuity?: number // the continuity of the last decoded frame
+	private rendered?: number // the timestamp of the last rendered frame
 
-	constructor(config: Config, timeline: Timeline.Component) {
+	constructor(config: Config, timeline: Timeline.Sync) {
 		this.canvas = config.canvas
 		this.timeline = timeline
 
@@ -21,7 +22,7 @@ export class Renderer {
 
 	private render(frame: VideoFrame) {
 		// Drop any old frames
-		if (this.last && frame.timestamp <= this.last) {
+		if (this.rendered && frame.timestamp <= this.rendered) {
 			frame.close()
 			return
 		}
@@ -74,22 +75,42 @@ export class Renderer {
 		const ctx = this.canvas.getContext("2d")
 		ctx!.drawImage(frame, 0, 0, this.canvas.width, this.canvas.height) // TODO aspect ratio
 
-		this.last = frame.timestamp
+		this.rendered = frame.timestamp
 		frame.close()
 	}
 
 	private tryDecode() {
 		for (;;) {
+			// Check if there was a seek, and we need to flush any decode queue.
+			const continuity = this.timeline.continuity()
+			if (this.continuity && continuity !== this.continuity) {
+				console.log("clearing decoder queue", continuity)
+
+				// Flush the decoder queue.
+				if (this.decoder) {
+					this.decoder.close()
+					this.decoder = undefined
+				}
+
+				// Close all existing frames
+				while (this.queue.length) {
+					this.queue.shift()!.close()
+				}
+			}
+
+			this.continuity = continuity
+
 			// There's already a large decoder queue.
-			if (this.decoder && this.decoder.decodeQueueSize > 4) return
+			if (this.decoder && this.decoder.decodeQueueSize > 0) return
 
 			// Get the next frame to render.
-			const frame = this.timeline.next()
+			const frame = this.timeline.video.next()
 			if (!frame) return
 
 			// Convert to wall clock time at decode for simplicity.
-			const wall = 1000 * this.timeline.sync(frame.timestamp)
+			const wall = 1000 * this.timeline.sync(frame.timestamp)!
 
+			// Create or reuse the decoder.
 			const decoder = this.makeDecoder(frame)
 			decoder.decode(
 				new EncodedVideoChunk({
@@ -135,9 +156,5 @@ export class Renderer {
 		this.decoder = decoder
 
 		return decoder
-	}
-
-	play(_play: Message.Play) {
-		// TODO
 	}
 }
