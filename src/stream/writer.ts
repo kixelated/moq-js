@@ -89,12 +89,17 @@ export class Writer {
 		}
 	}
 
-	async bytes(buffer: ArrayBuffer) {
+	async write(buffer: ArrayBuffer) {
 		return this.writer.write(buffer)
+	}
+
+	async bytes(data: ArrayBuffer) {
+		this.vint52(data.byteLength)
+		return this.write(data)
 	}
 
 	async string(str: string) {
 		const data = new TextEncoder().encode(str)
-		return this.writer.write(data)
+		this.bytes(data)
 	}
 }

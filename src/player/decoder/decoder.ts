@@ -16,6 +16,8 @@ export class Decoder {
 	}
 
 	async init(buffer: Stream.Buffer) {
+		console.log("received init stream")
+
 		const init = new Array<MP4.ArrayBuffer>()
 		let offset = 0
 
@@ -38,10 +40,14 @@ export class Decoder {
 			offset += data.byteLength
 		}
 
+		console.log("received init", init)
+
 		this.moov.resolve(init)
 	}
 
 	async segment(buffer: Stream.Buffer) {
+		console.log("received segment stream")
+
 		// Wait for the init segment to be fully received and parsed
 		const input = MP4.New()
 
@@ -58,6 +64,9 @@ export class Decoder {
 		}
 
 		input.onReady = (info: MP4.Info) => {
+			// TODO do this parsing once
+			console.log("parsed init", info)
+
 			// Extract all of the tracks, because we don't know if it's audio or video.
 			for (const track of info.tracks) {
 				input.setExtractionOptions(track.id, track, { nbSamples: 1 })

@@ -5,13 +5,13 @@ export class Reader {
 	private reader: ReadableStream
 	private buffer: Uint8Array
 
-	constructor(buffer: Buffer) {
-		this.reader = buffer.reader
-		this.buffer = buffer.buffer
+	constructor(reader: ReadableStream, buffer: Uint8Array = new Uint8Array(0)) {
+		this.reader = reader
+		this.buffer = buffer
 	}
 
 	// Returns any number of bytes
-	async read(): Promise<Uint8Array | undefined> {
+	async chunk(): Promise<Uint8Array | undefined> {
 		if (this.buffer.byteLength) {
 			const buffer = this.buffer
 			this.buffer = new Uint8Array()
@@ -55,7 +55,7 @@ export class Reader {
 		return result
 	}
 
-	async bytes(size: number): Promise<Uint8Array> {
+	async read(size: number): Promise<Uint8Array> {
 		const r = this.reader.getReader()
 
 		while (this.buffer.byteLength < size) {
@@ -113,7 +113,7 @@ export class Reader {
 	}
 
 	async view(size: number): Promise<DataView> {
-		const buf = await this.bytes(size)
+		const buf = await this.read(size)
 		return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 	}
 
@@ -184,6 +184,16 @@ export class Reader {
 			default:
 				throw "impossible"
 		}
+	}
+
+	async bytes(): Promise<Uint8Array> {
+		const size = await this.vint52()
+		return this.read(size)
+	}
+
+	async string(): Promise<string> {
+		const raw = await this.bytes()
+		return new TextDecoder().decode(raw)
 	}
 
 	async done(): Promise<boolean> {

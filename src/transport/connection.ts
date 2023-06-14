@@ -1,8 +1,13 @@
 import * as Stream from "../stream"
-import * as Interface from "./interface"
+import * as Setup from "./setup"
+import * as Control from "./control"
+import * as Data from "./data"
 
 export interface Config {
 	url: string
+
+	// Parameters used to create the MoQ session
+	setup: Setup.Client
 
 	// If set, the server fingerprint will be fetched from this URL.
 	// This is required to use self-signed certificates with Chrome (May 2023)
@@ -11,26 +16,30 @@ export interface Config {
 
 export class Connection {
 	quic: Promise<WebTransport>
-	api: Promise<WritableStream>
-	callback?: Interface.Callback
+
+	// Use to receive/send control messages.
+	control: Promise<Control.Stream>
+
+	// Use to receive/send data streams.
+	data: Promise<Data.Transport>
 
 	constructor(config: Config) {
-		this.quic = this.connect(config)
+		this.quic = this.#connect(config)
 
-		// Create a unidirectional stream for all of our messages
-		this.api = this.quic.then((q) => {
-			return q.createUnidirectionalStream()
+		// Create a bidirection stream to control the connection
+		this.control = this.#setup(config.setup)
+
+		// Create unidirectional streams to send media.
+		this.data = this.quic.then((quic) => {
+			return new Data.Transport(quic)
 		})
-
-		// async functions
-		this.receiveStreams()
 	}
 
 	async close() {
 		;(await this.quic).close()
 	}
 
-	private async fingerprint(url: string): Promise<WebTransportHash> {
+	async #fingerprint(url: string): Promise<WebTransportHash> {
 		// TODO remove this fingerprint when Chrome WebTransport accepts the system CA
 		const response = await fetch(url)
 		const hexString = await response.text()
@@ -47,12 +56,12 @@ export class Connection {
 	}
 
 	// Helper function to make creating a promise easier
-	private async connect(config: Config): Promise<WebTransport> {
+	async #connect(config: Config): Promise<WebTransport> {
 		const options: WebTransportOptions = {}
 
 		if (config.fingerprintUrl) {
 			try {
-				const fingerprint = await this.fingerprint(config.fingerprintUrl)
+				const fingerprint = await this.#fingerprint(config.fingerprintUrl)
 				options.serverCertificateHashes = [fingerprint]
 			} catch (e) {
 				console.warn("failed to fetch fingerprint: ", e)
@@ -61,55 +70,26 @@ export class Connection {
 
 		const quic = new WebTransport(config.url, options)
 		await quic.ready
+
 		return quic
 	}
 
-	async sendMessage(msg: any) {
-		const payload = JSON.stringify(msg)
-		const size = payload.length + 8
+	async #setup(client: Setup.Client): Promise<Control.Stream> {
+		const quic = await this.quic
+		const stream = await quic.createBidirectionalStream()
 
-		const stream = await this.api
+		const writer = new Stream.Writer(stream.writable)
+		const reader = new Stream.Reader(stream.readable)
 
-		const writer = new Stream.Writer(stream)
-		await writer.uint32(size)
-		await writer.string("warp")
-		await writer.string(payload)
-		writer.release()
-	}
+		const setup = new Setup.Stream(reader, writer)
 
-	async receiveStreams() {
-		const q = await this.quic
-		const streams = q.incomingUnidirectionalStreams.getReader()
+		// Send the setup message.
+		await setup.send.client(client)
 
-		for (;;) {
-			const result = await streams.read()
-			if (result.done) break
+		// Receive the setup message.
+		// TODO verify the SETUP response.
+		const _server = await setup.recv.server()
 
-			const stream = new Stream.Buffer(result.value)
-			this.handleStream(stream) // don't await
-		}
-	}
-
-	async handleStream(buffer: Stream.Buffer) {
-		const r = new Stream.Reader(buffer)
-
-		while (!(await r.done())) {
-			const size = await r.uint32()
-			const typ = new TextDecoder("utf-8").decode(await r.bytes(4))
-
-			if (typ != "warp") throw "expected warp atom"
-			if (size < 8) throw "atom too small"
-
-			const payload = new TextDecoder("utf-8").decode(await r.bytes(size - 8))
-			const msg = JSON.parse(payload)
-
-			if (msg.init) {
-				return this.callback?.onInit(r.release())
-			} else if (msg.segment) {
-				return this.callback?.onSegment(r.release())
-			} else {
-				console.warn("unknown message", msg)
-			}
-		}
+		return new Control.Stream(reader, writer)
 	}
 }
