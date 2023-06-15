@@ -19,8 +19,8 @@ class Worker {
 	video: Video.Renderer
 
 	// Send buffer updates every so often
-	infoEpoch: number
-	infoInterval: number
+	timelineEpoch: number
+	timelineInterval: number
 
 	constructor(config: Message.Config) {
 		this.timeline = new Timeline.Sync()
@@ -33,12 +33,23 @@ class Worker {
 		this.video = new Video.Renderer(config.video, this.timeline)
 
 		// Send updates every 100ms
-		this.infoEpoch = 0
-		this.infoInterval = setInterval(this.sendInfo.bind(this), 100)
+		this.timelineEpoch = 0
+		this.timelineInterval = setInterval(this.sendTimeline.bind(this), 100)
+
+		this.#runInit()
+	}
+
+	// Send the init info when the decoder parses the catalog.
+	async #runInit() {
+		const info = await this.decoder.info()
+		const init = { info }
+		this.send({ init })
 	}
 
 	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
+
+		//console.log("received message to worker from main", msg)
 
 		if (msg.config) {
 			throw new Error("tried to reconfigure worker")
@@ -57,17 +68,22 @@ class Worker {
 
 	// Mostly for type safety
 	send(msg: Message.FromWorker) {
+		// Don't print the verbose timeline message
+		if (!msg.timeline) {
+			//console.log("sent message from worker to main", msg)
+		}
+
 		postMessage(msg)
 	}
 
-	sendInfo() {
+	sendTimeline() {
 		// TODO support gaps
 		const audio = this.timeline.audio.ranges()
 		const video = this.timeline.video.ranges()
 
 		// TODO send on each update, not at an interval
-		const info: Message.Info = {
-			epoch: this.infoEpoch++,
+		const timeline: Message.Timeline = {
+			epoch: this.timelineEpoch++,
 			audio,
 			video,
 		}
@@ -75,10 +91,10 @@ class Worker {
 		const ref = this.timeline.sync(0)
 		if (ref) {
 			const now = performance.now() / 1000
-			info.timestamp = now - ref
+			timeline.timestamp = now - ref
 		}
 
-		this.send({ info })
+		this.send({ timeline })
 	}
 }
 

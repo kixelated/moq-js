@@ -26,6 +26,7 @@ export class Main {
 
 	// Just to enforce we're sending valid types to the worker
 	private send(msg: Message.ToWorker, ...transfer: Transferable[]) {
+		//console.log("sent message from main to worker", msg)
 		this.#worker.postMessage(msg, transfer)
 	}
 
@@ -50,6 +51,12 @@ export class Main {
 
 	private on(e: MessageEvent) {
 		const msg = e.data as Message.FromWorker
+
+		// Don't print the verbose timeline message.
+		if (!msg.timeline) {
+			//console.log("received message from worker to main", msg)
+		}
+
 		this.#callback(msg)
 	}
 }

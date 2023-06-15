@@ -5,6 +5,10 @@ export type Subscriber = Subscribe | AnnounceOk | AnnounceError
 export type Publisher = SubscribeOk | SubscribeError | Announce
 
 export enum Type {
+	// NOTE: object and setup are in other modules
+	// Object = 0,
+	// Setup = 1,
+
 	Subscribe = 3,
 	SubscribeOk = 4,
 	SubscribeError = 5,
@@ -13,16 +17,18 @@ export enum Type {
 	AnnounceError = 8,
 }
 
+// NOTE: These are forked from moq-transport-00.
+//   1. subscribe specifies the track_id, not subscribe_ok
+//   2. messages lack a specified length
+//   3. optional parameters are not supported (announce, subscribe)
+//   4. not allowed on undirectional streams; only after SETUP on the bidirectional stream
+
 export interface Subscribe {
 	type: Type.Subscribe
 
 	id: number
 	namespace: string
 	name: string
-
-	group?: number
-	object?: number
-	auth?: string
 }
 
 export interface SubscribeOk {
@@ -41,7 +47,6 @@ export interface SubscribeError {
 export interface Announce {
 	type: Type.Announce
 	namespace: string
-	auth?: string
 }
 
 export interface AnnounceOk {
@@ -110,31 +115,11 @@ export class Decoder {
 		const namespace = await this.r.string()
 		const name = await this.r.string()
 
-		let group
-		let object
-		let auth
-
-		while (!this.r.done()) {
-			const id = await this.r.vint52()
-			if (id == 0) {
-				group = await this.r.vint52()
-			} else if (id == 1) {
-				object = await this.r.vint52()
-			} else if (id == 2) {
-				auth = await this.r.string()
-			} else {
-				throw new Error(`unknown param: ${id}`)
-			}
-		}
-
 		return {
 			type: Type.Subscribe,
 			id,
 			namespace,
 			name,
-			group,
-			object,
-			auth,
 		}
 	}
 
@@ -158,21 +143,9 @@ export class Decoder {
 	private async announce(): Promise<Announce> {
 		const namespace = await this.r.string()
 
-		let auth
-
-		while (!this.r.done()) {
-			const id = await this.r.vint52()
-			if (id == 2) {
-				auth = await this.r.string()
-			} else {
-				throw new Error(`unknown param: ${id}`)
-			}
-		}
-
 		return {
 			type: Type.Announce,
 			namespace,
-			auth,
 		}
 	}
 
@@ -223,21 +196,6 @@ export class Encoder {
 		await this.w.vint52(s.id)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
-
-		if (s.group !== undefined) {
-			await this.w.vint52(0)
-			await this.w.vint52(s.group)
-		}
-
-		if (s.object !== undefined) {
-			await this.w.vint52(1)
-			await this.w.vint52(s.object)
-		}
-
-		if (s.auth !== undefined) {
-			await this.w.vint52(2)
-			await this.w.string(s.auth)
-		}
 	}
 
 	async subscribe_ok(s: SubscribeOk) {
@@ -253,11 +211,6 @@ export class Encoder {
 
 	async announce(a: Announce) {
 		await this.w.string(a.namespace)
-
-		if (a.auth !== undefined) {
-			await this.w.vint52(2)
-			await this.w.string(a.auth)
-		}
 	}
 
 	async announce_ok(a: AnnounceOk) {

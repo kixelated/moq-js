@@ -27,11 +27,11 @@ export class App {
 
 		const params = new URLSearchParams(window.location.search)
 		const url = params.get("url") || "https://localhost:4443"
-		const fingerprintUrl = url + "/fingerprint"
 
 		this.#transport = new Transport.Connection({
 			url,
-			fingerprintUrl,
+			role: "subscriber",
+			fingerprint: url + "/fingerprint",
 		})
 
 		this.#player = new Player.Player(this.#transport, canvas.transferControlToOffscreen())

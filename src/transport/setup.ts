@@ -2,12 +2,20 @@ import { Reader, Writer } from "../stream"
 
 export type Message = Client | Server
 export type Role = "publisher" | "subscriber" | "both"
-export type Version = number
+
+export enum Version {
+	DRAFT_00 = 0xff00,
+}
+
+// NOTE: These are forked from moq-transport-00.
+//   1. messages lack a sized length
+//   2. parameters are not optional and written in order (role + path)
+//   3. role indicates local support only, not remote support
 
 export interface Client {
 	versions: Version[]
 	role: Role
-	path?: string
+	path?: string // not used with WebTransport
 }
 
 export interface Server {
@@ -33,6 +41,9 @@ export class Decoder {
 	}
 
 	async client(): Promise<Client> {
+		const type = await this.r.vint52()
+		if (type !== 1) throw new Error(`client SETUP type must be 1, got ${type}`)
+
 		const count = await this.r.vint52()
 
 		const versions = []
@@ -41,23 +52,8 @@ export class Decoder {
 			versions.push(version)
 		}
 
-		let role: Role | undefined
-		let path
-
-		while (!this.r.done()) {
-			const id = await this.r.vint52()
-			if (id == 0) {
-				role = await this.role()
-			} else if (id == 1) {
-				path = await this.r.string()
-			} else {
-				throw new Error(`unknown param: ${id}`)
-			}
-		}
-
-		if (!role) {
-			throw new Error("missing role")
-		}
+		const role = await this.role()
+		const path = (await this.r.string()) || undefined
 
 		return {
 			versions,
@@ -67,24 +63,11 @@ export class Decoder {
 	}
 
 	async server(): Promise<Server> {
+		const type = await this.r.vint52()
+		if (type !== 2) throw new Error(`server SETUP type must be 2, got ${type}`)
+
 		const version = await this.r.vint52()
-
-		let role: Role | undefined
-
-		while (!this.r.done()) {
-			const id = await this.r.vint52()
-			if (id == 0) {
-				role = await this.role()
-			} else if (id == 1) {
-				throw new Error(`path not allowed for server`)
-			} else {
-				throw new Error(`unknown param: ${id}`)
-			}
-		}
-
-		if (!role) {
-			throw new Error("missing role")
-		}
+		const role = await this.role()
 
 		return {
 			version,
@@ -114,22 +97,19 @@ export class Encoder {
 	}
 
 	async client(c: Client) {
+		await this.w.vint52(1) // message_type = 1
 		await this.w.vint52(c.versions.length)
 		for (const v of c.versions) {
 			await this.w.vint52(v)
 		}
-		await this.w.vint52(0)
-		await this.role(c.role)
 
-		if (c.path !== undefined) {
-			await this.w.vint52(1)
-			await this.w.string(c.path)
-		}
+		await this.role(c.role)
+		await this.w.string(c.path || "")
 	}
 
 	async server(s: Server) {
+		await this.w.vint52(2) // message_type = 2
 		await this.w.vint52(s.version)
-		await this.w.vint52(0) // role id
 		await this.role(s.role)
 	}
 

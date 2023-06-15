@@ -1,8 +1,9 @@
-import { Player, Info, Range } from "./player"
+import { Player, Range } from "./player"
+import { State } from "./player/timeline"
 
 export class Timeline {
 	#player: Player
-	#info?: Info
+	#state?: State
 
 	#parent: HTMLElement
 	#audio: HTMLElement
@@ -38,21 +39,21 @@ export class Timeline {
 
 		let epoch = 0
 		for (;;) {
-			this.#info = await this.#player.info(epoch)
+			this.#state = await this.#player.timeline(epoch)
 
 			// Update the cursor when we can seek.
-			this.#parent.style.cursor = this.#info.timestamp !== undefined ? "pointer" : "default"
+			this.#parent.style.cursor = this.#state.timestamp !== undefined ? "pointer" : "default"
 
-			epoch = this.#info.epoch + 1
+			epoch = this.#state.epoch + 1
 		}
 	}
 
 	#onClick(e: MouseEvent) {
 		e.preventDefault()
 
-		if (!this.#info || !this.#info.timestamp) return
+		if (!this.#state || !this.#state.timestamp) return
 
-		const timestamp = this.#info.timestamp
+		const timestamp = this.#state.timestamp
 		const rect = this.#parent.getBoundingClientRect()
 		const seek = (e.clientX - rect.left) / rect.width
 
@@ -61,13 +62,13 @@ export class Timeline {
 	}
 
 	#render(_now: number) {
-		const info = this.#info // less typing
+		const state = this.#state // less typing
 
-		if (info && info.timestamp) {
-			this.#renderRanges(this.#audio, info.timestamp, info.audio.buffer)
-			this.#renderRanges(this.#video, info.timestamp, info.video.buffer)
-			this.#renderPlayhead(this.#playhead, info.timestamp)
-			this.#renderLegend(this.#legend, info.timestamp)
+		if (state && state.timestamp) {
+			this.#renderRanges(this.#audio, state.timestamp, state.audio.buffer)
+			this.#renderRanges(this.#video, state.timestamp, state.video.buffer)
+			this.#renderPlayhead(this.#playhead, state.timestamp)
+			this.#renderLegend(this.#legend, state.timestamp)
 		}
 
 		requestAnimationFrame(this.#render.bind(this))

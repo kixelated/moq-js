@@ -1,8 +1,12 @@
 import { Reader, Writer } from "../stream"
-
 export { Reader, Writer }
 
 // This is OBJECT but we can't use that name because it's a reserved word.
+
+// NOTE: This is forked from moq-transport-00.
+//   1. messages lack a specified length
+//   2. OBJECT must be the only message on a unidirectional stream
+
 export interface Header {
 	track: number
 	group: number
@@ -49,6 +53,9 @@ export class Transport {
 }
 
 async function decode_header(r: Reader): Promise<Header> {
+	const type = await r.vint52()
+	if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
+
 	const track = await r.vint52()
 	const group = await r.vint52()
 	const sequence = await r.vint52()
@@ -63,6 +70,7 @@ async function decode_header(r: Reader): Promise<Header> {
 }
 
 async function encode_header(w: Writer, h: Header) {
+	await w.vint52(0)
 	await w.vint52(h.track)
 	await w.vint52(h.group)
 	await w.vint52(h.sequence)

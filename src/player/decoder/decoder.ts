@@ -8,62 +8,72 @@ import { Deferred } from "../../util/deferred"
 // Decoder receives a QUIC stream, parsing the MP4 container, and passing samples to the Timeline.
 export class Decoder {
 	#timeline: Timeline.Sync
-	#moov: Deferred<MP4.File>
+	#info: Deferred<MP4.Info>
 
 	constructor(timeline: Timeline.Sync) {
 		this.#timeline = timeline
-		this.#moov = new Deferred()
+		this.#info = new Deferred()
 	}
 
-	/*
-	async init(buffer: Stream.Buffer) {
-		console.log("received init stream")
-
-		const init = new Array<MP4.ArrayBuffer>()
-		let offset = 0
-
-		const stream = new Stream.Reader(buffer)
-		for (;;) {
-			const data = await stream.chunk()
-			if (!data) break
-
-			// Make a copy of the atom because mp4box only accepts an ArrayBuffer unfortunately
-			const box = new Uint8Array(data.byteLength)
-			box.set(data)
-
-			// and for some reason we need to modify the underlying ArrayBuffer with fileStart
-			const buffer = box.buffer as MP4.ArrayBuffer
-			buffer.fileStart = offset
-
-			// Add the box to our queue of chunks
-			init.push(buffer)
-
-			offset += data.byteLength
-		}
-
-		console.log("received init", init)
-
-		this.moov.resolve(init)
+	async info(): Promise<MP4.Info> {
+		return this.#info.promise
 	}
-	*/
 
 	async receive(header: Data.Header, stream: Stream.Reader) {
 		if (header.track === 0) {
-			const mp4 = await this.#init(header, stream)
-			this.#moov.resolve(mp4)
+			await this.#catalog(header, stream)
 		} else {
-			let mp4 = await this.#moov.promise
-			mp4 = structuredClone(mp4)
-
-			await this.#parse(mp4, stream)
+			await this.#segment(header, stream)
 		}
 	}
 
-	async #init(header: Data.Header, stream: Stream.Reader): Promise<MP4.File> {
-		// Wait for the init segment to be fully received and parsed
+	async #catalog(header: Data.Header, stream: Stream.Reader) {
+		try {
+			const raw = await stream.readAll()
+
+			// Make a copy of the atom because mp4box only accepts an ArrayBuffer unfortunately
+			const box = new Uint8Array(raw.byteLength)
+			box.set(raw)
+
+			// For some reason we need to modify the underlying ArrayBuffer with offset
+			const buf = box.buffer as MP4.ArrayBuffer
+			buf.fileStart = 0
+
+			const mp4 = MP4.New()
+			let done = false
+
+			mp4.onReady = (info: MP4.Info) => {
+				info.raw = buf
+				this.#info.resolve(info)
+				done = true
+			}
+
+			mp4.onError = (err) => {
+				throw err
+			}
+
+			// Parse the data
+			mp4.appendBuffer(buf)
+			mp4.flush()
+
+			if (!done) {
+				throw new Error("incomplete catalog")
+			}
+		} catch (err) {
+			this.#info.reject(err)
+		}
+	}
+
+	async #segment(header: Data.Header, stream: Stream.Reader) {
+		// Wait until we have parsed the info.
+		const info = await this.#info.promise
+		const raw = info.raw!
+
 		const mp4 = MP4.New()
 
-		mp4.offset = 0
+		mp4.onError = (err) => {
+			throw err
+		}
 
 		mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
 			for (const sample of samples) {
@@ -77,22 +87,20 @@ export class Decoder {
 			}
 		}
 
-		mp4.onReady = (info: MP4.Info) => {
-			// Extract all of the tracks, because we don't know if it's audio or video.
-			for (const track of info.tracks) {
-				mp4.setExtractionOptions(track.id, track, { nbSamples: 1 })
-			}
+		// Unfortunately we need to parse the init segment again because of the MP4Box API.
+		// TODO you should optimize this before shipping.
+		let offset = mp4.appendBuffer(raw)
 
-			mp4.start()
+		// Extract all of the tracks, because we don't know if it's audio or video.
+		// TODO extract just the track based on Data.Header?
+		for (const track of info.tracks) {
+			mp4.setExtractionOptions(track.id, track, { nbSamples: 1 })
 		}
 
-		await this.#parse(mp4, stream)
+		mp4.start()
 
-		return mp4
-	}
-
-	async #parse(mp4: MP4.File, stream: Stream.Reader) {
 		// For whatever reason, mp4box doesn't work until you read an atom at a time.
+		// TODO You should optimize this before shipping
 		while (!(await stream.done())) {
 			const raw = await stream.peek(4)
 
@@ -106,10 +114,10 @@ export class Decoder {
 
 			// and for some reason we need to modify the underlying ArrayBuffer with offset
 			const buffer = box.buffer as MP4.ArrayBuffer
-			buffer.fileStart = mp4.offset!
+			buffer.fileStart = offset
 
 			// Parse the data
-			mp4.offset = mp4.appendBuffer(buffer)
+			offset = mp4.appendBuffer(buffer)
 			mp4.flush()
 		}
 	}

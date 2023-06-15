@@ -7,11 +7,11 @@ export interface Config {
 	url: string
 
 	// Parameters used to create the MoQ session
-	setup: Setup.Client
+	role: Setup.Role
 
 	// If set, the server fingerprint will be fetched from this URL.
 	// This is required to use self-signed certificates with Chrome (May 2023)
-	fingerprintUrl?: string
+	fingerprint?: string
 }
 
 export class Connection {
@@ -27,7 +27,10 @@ export class Connection {
 		this.quic = this.#connect(config)
 
 		// Create a bidirection stream to control the connection
-		this.control = this.#setup(config.setup)
+		this.control = this.#setup({
+			versions: [Setup.Version.DRAFT_00],
+			role: config.role,
+		})
 
 		// Create unidirectional streams to send media.
 		this.data = this.quic.then((quic) => {
@@ -59,9 +62,9 @@ export class Connection {
 	async #connect(config: Config): Promise<WebTransport> {
 		const options: WebTransportOptions = {}
 
-		if (config.fingerprintUrl) {
+		if (config.fingerprint) {
 			try {
-				const fingerprint = await this.#fingerprint(config.fingerprintUrl)
+				const fingerprint = await this.#fingerprint(config.fingerprint)
 				options.serverCertificateHashes = [fingerprint]
 			} catch (e) {
 				console.warn("failed to fetch fingerprint: ", e)
@@ -69,13 +72,16 @@ export class Connection {
 		}
 
 		const quic = new WebTransport(config.url, options)
+		console.log("awaiting connection")
 		await quic.ready
+		console.log("connection ready")
 
 		return quic
 	}
 
 	async #setup(client: Setup.Client): Promise<Control.Stream> {
 		const quic = await this.quic
+		console.log("creating bidi")
 		const stream = await quic.createBidirectionalStream()
 
 		const writer = new Stream.Writer(stream.writable)
@@ -83,12 +89,16 @@ export class Connection {
 
 		const setup = new Setup.Stream(reader, writer)
 
+		console.log("sending client setup", client)
+
 		// Send the setup message.
 		await setup.send.client(client)
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
 		const _server = await setup.recv.server()
+
+		console.log("recv server setup", _server)
 
 		return new Control.Stream(reader, writer)
 	}

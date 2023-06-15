@@ -4,7 +4,7 @@
 	"scripts": {
 		"serve": "parcel serve --https --cert localhost.crt --key localhost.key  --port 4444 --open",
 		"build": "parcel build",
-		"check": "tsc --noEmit",
+		"tsc": "tsc --noEmit",
 		"lint": "eslint .",
 		"fmt": "prettier --write .",
 		"cert": "mkcert --install && mkcert -ecdsa -cert-file localhost.crt -key-file localhost.key localhost 127.0.0.1 ::1"

@@ -1,2 +1,2 @@
 export * from "./player"
-export * from "./info"
+export * from "./timeline"

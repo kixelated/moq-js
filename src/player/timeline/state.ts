@@ -1,4 +1,6 @@
-export interface Info {
+import { Range } from "./range"
+
+export interface State {
 	// The epoch, increased by 1 for each update
 	epoch: number
 
@@ -6,21 +8,16 @@ export interface Info {
 	timestamp?: number
 
 	// Audio specific information
-	audio: AudioInfo
+	audio: AudioState
 
 	// Video specific information
-	video: VideoInfo
+	video: VideoState
 }
 
-export interface Range {
-	start: number
-	end: number
-}
-
-export interface AudioInfo {
+export interface AudioState {
 	buffer: Range[]
 }
 
-export interface VideoInfo {
+export interface VideoState {
 	buffer: Range[]
 }
