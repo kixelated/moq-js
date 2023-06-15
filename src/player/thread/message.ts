@@ -2,6 +2,7 @@ import * as Audio from "../audio"
 import * as Video from "../video"
 import * as Timeline from "../timeline"
 import * as Stream from "../../stream"
+import { Data } from "../../transport"
 
 // Any top level messages that can be sent to the worker.
 export interface ToWorker {
@@ -9,9 +10,7 @@ export interface ToWorker {
 	config?: Config
 
 	// Sent on each init/data stream
-	// TODO combine into a single message
-	init?: Stream.Buffer
-	segment?: Stream.Buffer
+	segment?: Segment
 
 	// Sent to control playback
 	play?: Play
@@ -36,8 +35,8 @@ export interface Config {
 }
 
 export interface Segment {
-	buffer: Uint8Array // unread buffered data
-	reader: ReadableStream // unread unbuffered data
+	header: Data.Header
+	stream: Stream.Buffer
 }
 
 export interface Play {

@@ -1,5 +1,7 @@
 import { Reader, Writer } from "../stream"
 
+export { Reader, Writer }
+
 // This is OBJECT but we can't use that name because it's a reserved word.
 export interface Header {
 	track: number

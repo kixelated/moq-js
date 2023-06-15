@@ -1,15 +1,16 @@
 import * as Audio from "./audio"
 import * as Thread from "./thread"
-import * as Transport from "../transport"
+
+import { Connection, Control } from "../transport"
 
 import { Deferred } from "../util/deferred"
 import { Info } from "./info"
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
-	connection: Transport.Connection
-	context: Audio.Context
-	main: Thread.Main
+	#conn: Connection
+	#context: Audio.Context
+	#main: Thread.Main
 
 	// The most recent info message received from the worker.
 	#info?: Info
@@ -17,7 +18,7 @@ export class Player {
 	// A list of consumers waiting for the next info message by epoch.
 	#infoWaiting: Array<[number, Deferred<Info>]> = []
 
-	constructor(connection: Transport.Connection, canvas: OffscreenCanvas) {
+	constructor(conn: Connection, canvas: OffscreenCanvas) {
 		// TODO refactor audio and video configuation
 		const config = {
 			audio: {
@@ -30,23 +31,58 @@ export class Player {
 			},
 		}
 
-		this.context = new Audio.Context(config.audio)
-		this.main = new Thread.Main(this.#onMessage.bind(this))
-		this.main.sendConfig(config)
+		this.#context = new Audio.Context(config.audio)
+		this.#main = new Thread.Main(this.#onMessage.bind(this))
+		this.#main.sendConfig(config)
 
-		// TODO fix this API
-		this.connection = connection
-		this.connection.callback = this
+		this.#conn = conn
+
+		// Async
+		this.#runData()
+		this.#runControl()
 	}
 
-	// An init stream was received over the network.
-	onInit(stream: Transport.Stream) {
-		this.main.sendInit(stream)
+	async #runData() {
+		const data = await this.#conn.data
+
+		for (;;) {
+			const next = await data.recv()
+			if (!next) break
+
+			const header = next[0]
+			const stream = next[1]
+
+			this.#main.sendSegment(header, stream)
+		}
 	}
 
-	// A segment stream was received over the network.
-	onSegment(stream: Transport.Stream) {
-		this.main.sendSegment(stream)
+	async #runControl() {
+		const control = await this.#conn.control
+
+		for (;;) {
+			const msg = await control.recv()
+			if (!msg) break
+
+			switch (msg.type) {
+				case Control.Type.Announce:
+					// Immediately subscribe to announced namespaces.
+					await control.send({
+						type: Control.Type.Subscribe,
+						id: 0,
+						namespace: msg.namespace,
+						name: "catalog",
+					})
+
+					break
+				case Control.Type.SubscribeOk:
+					// cool i guess
+					break
+				case Control.Type.SubscribeError:
+					throw new Error(`failed to subscribe: ${msg.reason} (${msg.code})`)
+				default:
+					throw new Error(`unknown message type: ${msg.type}`)
+			}
+		}
 	}
 
 	#onMessage(msg: Thread.FromWorker) {
@@ -81,12 +117,12 @@ export class Player {
 
 	// TODO support arguments
 	play() {
-		this.context.resume()
-		this.main.sendPlay({ minBuffer: 0.5 }) // TODO
+		this.#context.resume()
+		this.#main.sendPlay({ minBuffer: 0.5 }) // TODO
 	}
 
 	seek(timestamp: number) {
-		this.main.sendSeek({ timestamp })
+		this.#main.sendSeek({ timestamp })
 	}
 
 	async info(minEpoch = 0): Promise<Info> {

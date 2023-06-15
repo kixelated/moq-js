@@ -57,12 +57,20 @@ export interface AnnounceError {
 }
 
 export class Stream {
-	recv: Decoder
-	send: Encoder
+	private decoder: Decoder
+	private encoder: Encoder
 
 	constructor(r: Reader, w: Writer) {
-		this.recv = new Decoder(r)
-		this.send = new Encoder(w)
+		this.decoder = new Decoder(r)
+		this.encoder = new Encoder(w)
+	}
+
+	async recv(): Promise<Message> {
+		return this.decoder.message()
+	}
+
+	async send(msg: Message) {
+		return this.encoder.message(msg)
 	}
 }
 

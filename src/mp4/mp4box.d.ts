@@ -70,6 +70,9 @@ declare module "mp4box" {
 		flush(): void
 
 		setExtractionOptions(id: number, user: any, options: ExtractionOptions): void
+
+		// custom
+		offset: number | undefined
 	}
 
 	export function createFile(): MP4File
