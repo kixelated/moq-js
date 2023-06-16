@@ -59,7 +59,6 @@ export class Player {
 			const header = next[0]
 			const stream = next[1]
 
-			console.log("received data: ", header)
 			this.#main.sendSegment(header, stream)
 		}
 	}
