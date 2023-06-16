@@ -1,7 +1,10 @@
 import * as Audio from "../audio"
 import * as Video from "../video"
-import * as Timeline from "../timeline"
 import * as Stream from "../../stream"
+import * as MP4 from "../../mp4"
+
+import { Range } from "../timeline"
+import { Data } from "../../transport"
 
 // Any top level messages that can be sent to the worker.
 export interface ToWorker {
@@ -9,9 +12,7 @@ export interface ToWorker {
 	config?: Config
 
 	// Sent on each init/data stream
-	// TODO combine into a single message
-	init?: Stream.Buffer
-	segment?: Stream.Buffer
+	segment?: Segment
 
 	// Sent to control playback
 	play?: Play
@@ -20,8 +21,11 @@ export interface ToWorker {
 
 // Any top-level messages that can be sent from the worker.
 export interface FromWorker {
-	// Sent back to the main thread on state change
-	info?: Info
+	// Sent to the main thread after the catalog has been parsed
+	init?: Init
+
+	// Sent back to the main thread regularly to update the UI
+	timeline?: Timeline
 }
 
 export interface ToWorklet {
@@ -36,8 +40,8 @@ export interface Config {
 }
 
 export interface Segment {
-	buffer: Uint8Array // unread buffered data
-	reader: ReadableStream // unread unbuffered data
+	header: Data.Header
+	stream: Stream.Buffer
 }
 
 export interface Play {
@@ -49,10 +53,17 @@ export interface Seek {
 	timestamp: number
 }
 
-export interface Info {
+// Sent by the worker when the catalog is parsed and the broadcast info is known.
+export interface Init {
+	// The contents of the MP4 container
+	info: MP4.Info
+}
+
+// Sent periodically with the current timeline info.
+export interface Timeline {
 	epoch: number // increases by 1 each update
 
 	timestamp?: number
-	audio: Timeline.Range[]
-	video: Timeline.Range[]
+	audio: Range[]
+	video: Range[]
 }

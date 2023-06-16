@@ -1,5 +1,5 @@
 import * as Message from "./message"
-import * as Stream from "../../stream"
+import { Data } from "../../transport"
 
 export type Callback = (e: Message.FromWorker) => void
 
@@ -26,6 +26,7 @@ export class Main {
 
 	// Just to enforce we're sending valid types to the worker
 	private send(msg: Message.ToWorker, ...transfer: Transferable[]) {
+		//console.log("sent message from main to worker", msg)
 		this.#worker.postMessage(msg, transfer)
 	}
 
@@ -33,12 +34,11 @@ export class Main {
 		this.send({ config }, config.video.canvas)
 	}
 
-	sendInit(init: Stream.Buffer) {
-		this.send({ init }, init.buffer.buffer, init.reader)
-	}
+	sendSegment(header: Data.Header, reader: Data.Reader) {
+		const stream = reader.release()
+		const segment: Message.Segment = { header, stream }
 
-	sendSegment(segment: Message.Segment) {
-		this.send({ segment }, segment.buffer.buffer, segment.reader)
+		this.send({ segment }, segment.stream.buffer.buffer, segment.stream.reader)
 	}
 
 	sendPlay(play: Message.Play) {
@@ -51,6 +51,12 @@ export class Main {
 
 	private on(e: MessageEvent) {
 		const msg = e.data as Message.FromWorker
+
+		// Don't print the verbose timeline message.
+		if (!msg.timeline) {
+			//console.log("received message from worker to main", msg)
+		}
+
 		this.#callback(msg)
 	}
 }

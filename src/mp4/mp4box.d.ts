@@ -54,6 +54,9 @@ declare module "mp4box" {
 		mime: string
 		audioTracks: MP4AudioTrack[]
 		videoTracks: MP4VideoTrack[]
+
+		// CUSTOM: the raw init segment (styp+moov)
+		raw: MP4ArrayBuffer | undefined
 	}
 
 	export type MP4ArrayBuffer = ArrayBuffer & { fileStart: number }
