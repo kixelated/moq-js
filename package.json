@@ -1,6 +1,6 @@
 {
 	"license": "Apache-2.0",
-	"source": "src/index.html",
+	"source": "src/demo/index.html",
 	"scripts": {
 		"serve": "parcel serve --https --cert localhost.crt --key localhost.key  --port 4444 --open",
 		"build": "parcel build",
@@ -11,6 +11,7 @@
 	},
 	"devDependencies": {
 		"@parcel/transformer-inline-string": "2.9.2",
+		"@parcel/transformer-typescript-types": "2.9.2",
 		"@parcel/validator-typescript": "^2.9.2",
 		"@types/audioworklet": "^0.0.47",
 		"@types/dom-webcodecs": "^0.1.7",

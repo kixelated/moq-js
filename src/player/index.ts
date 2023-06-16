@@ -1,2 +1,2 @@
 export * from "./player"
-export * from "./timeline"
+export * as Timeline from "./timeline"

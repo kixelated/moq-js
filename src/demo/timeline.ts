@@ -1,9 +1,8 @@
-import { Player, Range } from "./player"
-import { State } from "./player/timeline"
+import { Player, Timeline as Time } from "../player"
 
 export class Timeline {
 	#player: Player
-	#state?: State
+	#state?: Time.State
 
 	#parent: HTMLElement
 	#audio: HTMLElement
@@ -74,7 +73,7 @@ export class Timeline {
 		requestAnimationFrame(this.#render.bind(this))
 	}
 
-	#renderRanges(parent: HTMLElement, timestamp: number, ranges: Range[]) {
+	#renderRanges(parent: HTMLElement, timestamp: number, ranges: Time.Range[]) {
 		// Add divs until we have enough
 		while (parent.children.length < ranges.length) {
 			const fill = document.createElement("div")
