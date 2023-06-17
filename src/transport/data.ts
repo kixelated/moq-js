@@ -8,10 +8,10 @@ export { Reader, Writer }
 //   2. OBJECT must be the only message on a unidirectional stream
 
 export interface Header {
-	track: number
-	group: number
-	sequence: number
-	send_order: number
+	track: bigint
+	group: bigint
+	sequence: bigint
+	send_order: bigint
 	// followed by payload
 }
 
@@ -53,13 +53,13 @@ export class Transport {
 }
 
 async function decode_header(r: Reader): Promise<Header> {
-	const type = await r.vint52()
+	const type = await r.uint52()
 	if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
 
-	const track = await r.vint52()
-	const group = await r.vint52()
-	const sequence = await r.vint52()
-	const send_order = await r.vint52()
+	const track = await r.vint62()
+	const group = await r.vint62()
+	const sequence = await r.vint62()
+	const send_order = await r.vint62()
 
 	return {
 		track,
@@ -70,9 +70,9 @@ async function decode_header(r: Reader): Promise<Header> {
 }
 
 async function encode_header(w: Writer, h: Header) {
-	await w.vint52(0)
-	await w.vint52(h.track)
-	await w.vint52(h.group)
-	await w.vint52(h.sequence)
-	await w.vint52(h.send_order)
+	await w.uint52(0)
+	await w.vint62(h.track)
+	await w.vint62(h.group)
+	await w.vint62(h.sequence)
+	await w.vint62(h.send_order)
 }
