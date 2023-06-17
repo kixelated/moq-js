@@ -26,21 +26,21 @@ export enum Type {
 export interface Subscribe {
 	type: Type.Subscribe
 
-	id: number
+	id: bigint
 	namespace: string
 	name: string
 }
 
 export interface SubscribeOk {
 	type: Type.SubscribeOk
-	id: number
-	expires?: number // ms
+	id: bigint
+	expires?: bigint // ms
 }
 
 export interface SubscribeError {
 	type: Type.SubscribeError
-	id: number
-	code: number
+	id: bigint
+	code: bigint
 	reason: string
 }
 
@@ -57,7 +57,7 @@ export interface AnnounceOk {
 export interface AnnounceError {
 	type: Type.AnnounceError
 	namespace: string
-	code: number
+	code: bigint
 	reason: string
 }
 
@@ -87,7 +87,7 @@ export class Decoder {
 	}
 
 	private async type(): Promise<Type> {
-		return (await this.r.vint52()) as Type
+		return (await this.r.uint52()) as Type
 	}
 
 	async message(): Promise<Message> {
@@ -111,7 +111,7 @@ export class Decoder {
 	}
 
 	private async subscribe(): Promise<Subscribe> {
-		const id = await this.r.vint52()
+		const id = await this.r.vint62()
 		const namespace = await this.r.string()
 		const name = await this.r.string()
 
@@ -126,16 +126,16 @@ export class Decoder {
 	private async subscribe_ok(): Promise<SubscribeOk> {
 		return {
 			type: Type.SubscribeOk,
-			id: await this.r.vint52(),
-			expires: await this.r.vint52(),
+			id: await this.r.vint62(),
+			expires: await this.r.vint62(),
 		}
 	}
 
 	private async subscribe_error(): Promise<SubscribeError> {
 		return {
 			type: Type.SubscribeError,
-			id: await this.r.vint52(),
-			code: await this.r.vint52(),
+			id: await this.r.vint62(),
+			code: await this.r.vint62(),
 			reason: await this.r.string(),
 		}
 	}
@@ -160,7 +160,7 @@ export class Decoder {
 		return {
 			type: Type.AnnounceError,
 			namespace: await this.r.string(),
-			code: await this.r.vint52(),
+			code: await this.r.vint62(),
 			reason: await this.r.string(),
 		}
 	}
@@ -174,7 +174,7 @@ export class Encoder {
 	}
 
 	async message(m: Message) {
-		this.w.vint52(m.type)
+		this.w.uint52(m.type)
 
 		switch (m.type) {
 			case Type.Subscribe:
@@ -193,19 +193,19 @@ export class Encoder {
 	}
 
 	async subscribe(s: Subscribe) {
-		await this.w.vint52(s.id)
+		await this.w.vint62(s.id)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
 	}
 
 	async subscribe_ok(s: SubscribeOk) {
-		await this.w.vint52(s.id)
-		await this.w.vint52(s.expires || 0)
+		await this.w.vint62(s.id)
+		await this.w.vint62(s.expires || 0n)
 	}
 
 	async subscribe_error(s: SubscribeError) {
-		await this.w.vint52(s.id)
-		await this.w.vint52(s.code)
+		await this.w.vint62(s.id)
+		await this.w.vint62(s.code)
 		await this.w.string(s.reason)
 	}
 
@@ -219,7 +219,7 @@ export class Encoder {
 
 	async announce_error(a: AnnounceError) {
 		await this.w.string(a.namespace)
-		await this.w.vint52(a.code)
+		await this.w.vint62(a.code)
 		await this.w.string(a.reason)
 	}
 }

@@ -20,7 +20,7 @@ export class Decoder {
 	}
 
 	async receive(header: Data.Header, stream: Stream.Reader) {
-		if (header.track === 0) {
+		if (header.track === 0n) {
 			await this.#catalog(header, stream)
 		} else {
 			await this.#segment(header, stream)

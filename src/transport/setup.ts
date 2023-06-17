@@ -41,7 +41,7 @@ export class Decoder {
 	}
 
 	async client(): Promise<Client> {
-		const type = await this.r.vint52()
+		const type = await this.r.uint52()
 		if (type !== 1) throw new Error(`client SETUP type must be 1, got ${type}`)
 
 		const count = await this.r.vint52()
@@ -63,7 +63,7 @@ export class Decoder {
 	}
 
 	async server(): Promise<Server> {
-		const type = await this.r.vint52()
+		const type = await this.r.uint52()
 		if (type !== 2) throw new Error(`server SETUP type must be 2, got ${type}`)
 
 		const version = await this.r.vint52()
@@ -76,7 +76,7 @@ export class Decoder {
 	}
 
 	async role(): Promise<Role> {
-		const v = await this.r.vint52()
+		const v = await this.r.uint52()
 		if (v == 0) {
 			return "publisher"
 		} else if (v == 1) {
@@ -97,7 +97,7 @@ export class Encoder {
 	}
 
 	async client(c: Client) {
-		await this.w.vint52(1) // message_type = 1
+		await this.w.uint52(1) // message_type = 1
 		await this.w.vint52(c.versions.length)
 		for (const v of c.versions) {
 			await this.w.vint52(v)
@@ -108,7 +108,7 @@ export class Encoder {
 	}
 
 	async server(s: Server) {
-		await this.w.vint52(2) // message_type = 2
+		await this.w.uint52(2) // message_type = 2
 		await this.w.vint52(s.version)
 		await this.role(s.role)
 	}
@@ -125,6 +125,6 @@ export class Encoder {
 			throw new Error(`invalid role: ${r}`)
 		}
 
-		return this.w.vint52(v)
+		return this.w.uint52(v)
 	}
 }

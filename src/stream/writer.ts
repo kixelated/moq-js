@@ -71,22 +71,24 @@ export class Writer {
 		}
 	}
 
-	async uint64(v: bigint) {
-		const view = new DataView(this.buffer, 0, 8)
-		view.setBigUint64(0, v)
-		return this.writer.write(view)
-	}
-
-	async vint64(v: bigint) {
+	async vint62(v: bigint) {
 		if (v < 1 << 6) {
 			return this.uint8(Number(v))
 		} else if (v < 1 << 14) {
 			return this.uint16(Number(v) | 0x4000)
 		} else if (v < 1 << 30) {
 			return this.uint32(Number(v) | 0x80000000)
+		} else if (v < 1 << 62) {
+			return this.uint64(BigInt(v) | 0xc000000000000000n)
 		} else {
-			return this.uint64(v | 0xc000000000000000n)
+			throw "value too large"
 		}
+	}
+
+	async uint64(v: bigint) {
+		const view = new DataView(this.buffer, 0, 8)
+		view.setBigUint64(0, v)
+		return this.writer.write(view)
 	}
 
 	async write(buffer: ArrayBuffer) {

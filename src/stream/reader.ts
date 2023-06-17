@@ -76,6 +76,9 @@ export class Reader {
 			}
 		}
 
+		// result = buffer[:n]
+		// buffer = buffer[n:]
+
 		const result = new Uint8Array(this.buffer.buffer, this.buffer.byteOffset, size)
 		this.buffer = new Uint8Array(this.buffer.buffer, this.buffer.byteOffset + size)
 
@@ -136,7 +139,7 @@ export class Reader {
 	async uint52(): Promise<number> {
 		const v = await this.uint64()
 		if (v > Number.MAX_SAFE_INTEGER) {
-			throw "overflow"
+			throw "value larger than 52-bits; use vint62 instead"
 		}
 
 		return Number(v)
@@ -144,22 +147,16 @@ export class Reader {
 
 	// Returns a Number using 52-bits, the max Javascript can use for integer math
 	async vint52(): Promise<number> {
-		const v = await this.vint64()
+		const v = await this.vint62()
 		if (v > Number.MAX_SAFE_INTEGER) {
-			throw "overflow"
+			throw "value larger than 52-bits; use vint62 instead"
 		}
 
 		return Number(v)
 	}
 
-	// NOTE: Returns a BigInt instead of a Number
-	async uint64(): Promise<bigint> {
-		const view = await this.view(8)
-		return view.getBigUint64(0)
-	}
-
-	// NOTE: Returns a BigInt instead of a Number
-	async vint64(): Promise<bigint> {
+	// NOTE: Returns a bigint instead of a number since it may be larger than 52-bits
+	async vint62(): Promise<bigint> {
 		const peek = await this.peek(1)
 		const first = new DataView(peek.buffer, peek.byteOffset, peek.byteLength).getUint8(0)
 		const size = (first & 0xc0) >> 6
@@ -184,6 +181,12 @@ export class Reader {
 			default:
 				throw "impossible"
 		}
+	}
+
+	// NOTE: Returns a BigInt instead of a Number
+	async uint64(): Promise<bigint> {
+		const view = await this.view(8)
+		return view.getBigUint64(0)
 	}
 
 	async bytes(): Promise<Uint8Array> {

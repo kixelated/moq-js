@@ -100,7 +100,7 @@ export class Player {
 		// Immediately subscribe to announced namespaces.
 		return this.#sendControl({
 			type: Control.Type.Subscribe,
-			id: 0,
+			id: 0n,
 			namespace: this.#namespace,
 			name: "catalog",
 		})
@@ -130,9 +130,11 @@ export class Player {
 		// Subscribe to all of the listed tracks.
 		// TODO support ABR
 		for (const track of this.#info.tracks) {
+			const subscribe_id = BigInt(track.id + 1)
+
 			await this.#sendControl({
 				type: Control.Type.Subscribe,
-				id: track.id + 1, // 0 is reserved for the catalog
+				id: subscribe_id,
 				namespace: this.#namespace!,
 				name: track.id.toString(), // the track name is just the track ID as a string
 			})
