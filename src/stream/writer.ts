@@ -1,107 +1,155 @@
 // Writer wraps a stream and writes chunks of data
 export class Writer {
-	buffer: ArrayBuffer
-	writer: WritableStreamDefaultWriter
+	#writer: WritableStream
+	#scratch: Uint8Array
 
-	constructor(stream: WritableStream) {
-		this.buffer = new ArrayBuffer(8)
-		this.writer = stream.getWriter()
-	}
-
-	release() {
-		this.writer.releaseLock()
-	}
-
-	async close() {
-		return this.writer.close()
+	constructor(writer: WritableStream) {
+		this.#scratch = new Uint8Array(8)
+		this.#writer = writer
 	}
 
 	async uint8(v: number) {
-		const view = new DataView(this.buffer, 0, 1)
-		view.setUint8(0, v)
-		return this.writer.write(view)
+		await this.write(setUint8(this.#scratch, v))
 	}
 
 	async uint16(v: number) {
-		const view = new DataView(this.buffer, 0, 2)
-		view.setUint16(0, v)
-		return this.writer.write(view)
+		await this.write(setUint16(this.#scratch, v))
 	}
 
 	async uint24(v: number) {
-		const v1 = (v >> 16) & 0xff
-		const v2 = (v >> 8) & 0xff
-		const v3 = v & 0xff
-
-		const view = new DataView(this.buffer, 0, 3)
-		view.setUint8(0, v1)
-		view.setUint8(1, v2)
-		view.setUint8(2, v3)
-
-		return this.writer.write(view)
+		await this.write(setUint24(this.#scratch, v))
 	}
 
 	async uint32(v: number) {
-		const view = new DataView(this.buffer, 0, 4)
-		view.setUint32(0, v)
-		return this.writer.write(view)
+		await this.write(setUint32(this.#scratch, v))
 	}
 
 	async uint52(v: number) {
-		if (v > Number.MAX_SAFE_INTEGER) {
-			throw "value too large"
-		}
-
-		this.uint64(BigInt(v))
+		await this.write(setUint52(this.#scratch, v))
 	}
 
 	async vint52(v: number) {
-		if (v > Number.MAX_SAFE_INTEGER) {
-			throw "value too large"
-		}
-
-		if (v < 1 << 6) {
-			return this.uint8(v)
-		} else if (v < 1 << 14) {
-			return this.uint16(v | 0x4000)
-		} else if (v < 1 << 30) {
-			return this.uint32(v | 0x80000000)
-		} else {
-			return this.uint64(BigInt(v) | 0xc000000000000000n)
-		}
+		await this.write(setVint52(this.#scratch, v))
 	}
 
 	async vint62(v: bigint) {
-		if (v < 1 << 6) {
-			return this.uint8(Number(v))
-		} else if (v < 1 << 14) {
-			return this.uint16(Number(v) | 0x4000)
-		} else if (v < 1 << 30) {
-			return this.uint32(Number(v) | 0x80000000)
-		} else if (v < 1 << 62) {
-			return this.uint64(BigInt(v) | 0xc000000000000000n)
-		} else {
-			throw "value too large"
-		}
+		await this.write(setVint62(this.#scratch, v))
 	}
 
 	async uint64(v: bigint) {
-		const view = new DataView(this.buffer, 0, 8)
-		view.setBigUint64(0, v)
-		return this.writer.write(view)
+		await this.write(setUint64(this.#scratch, v))
 	}
 
-	async write(buffer: ArrayBuffer) {
-		return this.writer.write(buffer)
-	}
-
-	async bytes(data: ArrayBuffer) {
-		this.vint52(data.byteLength)
-		return this.write(data)
+	async write(v: Uint8Array) {
+		const writer = this.#writer.getWriter()
+		try {
+			await writer.write(v)
+		} finally {
+			writer.releaseLock()
+		}
 	}
 
 	async string(str: string) {
 		const data = new TextEncoder().encode(str)
-		this.bytes(data)
+		await this.vint52(data.byteLength)
+		await this.write(data)
 	}
+}
+
+export function setUint8(dst: Uint8Array, v: number): Uint8Array {
+	if (v >= 1 << 8) {
+		throw new Error(`overflow, value larger than 8-bits: ${v}`)
+	}
+
+	dst[0] = v
+
+	return dst.slice(0, 1)
+}
+
+export function setUint16(dst: Uint8Array, v: number): Uint8Array {
+	if (v >= 1 << 16) {
+		throw new Error(`overflow, value larger than 16-bits: ${v}`)
+	}
+
+	const view = new DataView(dst.buffer, dst.byteOffset, 2)
+	view.setUint16(0, v)
+
+	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+}
+
+export function setUint24(dst: Uint8Array, v: number): Uint8Array {
+	if (v >= 1 << 24) {
+		throw new Error(`overflow, value larger than 24-bits: ${v}`)
+	}
+
+	const view = new DataView(dst.buffer, dst.byteOffset, 3)
+
+	view.setUint8(0, (v >> 16) & 0xff)
+	view.setUint8(1, (v >> 8) & 0xff)
+	view.setUint8(2, v & 0xff)
+
+	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+}
+
+export function setUint32(dst: Uint8Array, v: number): Uint8Array {
+	if (v >= 1 << 32) {
+		throw new Error(`overflow, value larger than 32-bits: ${v}`)
+	}
+
+	const view = new DataView(dst.buffer, dst.byteOffset, 4)
+	view.setUint32(0, v)
+
+	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+}
+
+export function setUint52(dst: Uint8Array, v: number): Uint8Array {
+	if (v > Number.MAX_SAFE_INTEGER) {
+		throw new Error(`overflow, value larger than 52-bits: ${v}`)
+	}
+
+	const view = new DataView(dst.buffer, dst.byteOffset, 8)
+	view.setBigUint64(0, BigInt(v))
+
+	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+}
+
+export function setVint52(dst: Uint8Array, v: number): Uint8Array {
+	if (v > Number.MAX_SAFE_INTEGER) {
+		throw new Error(`overflow, value larger than 52-bits: ${v}`)
+	}
+
+	if (v < 1 << 6) {
+		return setUint8(dst, v)
+	} else if (v < 1 << 14) {
+		return setUint16(dst, v | 0x4000)
+	} else if (v < 1 << 30) {
+		return setUint32(dst, v | 0x80000000)
+	} else {
+		return setUint64(dst, BigInt(v) | 0xc000000000000000n)
+	}
+}
+
+export function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
+	if (v < 1 << 6) {
+		return setUint8(dst, Number(v))
+	} else if (v < 1 << 14) {
+		return setUint16(dst, Number(v) | 0x4000)
+	} else if (v < 1 << 30) {
+		return setUint32(dst, Number(v) | 0x80000000)
+	} else if (v < 1 << 62) {
+		return setUint64(dst, BigInt(v) | 0xc000000000000000n)
+	} else {
+		throw new Error(`overflow, value larger than 62-bits: ${v}`)
+	}
+}
+
+export function setUint64(dst: Uint8Array, v: bigint): Uint8Array {
+	if (v >= 1n << 64n) {
+		throw new Error(`overflow, value larger than 64-bits: ${v}`)
+	}
+
+	const view = new DataView(dst.buffer, dst.byteOffset, 8)
+	view.setBigUint64(0, v)
+
+	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }

@@ -1,6 +1,5 @@
 import * as Audio from "../audio"
 import * as Video from "../video"
-import * as Stream from "../../stream"
 import * as MP4 from "../../mp4"
 
 import { Range } from "../timeline"
@@ -41,7 +40,7 @@ export interface Config {
 
 export interface Segment {
 	header: Data.Header
-	stream: Stream.Buffer
+	stream: ReadableStream
 }
 
 export interface Play {

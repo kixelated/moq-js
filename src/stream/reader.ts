@@ -1,123 +1,74 @@
-import { Buffer } from "./buffer"
-
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 export class Reader {
-	private reader: ReadableStream
-	private buffer: Uint8Array
+	#reader: ReadableStream
+	#scratch: Uint8Array
 
-	constructor(reader: ReadableStream, buffer: Uint8Array = new Uint8Array(0)) {
-		this.reader = reader
-		this.buffer = buffer
+	constructor(reader: ReadableStream) {
+		this.#reader = reader
+		this.#scratch = new Uint8Array(8)
 	}
 
-	// Returns any number of bytes
-	async chunk(): Promise<Uint8Array | undefined> {
-		if (this.buffer.byteLength) {
-			const buffer = this.buffer
-			this.buffer = new Uint8Array()
-			return buffer
-		}
+	async readAll(dst?: Uint8Array): Promise<Uint8Array> {
+		const reader = this.#reader.getReader({ mode: "byob" })
 
-		const r = this.reader.getReader()
-		const result = await r.read()
+		let buf = dst ?? new Uint8Array(1024)
 
-		r.releaseLock()
-
-		return result.value
-	}
-
-	async readAll(): Promise<Uint8Array> {
-		const r = this.reader.getReader()
-
+		let offset = 0
 		for (;;) {
-			const result = await r.read()
-			if (result.done) {
-				break
+			if (offset >= buf.byteLength) {
+				const temp = new Uint8Array(buf.byteLength * 2)
+				temp.set(buf)
+				buf = temp
 			}
 
-			const buffer = new Uint8Array(result.value)
+			const { value, done } = await reader.read(buf.slice(offset))
+			if (done) break
 
-			if (this.buffer.byteLength == 0) {
-				this.buffer = buffer
-			} else {
-				const temp = new Uint8Array(this.buffer.byteLength + buffer.byteLength)
-				temp.set(this.buffer)
-				temp.set(buffer, this.buffer.byteLength)
-				this.buffer = temp
-			}
+			offset += value.byteLength
+			buf = new Uint8Array(value.buffer, value.byteOffset)
 		}
 
-		const result = this.buffer
-		this.buffer = new Uint8Array()
+		reader.releaseLock()
 
-		r.releaseLock()
-
-		return result
+		return new Uint8Array(buf.buffer, buf.byteOffset, offset)
 	}
 
-	async read(size: number): Promise<Uint8Array> {
-		const r = this.reader.getReader()
+	async readFull(dst: Uint8Array): Promise<Uint8Array> {
+		const reader = this.#reader.getReader({ mode: "byob" })
 
-		while (this.buffer.byteLength < size) {
-			const result = await r.read()
-			if (result.done) {
+		let offset = 0
+
+		while (offset < dst.byteLength) {
+			const { value, done } = await reader.read(dst.slice(offset))
+			if (done) {
 				throw "short buffer"
 			}
 
-			const buffer = new Uint8Array(result.value)
-
-			if (this.buffer.byteLength == 0) {
-				this.buffer = buffer
-			} else {
-				const temp = new Uint8Array(this.buffer.byteLength + buffer.byteLength)
-				temp.set(this.buffer)
-				temp.set(buffer, this.buffer.byteLength)
-				this.buffer = temp
-			}
+			offset += value.byteLength
+			dst = new Uint8Array(value.buffer, value.byteOffset)
 		}
 
-		// result = buffer[:n]
-		// buffer = buffer[n:]
+		reader.releaseLock()
 
-		const result = new Uint8Array(this.buffer.buffer, this.buffer.byteOffset, size)
-		this.buffer = new Uint8Array(this.buffer.buffer, this.buffer.byteOffset + size)
-
-		r.releaseLock()
-
-		return result
+		return dst
 	}
 
-	async peek(size: number): Promise<Uint8Array> {
-		const r = this.reader.getReader()
-
-		while (this.buffer.byteLength < size) {
-			const result = await r.read()
-			if (result.done) {
-				throw "short buffer"
-			}
-
-			const buffer = new Uint8Array(result.value)
-
-			if (this.buffer.byteLength == 0) {
-				this.buffer = buffer
-			} else {
-				const temp = new Uint8Array(this.buffer.byteLength + buffer.byteLength)
-				temp.set(this.buffer)
-				temp.set(buffer, this.buffer.byteLength)
-				this.buffer = temp
-			}
+	async string(maxLength?: number): Promise<string> {
+		const length = await this.vint52()
+		if (maxLength !== undefined && length > maxLength) {
+			throw new Error(`string length ${length} exceeds max length ${maxLength}`)
 		}
 
-		const result = new Uint8Array(this.buffer.buffer, this.buffer.byteOffset, size)
+		let buffer = new Uint8Array(length)
+		buffer = await this.readFull(buffer)
 
-		r.releaseLock()
-
-		return result
+		return new TextDecoder().decode(buffer)
 	}
 
-	async view(size: number): Promise<DataView> {
-		const buf = await this.read(size)
-		return new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
+	private async view(size: number): Promise<DataView> {
+		const scratch = this.#scratch.slice(0, size)
+		const view = await this.readFull(scratch)
+		return new DataView(view.buffer, view.byteOffset, scratch.byteLength)
 	}
 
 	async uint8(): Promise<number> {
@@ -157,25 +108,34 @@ export class Reader {
 
 	// NOTE: Returns a bigint instead of a number since it may be larger than 52-bits
 	async vint62(): Promise<bigint> {
-		const peek = await this.peek(1)
-		const first = new DataView(peek.buffer, peek.byteOffset, peek.byteLength).getUint8(0)
+		const scratch = await this.readFull(this.#scratch.slice(0, 1))
+		const first = scratch[0]
+
 		const size = (first & 0xc0) >> 6
 
 		switch (size) {
 			case 0: {
-				const v = await this.uint8()
-				return BigInt(v) & 0x3fn
+				return BigInt(first) & 0x3fn
 			}
 			case 1: {
-				const v = await this.uint16()
+				await this.readFull(this.#scratch.slice(1, 2))
+				const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 2)
+
+				const v = view.getInt16(0)
 				return BigInt(v) & 0x3fffn
 			}
 			case 2: {
-				const v = await this.uint32()
+				await this.readFull(this.#scratch.slice(1, 4))
+				const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 4)
+
+				const v = view.getUint32(0)
 				return BigInt(v) & 0x3fffffffn
 			}
 			case 3: {
-				const v = await this.uint64()
+				await this.readFull(this.#scratch.slice(1, 8))
+				const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 8)
+
+				const v = view.getBigUint64(0)
 				return v & 0x3fffffffffffffffn
 			}
 			default:
@@ -187,29 +147,5 @@ export class Reader {
 	async uint64(): Promise<bigint> {
 		const view = await this.view(8)
 		return view.getBigUint64(0)
-	}
-
-	async bytes(): Promise<Uint8Array> {
-		const size = await this.vint52()
-		return this.read(size)
-	}
-
-	async string(): Promise<string> {
-		const raw = await this.bytes()
-		return new TextDecoder().decode(raw)
-	}
-
-	async done(): Promise<boolean> {
-		try {
-			await this.peek(1)
-			return false
-		} catch (err) {
-			return true // Assume EOF
-		}
-	}
-
-	// Stop reading from the stream, returning the unread parts
-	release(): Buffer {
-		return new Buffer(this.reader, this.buffer)
 	}
 }

@@ -22,21 +22,32 @@ export class Transport {
 		this.quic = quic
 	}
 
-	async recv(): Promise<[Header, ReadableStream] | undefined> {
+	// TODO ReadableStream
+	async recv(): Promise<[Header, Reader] | undefined> {
 		const streams = this.quic.incomingUnidirectionalStreams.getReader()
 
 		const result = await streams.read()
 		streams.releaseLock()
 
 		if (result.done) return
-		const stream = result.value
 
-		const header = await this.#decode(stream)
-		return [header, stream]
+		const reader = new Reader(result.value)
+		const header = await this.#decode(reader)
+
+		return [header, reader]
 	}
 
-	async #decode(s: ReadableStream): Promise<Header> {
-		const r = new Reader(s)
+	async send(header: Header): Promise<WritableStream> {
+		const stream = await this.quic.createUnidirectionalStream()
+
+		// TODO use send_order when suppotred
+		const writer = new Writer(stream)
+		await this.#encode(writer, header)
+
+		return stream
+	}
+
+	async #decode(r: Reader): Promise<Header> {
 		const type = await r.vint52()
 		if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
 
@@ -53,15 +64,7 @@ export class Transport {
 		}
 	}
 
-	async send(header: Header): Promise<WritableStream> {
-		// TODO use send_order when suppotred
-		const stream = await this.quic.createUnidirectionalStream()
-		await this.#encode(stream, header)
-		return stream
-	}
-
-	async #encode(s: WritableStream, h: Header) {
-		const w = new Writer(s)
+	async #encode(w: Writer, h: Header) {
 		await w.vint52(0)
 		await w.vint62(h.track)
 		await w.vint62(h.group)
