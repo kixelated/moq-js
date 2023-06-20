@@ -1,4 +1,4 @@
-import { Player, Timeline as Time } from "../player"
+import { Player, Timeline as Time } from "../playback"
 
 export class Timeline {
 	#player: Player

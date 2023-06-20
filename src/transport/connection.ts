@@ -1,7 +1,7 @@
 import * as Stream from "../stream"
 import * as Setup from "./setup"
 import * as Control from "./control"
-import * as Data from "./data"
+import * as Object from "./object"
 
 export interface Config {
 	url: string
@@ -20,8 +20,8 @@ export class Connection {
 	// Use to receive/send control messages.
 	control: Promise<Control.Stream>
 
-	// Use to receive/send data streams.
-	data: Promise<Data.Transport>
+	// Use to receive/send objects.
+	objects: Promise<Object.Transport>
 
 	constructor(config: Config) {
 		this.quic = this.#connect(config)
@@ -33,8 +33,8 @@ export class Connection {
 		})
 
 		// Create unidirectional streams to send media.
-		this.data = this.quic.then((quic) => {
-			return new Data.Transport(quic)
+		this.objects = this.quic.then((quic) => {
+			return new Object.Transport(quic)
 		})
 	}
 

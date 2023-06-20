@@ -25,6 +25,7 @@
 		"typescript": "^5.1.3"
 	},
 	"dependencies": {
+		"@types/dom-mediacapture-transform": "^0.1.5",
 		"mp4box": "^0.5.2"
 	}
 }

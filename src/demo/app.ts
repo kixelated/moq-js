@@ -1,5 +1,5 @@
 import { Connection } from "../transport"
-import { Player } from "../player"
+import { Player } from "../playback"
 import { Timeline } from "./timeline"
 
 export class App {

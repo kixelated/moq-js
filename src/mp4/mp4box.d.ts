@@ -150,7 +150,33 @@ declare module "mp4box" {
 			byteLength: number
 		): void
 
-		// TODO I got bored porting the remaining functions
+		// TODO I got bored porting all functions
+
+		save(filename: string): void
+		shift(offset: number): void
+
+		writeInt32Array(arr: Int32Array, littleEndian?: boolean): void
+		writeInt16Array(arr: Int16Array, littleEndian?: boolean): void
+		writeInt8Array(arr: Int8Array): void
+		writeUint32Array(arr: Uint32Array, littleEndian?: boolean): void
+		writeUint16Array(arr: Uint16Array, littleEndian?: boolean): void
+		writeUint8Array(arr: Uint8Array): void
+		writeFloat64Array(arr: Float64Array, littleEndian?: boolean): void
+		writeFloat32Array(arr: Float32Array, littleEndian?: boolean): void
+		writeInt32(v: number, littleEndian?: boolean): void
+		writeInt16(v: number, littleEndian?: boolean): void
+		writeInt8(v: number): void
+		writeUint32(v: number, littleEndian?: boolean): void
+		writeUint16(v: number, littleEndian?: boolean): void
+		writeUint8(v: number): void
+		writeFloat32(v: number, littleEndian?: boolean): void
+		writeFloat64(v: number, littleEndian?: boolean): void
+		writeUCS2String(s: string, endianness?: boolean, length?: number): void
+		writeString(s: string, encoding?: string, length?: number): void
+		writeCString(s: string, length?: number): void
+		writeUint64(v: number): void
+		writeUint24(v: number): void
+		adjustUint32(pos: number, v: number): void
 	}
 
 	export class Box {
@@ -228,6 +254,10 @@ declare module "mp4box" {
 		// helpers
 		getTrackById(id: number): Box | undefined
 		getTrexById(id: number): Box | undefined
+
+		// boxes that are added to the root
+		ftyp?: Box
+		moov?: Box
 	}
 
 	export {}

@@ -3,7 +3,7 @@ import * as Stream from "../../stream"
 import { Data } from "../../transport"
 import * as Timeline from "../timeline"
 
-import { Deferred } from "../../util/deferred"
+import { Deferred } from "../../async/deferred"
 
 // Decoder receives a QUIC stream, parsing the MP4 container, and passing samples to the Timeline.
 export class Decoder {

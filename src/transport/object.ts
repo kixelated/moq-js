@@ -15,11 +15,6 @@ export interface Header {
 	// followed by payload
 }
 
-export interface Payload {
-	buffer: Uint8Array // unread buffered data
-	reader: ReadableStream // unread unbuffered data
-}
-
 export class Transport {
 	private quic: WebTransport
 
@@ -27,6 +22,7 @@ export class Transport {
 		this.quic = quic
 	}
 
+	// TODO ReadableStream
 	async recv(): Promise<[Header, Reader] | undefined> {
 		const streams = this.quic.incomingUnidirectionalStreams.getReader()
 
@@ -36,43 +32,44 @@ export class Transport {
 		if (result.done) return
 
 		const reader = new Reader(result.value)
-		const header = await decode_header(reader)
+		const header = await this.#decode(reader)
 
 		return [header, reader]
 	}
 
-	async send(header: Header): Promise<Writer> {
+	async send(header: Header): Promise<WritableStream> {
 		const stream = await this.quic.createUnidirectionalStream()
 
 		// TODO use send_order when suppotred
 		const writer = new Writer(stream)
-		await encode_header(writer, header)
+		await this.#encode(writer, header)
+		writer.release()
 
-		return writer
+		return stream
 	}
-}
 
-async function decode_header(r: Reader): Promise<Header> {
-	const type = await r.uint52()
-	if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
+	async #decode(r: Reader): Promise<Header> {
+		const type = await r.uint52()
+		if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
 
-	const track = await r.vint62()
-	const group = await r.vint62()
-	const sequence = await r.vint62()
-	const send_order = await r.vint62()
+		const track = await r.vint62()
+		const group = await r.vint62()
+		const sequence = await r.vint62()
+		const send_order = await r.vint62()
 
-	return {
-		track,
-		group,
-		sequence,
-		send_order,
+		return {
+			track,
+			group,
+			sequence,
+			send_order,
+		}
 	}
-}
 
-async function encode_header(w: Writer, h: Header) {
-	await w.uint52(0)
-	await w.vint62(h.track)
-	await w.vint62(h.group)
-	await w.vint62(h.sequence)
-	await w.vint62(h.send_order)
+	async #encode(w: Writer, h: Header) {
+		await w.uint52(0)
+		await w.vint62(h.track)
+		await w.vint62(h.group)
+		await w.vint62(h.sequence)
+		await w.vint62(h.send_order)
+	}
 }

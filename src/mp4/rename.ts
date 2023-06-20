@@ -11,4 +11,6 @@ export {
 	Box,
 	ISOFile,
 	Sample,
+	TrackOptions,
+	SampleOptions,
 } from "mp4box"
