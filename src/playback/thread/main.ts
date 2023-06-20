@@ -1,5 +1,5 @@
 import * as Message from "./message"
-import { Data } from "../../transport"
+import { Object } from "../../transport"
 
 export type Callback = (e: Message.FromWorker) => void
 
@@ -34,11 +34,12 @@ export class Main {
 		this.send({ config }, config.video.canvas)
 	}
 
-	sendSegment(header: Data.Header, reader: Data.Reader) {
-		const stream = reader.release()
+	sendSegment(header: Object.Header, stream: ReadableStream) {
 		const segment: Message.Segment = { header, stream }
+		const reader = segment.stream.getReader({ mode: "byob" })
+		reader.releaseLock()
 
-		this.send({ segment }, segment.stream.buffer.buffer, segment.stream.reader)
+		this.send({ segment }, segment.stream)
 	}
 
 	sendPlay(play: Message.Play) {

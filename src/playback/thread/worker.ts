@@ -3,7 +3,6 @@ import * as Message from "./message"
 
 import * as Audio from "../audio"
 import * as Video from "../video"
-import * as Stream from "../../stream"
 
 import { Decoder } from "../decoder"
 
@@ -54,9 +53,7 @@ class Worker {
 		if (msg.config) {
 			throw new Error("tried to reconfigure worker")
 		} else if (msg.segment) {
-			const stream = msg.segment.stream
-			const reader = new Stream.Reader(stream.reader, stream.buffer)
-			this.decoder.receive(msg.segment.header, reader)
+			this.decoder.receive(msg.segment.header, msg.segment.stream)
 		} else if (msg.play) {
 			this.timeline.play(msg.play.minBuffer)
 		} else if (msg.seek) {
