@@ -2,25 +2,143 @@
 <html>
 	<head>
 		<meta charset="UTF-8" />
-		<title>WARP</title>
+		<title>quic.video</title>
 
 		<link rel="stylesheet" href="index.css" />
 	</head>
 
-	<body>
-		<div id="player">
-			<div id="screen">
-				<div id="timeline">
-					<div class="audio component"></div>
-					<div class="video component"></div>
-					<div class="playhead"></div>
-					<div class="legend"></div>
-				</div>
+	<body class="flex flex-row justify-center bg-white/90 p-6 text-slate-900">
+		<div class="flex-1">
+			<div class="mb-6 flex-1 font-mono text-xl">
+				<p>Media</p>
+				<p class="overline">over QUIC</p>
+			</div>
 
-				<div id="play"><span>click to play</span></div>
-				<canvas id="video" width="854" height="480"></canvas>
+			<div class="flex gap-2 text-sm">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="m-2 h-6 w-6">
+					<path
+						d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+					/>
+				</svg>
+				<a href="https://github.com/kixelated/moq-rs">server</a>
+				<a href="https://github.com/kixelated/moq-js">web</a>
+				<a href="https://github.com/moq-wg/moq-transport">spec</a>
 			</div>
 		</div>
+
+		<div class="relative overflow-hidden rounded-lg shadow-xl ring-1 ring-gray-900/5">
+			<div id="timeline" class="relative flex flex-col bg-black">
+				<div class="audio h-2"></div>
+				<div class="video h-2"></div>
+				<div class="playhead absolute"></div>
+				<div class="legend absolute"></div>
+			</div>
+
+			<canvas id="video" width="854" height="480" class="aspect-video bg-black"></canvas>
+
+			<div class="absolute top-0 w-full p-10">
+				<div class="flex flex-row rounded-md bg-white/90 shadow-xl ring-1 ring-gray-900/5 backdrop-blur-md">
+					<div class="w-60 basis-1/2 p-6">
+						<p class="mb-6 text-center font-mono text-xl">Watch</p>
+						<ul class="">
+							<li class="mb-4">
+								<a>quic.video / BigBuckBunny.mp4</a>
+								<ul class="ml-4 text-xs text-gray-700">
+									<li>
+										<span>video:</span>
+										<span class="italic">h.264 720p@30fps</span>
+									</li>
+									<li>
+										<span>audio:</span>
+										<span class="italic">aac 44.1Khz</span>
+									</li>
+								</ul>
+							</li>
+							<li class="mb-4">
+								<a>anon.quic.video / 126sdg124as</a>
+								<ul class="ml-4 text-xs text-gray-700">
+									<li>
+										<span>video:</span>
+										<span class="italic">h.264 720p@30fps</span>
+									</li>
+									<li>
+										<span>audio:</span>
+										<span class="italic">aac 44.1Khz</span>
+									</li>
+								</ul>
+							</li>
+						</ul>
+					</div>
+					<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
+					<div class="basis-1/2 p-6">
+						<p class="mb-6 text-center font-mono text-xl">Broadcast</p>
+
+						<form class="grid grid-cols-3 items-center gap-2 text-sm text-gray-900">
+							<label for="name" class="col-start-1 block font-medium"> Name </label>
+							<div
+								class="form-input col-span-2 w-full rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+							>
+								<span>anon.quic.video/</span>
+								<input
+									type="text"
+									name="name"
+									placeholder="random"
+									class="block border-0 bg-transparent p-1 pl-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0"
+								/>
+							</div>
+							<label for="codec" class="col-start-1 font-medium leading-6"> Codec </label>
+							<select
+								name="codec"
+								class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+							>
+								<option value="h.264">h.264</option>
+							</select>
+							<label for="resolution" class="col-start-1 font-medium leading-6"> Resolution </label>
+							<select
+								name="resolution"
+								class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+							>
+								<option value="480p">480p</option>
+								<option selected value="720">720p</option>
+								<option value="1080">1080p</option>
+								<option value="1440">1440p</option>
+							</select>
+							<label for="fps" class="col-start-1 font-medium"> FPS </label>
+							<select
+								name="fps"
+								class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+							>
+								<option value="15">15</option>
+								<option value="30">30</option>
+								<option value="60">60</option>
+							</select>
+							<label for="bitrate" class="col-start-1 font-medium"> Bitrate </label>
+							<input type="range" name="bitrate" min="500" max="4000" step="100" value="2000" />
+							<span class="text-left text-xs">2000 Kb/s</span>
+							<button
+								class="col-span-1 col-start-3 mt-3 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+								type="submit"
+							>
+								Go Live
+							</button>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			<div
+				id="settings-open"
+				class="absolute right-0 top-0 p-3 transition-all hover:rotate-45 hover:cursor-pointer"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-6 w-6 fill-white/90">
+					<path
+						d="M24 13.616v-3.232c-1.651-.587-2.694-.752-3.219-2.019v-.001c-.527-1.271.1-2.134.847-3.707l-2.285-2.285c-1.561.742-2.433 1.375-3.707.847h-.001c-1.269-.526-1.435-1.576-2.019-3.219h-3.232c-.582 1.635-.749 2.692-2.019 3.219h-.001c-1.271.528-2.132-.098-3.707-.847l-2.285 2.285c.745 1.568 1.375 2.434.847 3.707-.527 1.271-1.584 1.438-3.219 2.02v3.232c1.632.58 2.692.749 3.219 2.019.53 1.282-.114 2.166-.847 3.707l2.285 2.286c1.562-.743 2.434-1.375 3.707-.847h.001c1.27.526 1.436 1.579 2.019 3.219h3.232c.582-1.636.75-2.69 2.027-3.222h.001c1.262-.524 2.12.101 3.698.851l2.285-2.286c-.744-1.563-1.375-2.433-.848-3.706.527-1.271 1.588-1.44 3.221-2.021zm-12 2.384c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
+					/>
+				</svg>
+			</div>
+		</div>
+
+		<div class="flex-1"></div>
 
 		<script src="index.ts" type="module"></script>
 	</body>
