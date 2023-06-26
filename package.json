@@ -5,11 +5,11 @@
 	"license": "Apache-2.0",
 	"source": "ui/index.html",
 	"scripts": {
-		"serve": "parcel serve --https --cert localhost.crt --key localhost.key  --port 4444 --open",
+		"serve": "parcel serve --https --cert cert/localhost.crt --key cert/localhost.key  --port 4444 --open",
 		"build": "parcel build",
 		"lint": "eslint .",
 		"fmt": "prettier --write .",
-		"cert": "mkcert --install && mkcert -ecdsa -cert-file localhost.crt -key-file localhost.key localhost 127.0.0.1 ::1"
+		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1"
 	},
 	"devDependencies": {
 		"@parcel/transformer-inline-string": "^2.9.2",
