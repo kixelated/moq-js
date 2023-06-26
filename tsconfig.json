@@ -1,4 +1,5 @@
 {
+	"files": [],
 	"compilerOptions": {
 		"target": "es2022",
 		"module": "es2022",
@@ -11,6 +12,8 @@
 		"declarationMap": true,
 		"sourceMap": true,
 		"isolatedModules": true,
+		"experimentalDecorators": true,
+		"jsxImportSource": "preact",
 		"types": [], // Make it explicit, so we don't automatically import @types modules.
 		"paths": {
 			// Support referencing this root with ~/
@@ -33,11 +36,9 @@
 		{
 			"path": "./worker"
 		},
-		/*
 		{
 			"path": "./worklet"
 		},
-		*/
 		{
 			"path": "./transport"
 		}
