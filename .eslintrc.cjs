@@ -1,8 +1,8 @@
 /* eslint-env node */
 module.exports = {
-	extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
+	extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "plugin:react/recommended", "prettier"],
 	parser: "@typescript-eslint/parser",
-	plugins: ["@typescript-eslint", "prettier"],
+	plugins: ["@typescript-eslint", "react", "prettier"],
 	root: true,
 	ignorePatterns: ["dist", "node_modules", "tailwind.config.js"],
 	rules: {
@@ -19,5 +19,10 @@ module.exports = {
 			},
 		],
 		"prettier/prettier": 2, // Means error
+	},
+	parserOptions: {
+		ecmaFeatures: {
+			jsx: true,
+		},
 	},
 }

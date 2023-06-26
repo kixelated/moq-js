@@ -13,7 +13,6 @@
 		"sourceMap": true,
 		"isolatedModules": true,
 		"experimentalDecorators": true,
-		"jsxImportSource": "preact",
 		"types": [], // Make it explicit, so we don't automatically import @types modules.
 		"paths": {
 			// Support referencing this root with ~/

@@ -1,8 +1,19 @@
+import React from "react"
+
 import { Player } from "~/main"
 import { Connection } from "~/transport"
 import { Timeline } from "./timeline"
 
-export class App {
+export function App() {
+	return <div>Hello world</div>
+}
+
+type AppState = {
+	count: number // like this
+}
+
+/*
+export class App extends React.Component<AppProps, AppState> {
 	#transport: Connection
 	#player: Player
 	#timeline: Timeline
@@ -11,18 +22,8 @@ export class App {
 	#canvas: HTMLCanvasElement
 	#play: HTMLElement
 
-	constructor() {
-		const canvas = document.querySelector<HTMLCanvasElement>("canvas#video")
-		if (!canvas) throw new Error("missing canvas")
-
-		const play = document.querySelector<HTMLElement>("#screen #play")
-		if (!play) throw new Error("missing play button")
-
-		const timeline = document.querySelector<HTMLElement>("#timeline")
-		if (!timeline) throw new Error("missing timeline")
-
-		this.#canvas = canvas
-		this.#play = play
+	constructor(props: AppProps) {
+		super(props)
 
 		const params = new URLSearchParams(window.location.search)
 		const url = params.get("url") || "https://localhost:4443"
@@ -39,15 +40,12 @@ export class App {
 		this.#play.addEventListener("click", this.#onPlay.bind(this))
 	}
 
-	async run() {
-		await this.#timeline.run()
-	}
-
-	#onPlay(e: Event) {
-		e.preventDefault()
-
-		this.#player.play()
-		this.#play.removeEventListener("click", this.#onPlay.bind(this))
-		this.#play.style.display = "none"
+	render() {
+		return (
+			<div>
+				{this.props.message} {this.state.count}
+			</div>
+		)
 	}
 }
+*/
