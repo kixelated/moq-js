@@ -4,7 +4,7 @@ module.exports = {
 	parser: "@typescript-eslint/parser",
 	plugins: ["@typescript-eslint", "prettier"],
 	root: true,
-	ignorePatterns: ["dist", "node_modules"],
+	ignorePatterns: ["dist", "node_modules", "tailwind.config.js"],
 	rules: {
 		"@typescript-eslint/ban-ts-comment": "off",
 		"@typescript-eslint/no-non-null-assertion": "off",

@@ -11,7 +11,7 @@ export class Port {
 	#callback: Callback
 
 	constructor(callback: Callback) {
-		const url = new URL("worker.ts", import.meta.url)
+		const url = new URL("~/worker/index.ts", import.meta.url)
 
 		this.#callback = callback
 

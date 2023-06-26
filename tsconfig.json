@@ -13,25 +13,14 @@
 		"isolatedModules": true,
 		"types": [], // Make it explicit, so we don't automatically import @types modules.
 		"paths": {
-			"~/main": [
-				"./main",
+			// Support referencing this root with ~/
+			"~/*": [
+				"./*"
 			],
-			"~/shared": [
-				"./shared",
-			],
-			"~/worker": [
-				"/worker"
-			],
-			"~/worklet": [
-				"./worklet"
-			],
-			"~/transport": [
-				"./transport"
-			]
 		},
 		"typeRoots": [
 			"./types",
-			"../node_modules/@types"
+			"./node_modules/@types"
 		]
 	},
 	"references": [
@@ -44,9 +33,11 @@
 		{
 			"path": "./worker"
 		},
+		/*
 		{
 			"path": "./worklet"
 		},
+		*/
 		{
 			"path": "./transport"
 		}
