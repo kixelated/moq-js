@@ -1,0 +1,22 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"lib": [
+			"es2022",
+			// TODO make webworker-webcodecs so this will work
+			// "webworker",
+			"dom"
+		],
+		"types": [
+			"dom-webcodecs",
+		]
+	},
+	"include": [
+		"**/*",
+	],
+	"references": [
+		{
+			"path": "../shared"
+		},
+	],
+}

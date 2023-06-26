@@ -1,4 +1,4 @@
-import * as Stream from "../stream"
+import * as Stream from "./stream"
 import * as Setup from "./setup"
 import * as Control from "./control"
 import * as Object from "./object"

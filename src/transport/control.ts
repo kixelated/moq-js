@@ -1,4 +1,4 @@
-import { Reader, Writer } from "../stream"
+import { Reader, Writer } from "./stream"
 
 export type Message = Subscriber | Publisher
 export type Subscriber = Subscribe | AnnounceOk | AnnounceError

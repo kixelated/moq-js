@@ -1,4 +1,4 @@
-import { Reader, Writer } from "../stream"
+import { Reader, Writer } from "./stream"
 
 export type Message = Client | Server
 export type Role = "publisher" | "subscriber" | "both"

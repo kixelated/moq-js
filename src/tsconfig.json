@@ -1,0 +1,54 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "es2022",
+		"moduleResolution": "node",
+		"rootDir": ".",
+		"outDir": "../dist",
+		"declaration": true,
+		"strict": true,
+		"composite": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"isolatedModules": true,
+		"types": [], // Make it explicit, so we don't automatically import @types modules.
+		"paths": {
+			"~/main": [
+				"./main",
+			],
+			"~/shared": [
+				"./shared",
+			],
+			"~/worker": [
+				"/worker"
+			],
+			"~/worklet": [
+				"./worklet"
+			],
+			"~/transport": [
+				"./transport"
+			]
+		},
+		"typeRoots": [
+			"./types",
+			"../node_modules/@types"
+		]
+	},
+	"references": [
+		{
+			"path": "./shared"
+		},
+		{
+			"path": "./main"
+		},
+		{
+			"path": "./worker"
+		},
+		{
+			"path": "./worklet"
+		},
+		{
+			"path": "./transport"
+		}
+	]
+}

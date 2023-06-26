@@ -1,0 +1,15 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"lib": [
+			"es2022",
+			"dom" // TODO is there a way to import just ReadableSteram and WriteableStream?
+		],
+		"types": [
+			"webtransport",
+		]
+	},
+	"include": [
+		"**/*",
+	]
+}
