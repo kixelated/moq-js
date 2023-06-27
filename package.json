@@ -12,6 +12,7 @@
 		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1"
 	},
 	"devDependencies": {
+		"@babel/core": "^7.12.0",
 		"@parcel/transformer-inline-string": "^2.9.2",
 		"@parcel/transformer-typescript-tsc": "^2.9.3",
 		"@parcel/transformer-typescript-types": "^2.9.2",
@@ -20,15 +21,13 @@
 		"@types/audioworklet": "^0.0.47",
 		"@types/dom-mediacapture-transform": "^0.1.5",
 		"@types/dom-webcodecs": "^0.1.7",
-		"@types/react": "^18.2.14",
-		"@types/react-dom": "^18.2.6",
 		"@typescript-eslint/eslint-plugin": "^5.59.11",
 		"@typescript-eslint/parser": "^5.59.11",
 		"autoprefixer": "^10.4.14",
+		"babel-preset-solid": "^1.7.7",
 		"eslint": "^8.42.0",
 		"eslint-config-prettier": "^8.8.0",
 		"eslint-plugin-prettier": "^4.2.1",
-		"eslint-plugin-react": "^7.32.2",
 		"parcel": "^2.9.2",
 		"postcss": "^8.4.24",
 		"prettier": "^2.8.8",
@@ -39,7 +38,6 @@
 	},
 	"dependencies": {
 		"mp4box": "^0.5.2",
-		"react": "^18.2.0",
-		"react-dom": "^18.2.0"
+		"solid-js": "^1.7.7"
 	}
 }

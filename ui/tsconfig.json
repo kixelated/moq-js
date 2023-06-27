@@ -11,11 +11,7 @@
 		"types": [
 			"dom-mediacapture-transform",
 			"dom-webcodecs",
-			"react",
-			"react-dom"
 		],
-		"allowSyntheticDefaultImports": true,
-		"jsx": "react",
 	},
 	"references": [
 		{

@@ -1,8 +1,8 @@
 /* eslint-env node */
 module.exports = {
-	extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "plugin:react/recommended", "prettier"],
+	extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
 	parser: "@typescript-eslint/parser",
-	plugins: ["@typescript-eslint", "react", "prettier"],
+	plugins: ["@typescript-eslint", "prettier"],
 	root: true,
 	ignorePatterns: ["dist", "node_modules", "tailwind.config.js"],
 	rules: {

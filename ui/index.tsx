@@ -1,12 +1,10 @@
-import React from "react"
-
-import { createRoot } from "react-dom/client"
 import { App } from "./app"
 
-const container = document.getElementById("app")
-if (!container) {
+import { render } from "solid-js/web"
+
+const app = document.getElementById("app")
+if (!app) {
 	throw new Error("no container")
 }
 
-const root = createRoot(container)
-root.render(<App />)
+render(() => <App />, app)
