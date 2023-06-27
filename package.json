@@ -1,5 +1,5 @@
 {
-	"license": "Apache-2.0",
+	"license": "MIT",
 	"source": "src/demo/index.html",
 	"scripts": {
 		"serve": "parcel serve --https --cert localhost.crt --key localhost.key  --port 4444 --open",
