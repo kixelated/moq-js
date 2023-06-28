@@ -53,7 +53,7 @@ export class Transport {
 }
 
 async function decode_header(r: Reader): Promise<Header> {
-	const type = await r.uint52()
+	const type = await r.vint52()
 	if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
 
 	const track = await r.vint62()
@@ -70,7 +70,7 @@ async function decode_header(r: Reader): Promise<Header> {
 }
 
 async function encode_header(w: Writer, h: Header) {
-	await w.uint52(0)
+	await w.vint52(0)
 	await w.vint62(h.track)
 	await w.vint62(h.group)
 	await w.vint62(h.sequence)

@@ -87,7 +87,7 @@ export class Decoder {
 	}
 
 	private async type(): Promise<Type> {
-		return (await this.r.uint52()) as Type
+		return (await this.r.vint52()) as Type
 	}
 
 	async message(): Promise<Message> {
@@ -174,7 +174,7 @@ export class Encoder {
 	}
 
 	async message(m: Message) {
-		this.w.uint52(m.type)
+		this.w.vint52(m.type)
 
 		switch (m.type) {
 			case Type.Subscribe:
