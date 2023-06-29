@@ -23,6 +23,9 @@ export class Connection {
 	// Use to receive/send objects.
 	objects: Promise<Object.Transport>
 
+	// Use just to tell when we're connected
+	connected: Promise<void>
+
 	constructor(config: Config) {
 		this.quic = this.#connect(config)
 
@@ -35,6 +38,10 @@ export class Connection {
 		// Create unidirectional streams to send media.
 		this.objects = this.quic.then((quic) => {
 			return new Object.Transport(quic)
+		})
+
+		this.connected = this.control.then(() => {
+			/* noop */
 		})
 	}
 
@@ -72,16 +79,13 @@ export class Connection {
 		}
 
 		const quic = new WebTransport(config.url, options)
-		console.log("awaiting connection")
 		await quic.ready
-		console.log("connection ready")
 
 		return quic
 	}
 
 	async #setup(client: Setup.Client): Promise<Control.Stream> {
 		const quic = await this.quic
-		console.log("creating bidi")
 		const stream = await quic.createBidirectionalStream()
 
 		const writer = new Stream.Writer(stream.writable)
@@ -89,16 +93,12 @@ export class Connection {
 
 		const setup = new Setup.Stream(reader, writer)
 
-		console.log("sending client setup", client)
-
 		// Send the setup message.
 		await setup.send.client(client)
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
 		const _server = await setup.recv.server()
-
-		console.log("recv server setup", _server)
 
 		return new Control.Stream(reader, writer)
 	}

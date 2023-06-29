@@ -22,6 +22,14 @@ export class Player {
 	// A list of consumers waiting for the next timeline message.
 	#timelineNotify: Async.Notify = new Async.Notify()
 
+	#broadcasts: Array<string> = []
+	#broadcastsNotify: Async.Notify = new Async.Notify()
+
+	#error?: any
+
+	connected: Promise<void>
+	running: Promise<void>
+
 	constructor(conn: Connection, canvas: OffscreenCanvas) {
 		// TODO refactor audio and video configuation
 		const config = {
@@ -41,9 +49,21 @@ export class Player {
 
 		this.#conn = conn
 
-		// Async
-		this.#runObjects()
-		this.#runControl()
+		this.connected = this.#conn.connected
+		this.running = this.#run() // Async
+	}
+
+	async #run(): Promise<void> {
+		try {
+			this.#runObjects()
+			this.#runControl()
+		} catch (e) {
+			this.#error = e
+			this.#broadcastsNotify.broadcast()
+			this.#timelineNotify.broadcast()
+
+			throw e
+		}
 	}
 
 	async #runObjects() {
@@ -88,12 +108,11 @@ export class Player {
 	}
 
 	async #receiveAnnounce(msg: Control.Announce) {
-		if (this.#namespace) {
-			throw new Error("multiple ANNOUNCE messages received")
-		}
+		// Very important; we create a new array to avoid mutating any existing value we returned.
+		this.#broadcasts = this.#broadcasts.concat(msg.namespace)
+		this.#broadcastsNotify.broadcast()
 
-		this.#namespace = msg.namespace
-
+		/*
 		// Immediately subscribe to announced namespaces.
 		return this.#sendControl({
 			type: Control.Type.Subscribe,
@@ -101,6 +120,7 @@ export class Player {
 			namespace: this.#namespace,
 			name: "catalog",
 		})
+		*/
 	}
 
 	async #sendControl(msg: Control.Message) {
@@ -144,6 +164,10 @@ export class Player {
 		this.#timelineNotify.broadcast()
 	}
 
+	close() {
+		// TODO
+	}
+
 	// TODO support arguments
 	play() {
 		this.#context.resume()
@@ -154,15 +178,41 @@ export class Player {
 		this.#port.sendSeek({ timestamp })
 	}
 
-	async timeline(minEpoch = 0): Promise<Message.Timeline> {
-		for (;;) {
+	async *timeline() {
+		// Wait until connected, so we can throw any errors.
+		await this.connected
+
+		for (let i = 0; ; i += 1) {
 			// Return the cached timeline if the epoch is large enough
-			if (this.#timeline && this.#timeline.epoch >= minEpoch) {
-				return this.#timeline
+			if (this.#timeline && this.#timeline.epoch >= i) {
+				// Yield the updated timeline.
+				yield this.#timeline
+				i = this.#timeline.epoch
+			} else if (this.#error) {
+				throw this.#error
+			} else {
+				// Otherwise wait for the next update.
+				await this.#timelineNotify.wait()
+			}
+		}
+	}
+
+	async *broadcasts() {
+		// Wait until connected, so we can throw any errors.
+		await this.connected
+
+		console.log("connected")
+
+		for (;;) {
+			if (this.#error) {
+				throw this.#error
 			}
 
-			// Otherwise wait for the next update.
-			await this.#timelineNotify.wait()
+			// TODO use an epoch to avoid missing updates
+			console.log("yielding broadcasts", this.#broadcasts)
+
+			yield [...this.#broadcasts]
+			await this.#broadcastsNotify.wait()
 		}
 	}
 }

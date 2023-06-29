@@ -4,24 +4,17 @@ import { Encoder, Container, ContainerTrack } from "./media"
 export class Broadcaster {
 	#conn: Connection
 
-	// The namespace we announced
-	#namespace: string
-
 	// A map of track IDs to subscription IDs
 	#subscriptions: Map<string, bigint> = new Map()
 
-	constructor(conn: Connection, namespace: string) {
-		this.#conn = conn
-		this.#namespace = namespace
+	#namespace?: string
 
-		// Immediately announce our namespace
-		this.#sendControl({
-			type: Control.Type.Announce,
-			namespace: this.#namespace,
-		})
+	constructor(conn: Connection) {
+		this.#conn = conn
 	}
 
-	async run() {
+	async run(namespace: string) {
+		this.#namespace = namespace
 		await Promise.all([this.#runEncoder(), this.#runControl()])
 	}
 
@@ -77,6 +70,12 @@ export class Broadcaster {
 	}
 
 	async #runControl() {
+		// Immediately announce our namespace
+		this.#sendControl({
+			type: Control.Type.Announce,
+			namespace: this.#namespace!,
+		})
+
 		// Wait for the connection to be established.
 		const control = await this.#conn.control
 

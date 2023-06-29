@@ -1,5 +1,84 @@
 import { Player, Range, Timeline as State } from "~/main"
 
+import { createSignal, createMemo, Accessor, For, Switch, Match } from "solid-js"
+import { createStore } from "solid-js/store"
+
+export function Timeline() {
+	const [playhead, setPlayhead] = createSignal(0)
+
+	const [audio, setAudio] = createSignal([
+		{ start: 0, end: 0.5 },
+		{ start: 1.0, end: 2.0 },
+	])
+
+	const [video, setVideo] = createSignal([
+		{ start: 0, end: 0.7 },
+		{ start: 1.0, end: 2.1 },
+	])
+
+	return (
+		<div class="relative flex flex-col bg-black">
+			<Component playhead={playhead} ranges={audio} />
+			<Component playhead={playhead} ranges={video} />
+			<Playhead />
+			<Legend playhead={playhead} />
+		</div>
+	)
+}
+
+function Component({ playhead, ranges }: { playhead: Accessor<number>; ranges: Accessor<Range[]> }) {
+	return (
+		<div class="relative h-2">
+			<For each={ranges()}>
+				{(range) => {
+					return (
+						<div
+							class="fill absolute h-full bg-indigo-400"
+							style={{ left: 10 * range.start + "%", width: 10 * (range.end - range.start) + "%" }}
+						></div>
+					)
+				}}
+			</For>
+		</div>
+	)
+}
+
+function Playhead() {
+	// Fixed in the middle for now
+	return <div class="absolute left-1/2 right-1/2 border-l-2 border-indigo-50"></div>
+}
+
+function Legend({ playhead }: { playhead: Accessor<number> }) {
+	const breakpoints = createMemo(() => {
+		const start = Math.floor(playhead() - 5)
+		const end = Math.ceil(playhead() + 5)
+
+		const breakpoints = []
+		for (let i = start; i <= end; i++) {
+			breakpoints.push(i)
+		}
+
+		return breakpoints
+	})
+
+	return (
+		<div class="absolute inset-0 text-center text-xs text-indigo-50">
+			<For each={breakpoints()}>
+				{(breakpoint) => {
+					const x = 10 * (breakpoint - playhead() + 5)
+					// TODO center the text based on the width
+					return (
+						<div class="absolute" style={{ left: x + "%" }}>
+							{breakpoint}
+						</div>
+					)
+				}}
+			</For>
+		</div>
+	)
+}
+
+/*
 export class Timeline {
 	#player: Player
 	#state?: State
@@ -149,3 +228,5 @@ export class Timeline {
 		}
 	}
 }
+
+*/
