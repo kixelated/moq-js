@@ -55,8 +55,7 @@ export class Player {
 
 	async #run(): Promise<void> {
 		try {
-			this.#runObjects()
-			this.#runControl()
+			await Promise.all([this.#runObjects(), this.#runControl()])
 		} catch (e) {
 			this.#error = e
 			this.#broadcastsNotify.broadcast()

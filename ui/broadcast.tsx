@@ -7,7 +7,7 @@ export function Main(props: { broadcaster: Broadcaster }) {
 	return <></>
 }
 
-export function Settings(props: { broadcaster: Broadcaster }) {
+export function Setup(props: { broadcaster: Broadcaster }) {
 	const [state, setState] = createStore({
 		name: "",
 		codec: "h.264",
@@ -27,7 +27,7 @@ export function Settings(props: { broadcaster: Broadcaster }) {
 		<>
 			<p class="mb-6 text-center font-mono text-xl">Broadcast</p>
 
-			<form class="grid grid-cols-3 items-center gap-2 text-sm text-gray-900">
+			<form class="grid grid-cols-3 items-center gap-x-4 gap-y-2 text-sm text-gray-900">
 				<label for="name" class="col-start-1 block font-medium">
 					Name
 				</label>
@@ -110,7 +110,7 @@ export function Settings(props: { broadcaster: Broadcaster }) {
 				/>
 				<span class="text-left text-xs">{state.bitrate} Kb/s</span>
 				<button
-					class="col-span-1 col-start-3 mt-3 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+					class="col-span-2 col-start-2 mt-3 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
 					type="submit"
 				>
 					Go Live

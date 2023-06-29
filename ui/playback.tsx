@@ -22,30 +22,14 @@ export function Main(props: { player: Player }) {
 	return <Timeline player={props.player} />
 }
 
-export function Settings(props: { player: Player }) {
-	return (
-		<>
-			<p class="mb-6 text-center font-mono text-xl">Watch</p>
-			<ErrorBoundary fallback={(err) => <p class="text-m text-red-700">{err.message}</p>}>
-				<Broadcasts player={props.player} />
-			</ErrorBoundary>
-		</>
-	)
-}
-
-function Broadcasts(props: { player: Player }) {
+export function Setup(props: { player: Player }) {
 	const gen = props.player.broadcasts()
 	const [broadcasts, { refetch }] = createResource(async () => {
-		try {
-			const next = await gen.next()
-			if (next.done) {
-				throw "unexpected end"
-			}
-			return next.value
-		} catch (e) {
-			console.error("got error", e)
-			throw e
+		const next = await gen.next()
+		if (next.done) {
+			throw "unexpected end"
 		}
+		return next.value
 	})
 
 	createEffect(() => {
@@ -53,22 +37,25 @@ function Broadcasts(props: { player: Player }) {
 		refetch()
 	})
 
+	const watch = (e: MouseEvent, broadcast: string) => {
+		e.preventDefault()
+		props.player.load(broadcast)
+	}
+
 	return (
 		<>
+			<p class="mb-6 text-center font-mono text-xl">Watch</p>
 			<ul>
-				<For each={broadcasts.latest}>
+				<For each={broadcasts()} fallback={"No broadcasts"}>
 					{(broadcast) => {
 						return (
 							<li class="mt-4">
-								<a>{broadcast}</a>
+								<a onClick={(e) => watch(e, broadcast)}>{broadcast}</a>
 							</li>
 						)
 					}}
 				</For>
 			</ul>
-			<Show when={broadcasts.loading}>
-				<p class="mt-4 text-center text-xs">waiting for broadcasts...</p>
-			</Show>
 		</>
 	)
 }
