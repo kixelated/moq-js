@@ -18,7 +18,14 @@ export function App(props: { url: string }) {
 	const player = new Player(conn)
 	const broadcaster = new Broadcaster(conn)
 
-	const [nav, setNav] = createSignal<"watch" | "broadcast" | "setup">("setup")
+	const [nav, setNav] = createSignal<"playback" | "broadcast" | "setup">("setup")
+
+	const startPlayback = () => {
+		setNav("playback")
+	}
+	const startBroadcast = () => {
+		setNav("broadcast")
+	}
 
 	return (
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
@@ -28,7 +35,7 @@ export function App(props: { url: string }) {
 				<Match when={nav() === "setup"}>
 					<div class="flex flex-row bg-white/90">
 						<div class="basis-1/2 p-6">
-							<Playback.Setup player={player} />
+							<Playback.Setup start={startPlayback} player={player} />
 						</div>
 						<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
 						<div class="basis-1/2 p-6">
@@ -37,7 +44,7 @@ export function App(props: { url: string }) {
 					</div>
 				</Match>
 
-				<Match when={nav() === "watch"}>
+				<Match when={nav() === "playback"}>
 					<Playback.Main player={player} />
 				</Match>
 

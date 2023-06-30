@@ -1,12 +1,12 @@
-import { Ring } from "../shared"
 import * as Timeline from "./timeline"
-import { Message } from "../shared"
+import * as Ring from "../shared/ring"
+import * as Message from "../shared/message"
 
 export class Renderer {
 	ring?: Ring.Buffer
 	timeline: Timeline.Sync
 
-	queue: Array<AudioData>
+	queue: AudioData[]
 	interval?: number
 	last?: number // the timestamp of the last rendered frame, in microseconds
 

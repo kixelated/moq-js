@@ -5,6 +5,7 @@ import { Connection, Control } from "../transport"
 import { Deferred, Notify } from "../shared/async"
 import * as Ring from "../shared/ring"
 import * as Message from "../shared/message"
+import * as MP4 from "../shared/mp4"
 
 export type Range = Message.Range
 
@@ -16,17 +17,14 @@ export class Player {
 	// The audio context, which must be created on the main thread.
 	#context?: Audio.Context
 
-	// The namespace as announced by the server
-	#namespace?: string
-
 	// The most recent timeline message received from the worker.
 	#timeline?: Message.Timeline
 
 	// A list of consumers waiting for the next timeline message.
 	#timelineNotify = new Notify()
 
-	// Store the list of announced broadcasts, and notify when a new one arrives.
-	#broadcasts = new Map<string, BroadcastInner>()
+	// Store the list of broadcasts and notify when a new one arrives.
+	#broadcasts = new Map<string, Broadcast>()
 	#broadcastsNotify = new Notify()
 
 	// A list of active subscriptions
@@ -57,7 +55,7 @@ export class Player {
 				ring: new Ring.Init(2, 44100),
 			},
 			video: {
-				canvas,
+				canvas: canvas.transferControlToOffscreen(),
 			},
 		}
 
@@ -122,11 +120,8 @@ export class Player {
 	}
 
 	async #receiveAnnounce(msg: Control.Announce) {
-		this.#broadcasts.set(msg.namespace, new BroadcastInner(msg.namespace))
-		this.#broadcastsNotify.broadcast()
-
 		// Immediately subscribe to announced namespace to get the catalog.
-		await this.#subscribe(msg.namespace, "catalog")
+		await this.subscribe(msg.namespace, "catalog")
 	}
 
 	#receiveSubscribeOk(msg: Control.SubscribeOk) {
@@ -145,20 +140,11 @@ export class Player {
 
 		this.#subs.delete(msg.id)
 
-		const broadcast = this.#broadcasts.get(sub.broadcast)
-		if (!broadcast) {
-			throw new Error(`unknown broadcast: ${sub.broadcast}`)
-		}
-
-		if (sub.track == "catalog") {
-			broadcast.catalog.reject(error)
-		} else {
-			// TODO pass the error to the consumer
-			throw error
-		}
+		// TODO handle these better
+		throw error
 	}
 
-	async #subscribe(broadcast: string, track: string) {
+	async subscribe(broadcast: string, track: string) {
 		const id = this.#subsNext++
 		this.#subs.set(id, { broadcast, track })
 
@@ -189,13 +175,9 @@ export class Player {
 	}
 
 	async #onCatalog(catalog: Message.Catalog) {
-		const broadcast = this.#broadcasts.get(catalog.broadcast)
-		if (!broadcast) {
-			// Ignore unannounced broadcasts.
-			return
-		}
-
-		broadcast.catalog.resolve(catalog)
+		const broadcast = new Broadcast(this, catalog.broadcast, catalog.info)
+		this.#broadcasts.set(catalog.broadcast, broadcast)
+		this.#broadcastsNotify.broadcast()
 	}
 
 	#onTimeline(timeline: Message.Timeline) {
@@ -250,13 +232,13 @@ export class Player {
 
 			// Yield all new entries in the map.
 			let i = 0
-			for (const broadcast of this.#broadcasts.entries()) {
+			for (const broadcast of this.#broadcasts.values()) {
 				if (i < skip) {
 					i += 1
 					continue
 				}
 
-				yield new Broadcast(broadcast[1]) // wrap the broadcast to avoid exposing the inner object
+				yield broadcast
 				skip += 1
 			}
 
@@ -266,31 +248,50 @@ export class Player {
 }
 
 export class Broadcast {
-	#inner: BroadcastInner
+	#catalog = new Deferred<Message.Catalog>()
+	#player: Player
 
-	constructor(inner: BroadcastInner) {
-		this.#inner = inner
-	}
-
-	async catalog(): Promise<Message.Catalog> {
-		return await this.#inner.catalog.promise
-	}
-
-	get name(): string {
-		return this.#inner.name
-	}
-}
-
-class BroadcastInner {
 	name: string
-	catalog = new Deferred<Message.Catalog>()
+	tracks: Track[]
 
-	constructor(name: string) {
+	constructor(player: Player, name: string, info: MP4.Info) {
+		this.#player = player
+
 		this.name = name
+		this.tracks = info.tracks.map((info) => new Track(this, info))
+	}
+
+	async subscribe(id: number) {
+		await this.#player.subscribe(this.name, id.toString())
+	}
+
+	// Automatically subscribe to the best audio and video track.
+	async subscribeAuto() {
+		const tracks = await this.tracks
+		for (const track of tracks) {
+			// TODO
+			await track.subscribe()
+		}
 	}
 }
 
-export class Track {}
+export class Track {
+	#broadcast: Broadcast
+
+	id: number
+	info: MP4.Track
+
+	constructor(broadcast: Broadcast, info: MP4.Track) {
+		this.#broadcast = broadcast
+		this.id = info.id
+		this.info = info
+	}
+
+	// Subscribe to the track
+	async subscribe() {
+		await this.#broadcast.subscribe(this.id)
+	}
+}
 
 interface Subscribe {
 	broadcast: string

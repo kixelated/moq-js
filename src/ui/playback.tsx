@@ -1,23 +1,7 @@
 import { Player, Range, Broadcast } from "../playback"
 import * as MP4 from "../shared/mp4"
-import { Connection } from "../transport"
 
-import {
-	createSignal,
-	createMemo,
-	onMount,
-	Suspense,
-	mapArray,
-	Accessor,
-	For,
-	Switch,
-	ErrorBoundary,
-	Show,
-	Match,
-	createEffect,
-	createResource,
-} from "solid-js"
-import { createStore } from "solid-js/store"
+import { createSignal, createMemo, onMount, For, Show, createEffect } from "solid-js"
 
 export function Main(props: { player: Player }) {
 	let canvas: HTMLCanvasElement
@@ -34,7 +18,7 @@ export function Main(props: { player: Player }) {
 	)
 }
 
-export function Setup(props: { player: Player }) {
+export function Setup(props: { start: () => void; player: Player }) {
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
 
 	createEffect(async () => {
@@ -51,7 +35,7 @@ export function Setup(props: { player: Player }) {
 					{(broadcast) => {
 						return (
 							<li class="mt-4">
-								<SetupBroadcast broadcast={broadcast} />
+								<SetupBroadcast start={props.start} broadcast={broadcast} />
 							</li>
 						)
 					}}
@@ -61,29 +45,41 @@ export function Setup(props: { player: Player }) {
 	)
 }
 
-function SetupBroadcast(props: { broadcast: Broadcast }) {
-	const watch = (e: MouseEvent, broadcast: string) => {
+function SetupBroadcast(props: { start: () => void; broadcast: Broadcast }) {
+	const watch = (e: MouseEvent) => {
 		e.preventDefault()
-		props.player.load(broadcast)
+		props.broadcast.subscribeAuto()
+		props.start()
 	}
 
-	const [tracks] = createResource(
-		async () => {
-			return (await props.broadcast.catalog()).info.tracks
-		},
-		{ initialValue: [] }
-	)
+	const stylizeName = (name: string) => {
+		return name.replace(/\//, " / ")
+	}
 
-	const videoInfo = (track: MP4.VideoTrack) => {
+	return (
+		<>
+			<a onClick={watch}>{stylizeName(props.broadcast.name)}</a>
+			<div class="ml-4 text-xs italic text-gray-700">
+				<For each={props.broadcast.tracks}>
+					{(track) => {
+						return <div>{trackInfo(track.info)}</div>
+					}}
+				</For>
+			</div>
+		</>
+	)
+}
+
+// A function because Match doesn't work with Typescript type guards
+function trackInfo(track: MP4.Track) {
+	if (MP4.isVideoTrack(track)) {
 		return (
 			<>
 				video: {track.codec} {track.video.width}x{track.video.height}
 				<Show when={track.bitrate}> {track.bitrate} b/s</Show>
 			</>
 		)
-	}
-
-	const audioInfo = (track: MP4.AudioTrack) => {
+	} else if (MP4.isAudioTrack(track)) {
 		return (
 			<>
 				audio: {track.codec} {track.audio.sample_rate}Hz {track.audio.channel_count}.0
@@ -91,27 +87,9 @@ function SetupBroadcast(props: { broadcast: Broadcast }) {
 				<Show when={track.language !== "und"}> {track.language}</Show>
 			</>
 		)
+	} else {
+		return "unknown track type"
 	}
-
-	return (
-		<>
-			<a onClick={(e) => watch(e, props.broadcast.name)}>{props.broadcast.name}</a>
-			<div class="ml-4 text-xs italic text-gray-700">
-				<For each={tracks()}>
-					{(track) => {
-						return (
-							<div>
-								<Switch fallback={"unknown track type"}>
-									<Match when={MP4.isVideoTrack(track)}>{videoInfo(track as MP4.VideoTrack)}</Match>
-									<Match when={MP4.isAudioTrack(track)}>{audioInfo(track as MP4.AudioTrack)}</Match>
-								</Switch>
-							</div>
-						)
-					}}
-				</For>
-			</div>
-		</>
-	)
 }
 
 function Timeline(props: { player: Player }) {
