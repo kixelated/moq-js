@@ -1,4 +1,4 @@
-import { Async } from "~/shared"
+import { Deferred } from "../shared/async"
 
 export class Encoder {
 	tracks: Array<EncoderTrack> = []
@@ -24,11 +24,11 @@ export class EncoderTrack {
 	#settings: MediaTrackSettings
 
 	// outputs
-	#init: Async.Deferred<VideoDecoderConfig>
+	#init: Deferred<VideoDecoderConfig>
 	frames: ReadableStream<EncodedVideoChunk>
 
 	constructor(input: MediaStreamVideoTrack) {
-		this.#init = new Async.Deferred()
+		this.#init = new Deferred()
 		this.frames = new ReadableStream({
 			start: this.#start.bind(this),
 			pull: this.#pull.bind(this),

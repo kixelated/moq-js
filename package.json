@@ -3,13 +3,14 @@
 	"version": "0.0.1",
 	"description": "Media over QUIC library",
 	"license": "Apache-2.0",
-	"source": "ui/index.html",
+	"source": "src/ui/index.html",
 	"scripts": {
 		"serve": "parcel serve --https --cert cert/localhost.crt --key cert/localhost.key  --port 4444 --open",
 		"build": "parcel build",
 		"lint": "eslint .",
 		"fmt": "prettier --write .",
-		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1"
+		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1",
+		"clean": "rm -r ./.parcel-cache/ ./dist/"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.12.0",

@@ -1,4 +1,4 @@
-import { Broadcaster } from "~/main"
+import { Broadcaster } from "../broadcast"
 
 import { For } from "solid-js"
 import { createStore } from "solid-js/store"

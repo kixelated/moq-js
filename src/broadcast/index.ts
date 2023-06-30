@@ -1,5 +1,6 @@
-import { Connection, Control } from "~/transport"
-import { Encoder, Container, ContainerTrack } from "./media"
+import { Connection, Control } from "../transport"
+import { Encoder } from "./encoder"
+import { Container, ContainerTrack } from "./container"
 
 export class Broadcaster {
 	#conn: Connection

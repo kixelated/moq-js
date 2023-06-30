@@ -1,4 +1,4 @@
-import { Message } from "~/shared"
+import * as Message from "../shared/message"
 
 // NOTE: This must be on the main thread
 export class Context {
@@ -19,7 +19,7 @@ export class Context {
 
 	private async load(): Promise<AudioWorkletNode> {
 		// Load the worklet source code.
-		const url = new URL("~/worklet/index.ts", import.meta.url)
+		const url = new URL("../worklet/index.ts", import.meta.url)
 		await this.context.audioWorklet.addModule(url)
 
 		const volume = this.context.createGain()

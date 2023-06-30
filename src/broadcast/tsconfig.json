@@ -1,0 +1,24 @@
+{
+	"include": [
+		"**/*",
+	],
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"lib": [
+			"es2022",
+			"dom"
+		],
+		"types": [
+			"dom-mediacapture-transform",
+			"dom-webcodecs",
+		]
+	},
+	"references": [
+		{
+			"path": "../shared"
+		},
+		{
+			"path": "../transport"
+		},
+	]
+}

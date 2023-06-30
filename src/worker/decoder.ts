@@ -1,13 +1,13 @@
-import { MP4 } from "~/shared"
-import { Object } from "~/transport"
+import * as MP4 from "../shared/mp4"
+import { Object } from "../transport"
 import * as Timeline from "./timeline"
 
-import { Async } from "~/shared"
+import { Deferred } from "../shared/async"
 
 // Decoder receives a QUIC stream, parsing the MP4 container, and passing samples to the Timeline.
 export class Decoder {
 	#timeline: Timeline.Sync
-	#info: Async.Deferred<MP4.Info> = new Async.Deferred()
+	#info: Deferred<MP4.Info> = new Deferred()
 	#raw: MP4.ArrayBuffer[] = []
 
 	constructor(timeline: Timeline.Sync) {

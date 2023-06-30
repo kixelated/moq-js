@@ -1,6 +1,6 @@
-import { MP4 } from "~/shared"
+import { Info } from "../shared/mp4"
 
-import { Object } from "~/transport"
+import { Object } from "../transport"
 import * as Ring from "./ring"
 
 export interface Config {
@@ -20,6 +20,8 @@ export interface ConfigVideo {
 }
 
 export interface Segment {
+	broadcast: string
+
 	header: Object.Header
 	stream: ReadableStream
 }
@@ -34,9 +36,12 @@ export interface Seek {
 }
 
 // Sent by the worker when the catalog is parsed and the broadcast info is known.
-export interface Init {
+export interface Catalog {
+	// The name of the broadcast
+	broadcast: string
+
 	// The contents of the MP4 container
-	info: MP4.Info
+	info: Info
 }
 
 // Sent periodically with the current timeline info.
@@ -85,7 +90,7 @@ export interface ToWorker {
 // Any top-level messages that can be sent from the worker.
 export interface FromWorker {
 	// Sent to the main thread after the catalog has been parsed
-	init?: Init
+	catalog?: Catalog
 
 	// Sent back to the main thread regularly to update the UI
 	timeline?: Timeline

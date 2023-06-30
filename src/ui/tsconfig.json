@@ -15,7 +15,10 @@
 	},
 	"references": [
 		{
-			"path": "../main"
+			"path": "../playback"
+		},
+		{
+			"path": "../broadcast"
 		},
 	],
 }

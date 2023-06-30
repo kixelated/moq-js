@@ -5,7 +5,7 @@
 		"module": "es2022",
 		"moduleResolution": "node",
 		"rootDir": ".",
-		"outDir": "../dist",
+		"outDir": "dist",
 		"declaration": true,
 		"strict": true,
 		"composite": true,
@@ -17,14 +17,14 @@
 		"jsxImportSource": "solid-js",
 		"types": [], // Make it explicit, so we don't automatically import @types modules.
 		"paths": {
-			// Support referencing this root with ~/
-			"~/*": [
+			// Support referencing this dir with ~/src
+			"~/src/*": [
 				"./*"
 			],
 		},
 		"typeRoots": [
 			"./types",
-			"./node_modules/@types"
+			"../node_modules/@types"
 		]
 	},
 	"references": [
@@ -32,7 +32,10 @@
 			"path": "./shared"
 		},
 		{
-			"path": "./main"
+			"path": "./playback"
+		},
+		{
+			"path": "./broadcast"
 		},
 		{
 			"path": "./worker"

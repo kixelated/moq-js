@@ -1,5 +1,6 @@
-import { Broadcaster, Player } from "~/main"
-import { Connection } from "~/transport"
+import { Player } from "../playback"
+import { Broadcaster } from "../broadcast"
+import { Connection } from "../transport"
 
 import { createSignal, createEffect, onMount, Show, For, Switch, Match, ErrorBoundary, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -8,16 +9,13 @@ import * as Playback from "./playback"
 import * as Broadcast from "./broadcast"
 
 export function App(props: { url: string }) {
-	const canvas = <canvas width="854" height="480" class="aspect-video bg-black"></canvas>
-	const offscreen = (canvas as HTMLCanvasElement).transferControlToOffscreen()
-
 	const conn = new Connection({
 		url: props.url,
 		role: "both",
 		fingerprint: props.url + "/fingerprint",
 	})
 
-	const player = new Player(conn, offscreen)
+	const player = new Player(conn)
 	const broadcaster = new Broadcaster(conn)
 
 	const [nav, setNav] = createSignal<"watch" | "broadcast" | "setup">("setup")
@@ -26,25 +24,27 @@ export function App(props: { url: string }) {
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
 			<Notice conn={conn} player={player} />
 
-			<div class="transition-all" classList={{ "h-0": nav() !== "setup" }}>
-				<div class="flex flex-row bg-white/90">
-					<div class="basis-1/2 p-6">
-						<Playback.Setup player={player} />
+			<Switch>
+				<Match when={nav() === "setup"}>
+					<div class="flex flex-row bg-white/90">
+						<div class="basis-1/2 p-6">
+							<Playback.Setup player={player} />
+						</div>
+						<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
+						<div class="basis-1/2 p-6">
+							<Broadcast.Setup broadcaster={broadcaster} />
+						</div>
 					</div>
-					<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
-					<div class="basis-1/2 p-6">
-						<Broadcast.Setup broadcaster={broadcaster} />
-					</div>
-				</div>
-			</div>
+				</Match>
 
-			<div class="transition-all" classList={{ "h-0": nav() !== "watch" }}>
-				<Playback.Main player={player} />
-			</div>
+				<Match when={nav() === "watch"}>
+					<Playback.Main player={player} />
+				</Match>
 
-			<div class="transition-all" classList={{ "h-0": nav() !== "broadcast" }}>
-				<Broadcast.Main broadcaster={broadcaster} />
-			</div>
+				<Match when={nav() === "broadcast"}>
+					<Broadcast.Main broadcaster={broadcaster} />
+				</Match>
+			</Switch>
 		</div>
 	)
 }
@@ -55,7 +55,7 @@ function Notice(props: { conn: Connection; player: Player }) {
 
 	const [hidden, setHidden] = createSignal(false)
 
-	// Hide the notice after 2 seconds when state == "connected"
+	// Hide the notice after a few seconds when state == "connected"
 	createEffect(() => {
 		if (state() !== "connected") {
 			return
@@ -63,7 +63,7 @@ function Notice(props: { conn: Connection; player: Player }) {
 
 		const timeout = setTimeout(() => {
 			setHidden(true)
-		}, 2000)
+		}, 4000)
 
 		// Cleanup the timeout if the state changes
 		return () => {
@@ -73,7 +73,6 @@ function Notice(props: { conn: Connection; player: Player }) {
 
 	onMount(async () => {
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 1000))
 			await props.conn.connected
 			setState("handshake")
 			await props.player.connected
@@ -89,7 +88,7 @@ function Notice(props: { conn: Connection; player: Player }) {
 	return (
 		<div
 			class="overflow-hidden transition-all duration-1000 ease-in-out"
-			classList={{ "h-10": !hidden(), "h-0": hidden() }}
+			classList={{ "basis-10": !hidden(), "basis-0": hidden() }}
 		>
 			<div
 				class="px-4 py-2 font-bold transition-colors duration-1000 ease-in-out"

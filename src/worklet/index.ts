@@ -1,7 +1,8 @@
-import { Message, Ring } from "~/shared"
+import { Buffer } from "../shared/ring"
+import * as Message from "../shared/message"
 
 class Renderer extends AudioWorkletProcessor {
-	ring?: Ring.Buffer
+	ring?: Buffer
 	base: number
 
 	constructor() {
@@ -13,7 +14,7 @@ class Renderer extends AudioWorkletProcessor {
 	}
 
 	onConfig(config: Message.ConfigAudio) {
-		this.ring = new Ring.Buffer(config.ring)
+		this.ring = new Buffer(config.ring)
 	}
 
 	onMessage(e: MessageEvent) {

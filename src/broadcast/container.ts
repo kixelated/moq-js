@@ -1,4 +1,4 @@
-import { MP4 } from "~/shared"
+import * as MP4 from "../shared/mp4"
 import { Encoder, EncoderTrack } from "./encoder"
 import { segmented } from "./segment"
 

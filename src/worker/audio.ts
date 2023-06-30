@@ -1,6 +1,6 @@
-import { Ring } from "~/shared"
+import { Ring } from "../shared"
 import * as Timeline from "./timeline"
-import { Message } from "~/shared"
+import { Message } from "../shared"
 
 export class Renderer {
 	ring?: Ring.Buffer

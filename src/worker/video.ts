@@ -1,5 +1,6 @@
 import * as Timeline from "./timeline"
-import { MP4, Message } from "~/shared"
+import * as MP4 from "../shared/mp4"
+import * as Message from "../shared/message"
 
 export class Renderer {
 	private canvas: OffscreenCanvas

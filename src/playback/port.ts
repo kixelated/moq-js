@@ -1,5 +1,5 @@
-import { Message } from "~/shared"
-import { Object } from "~/transport"
+import * as Message from "../shared/message"
+import { Object } from "../transport"
 
 export type Callback = (e: Message.FromWorker) => void
 
@@ -11,7 +11,7 @@ export class Port {
 	#callback: Callback
 
 	constructor(callback: Callback) {
-		const url = new URL("~/worker/index.ts", import.meta.url)
+		const url = new URL("../worker/index.ts", import.meta.url)
 
 		this.#callback = callback
 
@@ -34,11 +34,7 @@ export class Port {
 		this.send({ config }, config.video.canvas)
 	}
 
-	sendSegment(header: Object.Header, stream: ReadableStream) {
-		const segment: Message.Segment = { header, stream }
-		const reader = segment.stream.getReader({ mode: "byob" })
-		reader.releaseLock()
-
+	sendSegment(segment: Message.Segment) {
 		this.send({ segment }, segment.stream)
 	}
 
