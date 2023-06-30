@@ -18,40 +18,21 @@ export function App(props: { url: string }) {
 	const player = new Player(conn)
 	const broadcaster = new Broadcaster(conn)
 
-	const [nav, setNav] = createSignal<"playback" | "broadcast" | "setup">("setup")
-
-	const startPlayback = () => {
-		setNav("playback")
-	}
-	const startBroadcast = () => {
-		setNav("broadcast")
-	}
-
 	return (
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
 			<Notice conn={conn} player={player} />
+			<Playback.Main player={player} />
+			<Broadcast.Main broadcaster={broadcaster} />
 
-			<Switch>
-				<Match when={nav() === "setup"}>
-					<div class="flex flex-row bg-white/90">
-						<div class="basis-1/2 p-6">
-							<Playback.Setup start={startPlayback} player={player} />
-						</div>
-						<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
-						<div class="basis-1/2 p-6">
-							<Broadcast.Setup broadcaster={broadcaster} />
-						</div>
-					</div>
-				</Match>
-
-				<Match when={nav() === "playback"}>
-					<Playback.Main player={player} />
-				</Match>
-
-				<Match when={nav() === "broadcast"}>
-					<Broadcast.Main broadcaster={broadcaster} />
-				</Match>
-			</Switch>
+			<div class="flex flex-row bg-white/90">
+				<div class="basis-1/2 p-6">
+					<Playback.Setup player={player} />
+				</div>
+				<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
+				<div class="basis-1/2 p-6">
+					<Broadcast.Setup broadcaster={broadcaster} />
+				</div>
+			</div>
 		</div>
 	)
 }

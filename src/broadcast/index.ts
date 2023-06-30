@@ -6,7 +6,7 @@ export class Broadcaster {
 	#conn: Connection
 
 	// A map of track IDs to subscription IDs
-	#subscriptions: Map<string, bigint> = new Map()
+	#subscriptions = new Map<string, bigint>()
 
 	#namespace?: string
 
@@ -74,7 +74,7 @@ export class Broadcaster {
 		// Immediately announce our namespace
 		this.#sendControl({
 			type: Control.Type.Announce,
-			namespace: this.#namespace!,
+			namespace: this.#namespace,
 		})
 
 		// Wait for the connection to be established.
@@ -83,8 +83,6 @@ export class Broadcaster {
 		// Read any messages.
 		for (;;) {
 			const msg = await control.recv()
-			if (!msg) break
-
 			await this.#receiveControl(msg)
 		}
 	}

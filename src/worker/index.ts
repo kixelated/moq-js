@@ -25,6 +25,7 @@ class Worker {
 		const msg = e.data as Message.ToWorker
 
 		if (msg.config) {
+			console.log("got config", msg.config)
 			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline)
 			this.#video = new Video.Renderer(msg.config.video, this.#timeline)
 		} else if (msg.segment) {
@@ -41,19 +42,18 @@ class Worker {
 		} else if (msg.seek) {
 			this.#timeline.seek(msg.seek.timestamp)
 		} else {
-			throw new Error(`unknown message ${msg}`)
+			throw new Error(`unknown message: + ${JSON.stringify(msg)}`)
 		}
 	}
 
 	async #runTimeline() {
-		for (let epoch = 0; ; epoch++) {
+		for (;;) {
 			// TODO support gaps
 			const audio = this.#timeline.audio.ranges()
 			const video = this.#timeline.video.ranges()
 
 			// TODO send on each update, not at an interval
 			const timeline: Message.Timeline = {
-				epoch,
 				audio: { buffer: audio },
 				video: { buffer: video },
 			}

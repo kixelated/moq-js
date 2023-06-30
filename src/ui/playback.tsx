@@ -1,4 +1,4 @@
-import { Player, Range, Broadcast } from "../playback"
+import { Player, Range, Broadcast, Timeline } from "../playback"
 import * as MP4 from "../shared/mp4"
 
 import { createSignal, createMemo, onMount, For, Show, createEffect } from "solid-js"
@@ -8,17 +8,31 @@ export function Main(props: { player: Player }) {
 
 	onMount(() => {
 		props.player.render(canvas)
+		return props.player.close
+	})
+
+	const [timeline, setTimeline] = createSignal<Timeline>({ audio: { buffer: [] }, video: { buffer: [] } })
+
+	createEffect(async () => {
+		for await (const timeline of props.player.timeline()) {
+			console.log(timeline)
+			setTimeline(timeline)
+		}
+	})
+
+	const playing = createMemo(() => {
+		return timeline() && timeline()?.timestamp !== undefined
 	})
 
 	return (
-		<>
+		<div class="flex flex-col transition-all duration-1000" classList={{ "h-[500]": playing(), "h-0": !playing() }}>
 			<canvas ref={canvas!} width="854" height="480" class="aspect-video bg-black"></canvas>
-			<Timeline player={props.player} />
-		</>
+			<Buffer width={854} height={20} timeline={timeline()} />
+		</div>
 	)
 }
 
-export function Setup(props: { start: () => void; player: Player }) {
+export function Setup(props: { player: Player }) {
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
 
 	createEffect(async () => {
@@ -35,7 +49,7 @@ export function Setup(props: { start: () => void; player: Player }) {
 					{(broadcast) => {
 						return (
 							<li class="mt-4">
-								<SetupBroadcast start={props.start} broadcast={broadcast} />
+								<SetupBroadcast player={props.player} broadcast={broadcast} />
 							</li>
 						)
 					}}
@@ -45,11 +59,11 @@ export function Setup(props: { start: () => void; player: Player }) {
 	)
 }
 
-function SetupBroadcast(props: { start: () => void; broadcast: Broadcast }) {
+function SetupBroadcast(props: { player: Player; broadcast: Broadcast }) {
 	const watch = (e: MouseEvent) => {
 		e.preventDefault()
 		props.broadcast.subscribeAuto()
-		props.start()
+		props.player.play()
 	}
 
 	const stylizeName = (name: string) => {
@@ -92,29 +106,18 @@ function trackInfo(track: MP4.Track) {
 	}
 }
 
-function Timeline(props: { player: Player }) {
+function Buffer(props: { timeline: Timeline; width: number; height: number }) {
 	let svg: SVGSVGElement
 
-	const [width, setWidth] = createSignal(0)
-	onMount(() => {
-		setWidth(svg.getBBox().width)
+	const playhead = createMemo(() => {
+		return props.timeline.timestamp ?? 0
 	})
 
-	const [playhead, setPlayhead] = createSignal(0)
 	//setInterval(() => setPlayhead((x) => x + 0.01), 10)
 
-	const [audio, setAudio] = createSignal([
-		{ start: 0, end: 0.5 },
-		{ start: 1.0, end: 2.0 },
-	])
-
-	const [video, setVideo] = createSignal([
-		{ start: 0, end: 0.7 },
-		{ start: 1.0, end: 2.1 },
-	])
-
 	const bounds = createMemo(() => {
-		return { start: playhead() - width() / 2, end: playhead() + width() / 2 }
+		const width = props.width / 100
+		return { start: playhead() - width / 2, end: playhead() + width / 2 }
 	})
 
 	const click = (e: MouseEvent) => {
@@ -127,24 +130,23 @@ function Timeline(props: { player: Player }) {
 
 		// TODO can we make this accurate?
 		const timestamp = playhead() - rect.width / 100 + e.clientX
-		props.player.seek(timestamp)
+		//props.player.seek(timestamp)
 	}
 
 	return (
-		<div class="relative">
-			<svg
-				ref={svg!}
-				class="h-6 w-full"
-				viewBox={`${bounds().start} 0 ${bounds().end - bounds().start} 0.24`}
-				preserveAspectRatio="xMidYMid meet"
-				onClick={click}
-			>
-				<Component y={0} height={0.12} ranges={audio()} />
-				<Component y={0.12} height={0.12} ranges={video()} />
-				<Legend playhead={playhead()} />
-				<Playhead playhead={playhead()} />
-			</svg>
-		</div>
+		<svg
+			ref={svg!}
+			width={props.width}
+			height={props.height}
+			viewBox={`${bounds().start} 0 ${bounds().end - bounds().start} 0.24`}
+			preserveAspectRatio="xMidYMid meet"
+			onClick={click}
+		>
+			<Component y={0} height={0.12} ranges={props.timeline.audio.buffer} />
+			<Component y={0.12} height={0.12} ranges={props.timeline.video.buffer} />
+			<Legend playhead={playhead()} />
+			<Playhead playhead={playhead()} />
+		</svg>
 	)
 }
 

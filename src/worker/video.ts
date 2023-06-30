@@ -6,7 +6,7 @@ export class Renderer {
 	private canvas: OffscreenCanvas
 	private timeline: Timeline.Sync
 
-	private queue: Array<VideoFrame>
+	private queue: VideoFrame[]
 	private decoder?: VideoDecoder
 	private continuity?: number // the continuity of the last decoded frame
 	private rendered?: number // the timestamp of the last rendered frame
@@ -93,8 +93,10 @@ export class Renderer {
 				}
 
 				// Close all existing frames
-				while (this.queue.length) {
-					this.queue.shift()!.close()
+				for (;;) {
+					const frame = this.queue.shift()
+					if (!frame) break
+					frame.close()
 				}
 			}
 
@@ -149,7 +151,7 @@ export class Renderer {
 			codec: track.codec,
 			codedHeight: track.video.height,
 			codedWidth: track.video.width,
-			description: description.buffer?.slice(8),
+			description: description.buffer.slice(8),
 			// optimizeForLatency: true
 		})
 

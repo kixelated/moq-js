@@ -87,7 +87,7 @@ export class Sync {
 		const video = this.video.span()
 
 		// Set our timestamp to be relative to the max value we have buffered.
-		const min = combined || audio || video
+		const min = combined ?? audio ?? video
 		if (!min) return
 
 		// NOTE: This could be in an unbuffered range.
@@ -104,7 +104,7 @@ export class Sync {
 
 export class Component {
 	// A queue of frames sorted by timestamp with the maximum capacity.
-	#queue: Array<Frame>
+	#queue: Frame[]
 	#capacity: number
 
 	// The next sample that we should push to the renderer.
@@ -194,7 +194,7 @@ interface Timed {
 	timestamp: number
 }
 
-export function search(queue: Array<Timed>, timestamp: number): number {
+export function search(queue: Timed[], timestamp: number): number {
 	// Do binary search
 	let low = 0
 	let high = queue.length

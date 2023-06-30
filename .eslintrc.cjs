@@ -12,7 +12,7 @@ module.exports = {
 	root: true,
 	ignorePatterns: ["dist", "node_modules", "tailwind.config.js", ".eslintrc.cjs"],
 	rules: {
-		// "@typescript-eslint/no-non-null-assertion": "off",
+		"@typescript-eslint/no-non-null-assertion": "off",
 		"@typescript-eslint/no-explicit-any": "off",
 		"no-unused-vars": "off", // Disable so we can allow variables prefixed with _
 		"@typescript-eslint/no-unused-vars": [

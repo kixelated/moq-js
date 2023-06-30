@@ -7,7 +7,7 @@ import { Deferred } from "../shared/async"
 // Decoder receives a QUIC stream, parsing the MP4 container, and passing samples to the Timeline.
 export class Decoder {
 	#timeline: Timeline.Sync
-	#info: Deferred<MP4.Info> = new Deferred()
+	#info = new Deferred<MP4.Info>()
 	#raw: MP4.ArrayBuffer[] = []
 
 	constructor(timeline: Timeline.Sync) {
@@ -40,7 +40,7 @@ export class Decoder {
 			}
 
 			mp4.onError = (err) => {
-				throw err
+				throw new Error(err)
 			}
 
 			for (;;) {
@@ -76,7 +76,7 @@ export class Decoder {
 		const mp4 = MP4.New()
 
 		mp4.onError = (err) => {
-			throw err
+			throw new Error(err)
 		}
 
 		mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {

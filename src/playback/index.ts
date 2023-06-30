@@ -8,6 +8,7 @@ import * as Message from "../shared/message"
 import * as MP4 from "../shared/mp4"
 
 export type Range = Message.Range
+export type Timeline = Message.Timeline
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
@@ -98,8 +99,6 @@ export class Player {
 
 		for (;;) {
 			const msg = await control.recv()
-			if (!msg) break
-
 			await this.#receiveControl(msg)
 		}
 	}
@@ -203,18 +202,11 @@ export class Player {
 		// Wait until connected, so we can throw any errors.
 		await this.connected
 
-		for (let i = 0; ; i += 1) {
-			// Return the cached timeline if the epoch is large enough
-			if (this.#timeline && this.#timeline.epoch >= i) {
-				// Yield the updated timeline.
+		for (;;) {
+			if (this.#timeline) {
 				yield this.#timeline
-				i = this.#timeline.epoch
-			} else if (this.#error) {
-				throw this.#error
-			} else {
-				// Otherwise wait for the next update.
-				await this.#timelineNotify.wait()
 			}
+			await this.#timelineNotify.wait()
 		}
 	}
 

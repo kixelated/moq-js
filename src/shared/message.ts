@@ -46,9 +46,6 @@ export interface Catalog {
 
 // Sent periodically with the current timeline info.
 export interface Timeline {
-	// The epoch, increased by 1 for each update
-	epoch: number
-
 	// The current playback position
 	timestamp?: number
 
