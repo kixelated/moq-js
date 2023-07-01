@@ -84,7 +84,7 @@ export class Decoder {
 				const frame = {
 					track,
 					sample,
-					timestamp: sample.dts / track.timescale,
+					timestamp: sample.dts / track.timescale, // TODO don't convert to seconds for better accuracy
 				}
 
 				this.#timeline.push(frame)

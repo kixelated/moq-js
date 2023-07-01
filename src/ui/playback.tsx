@@ -15,7 +15,6 @@ export function Main(props: { player: Player }) {
 
 	createEffect(async () => {
 		for await (const timeline of props.player.timeline()) {
-			console.log(timeline)
 			setTimeline(timeline)
 		}
 	})
@@ -25,9 +24,12 @@ export function Main(props: { player: Player }) {
 	})
 
 	return (
-		<div class="flex flex-col transition-all duration-1000" classList={{ "h-[500]": playing(), "h-0": !playing() }}>
+		<div
+			class="flex flex-col overflow-hidden transition-all duration-1000"
+			classList={{ "h-[500]": playing(), "h-0": !playing() }}
+		>
 			<canvas ref={canvas!} width="854" height="480" class="aspect-video bg-black"></canvas>
-			<Buffer width={854} height={20} timeline={timeline()} />
+			<Buffer timeline={timeline()} />
 		</div>
 	)
 }
@@ -106,18 +108,25 @@ function trackInfo(track: MP4.Track) {
 	}
 }
 
-function Buffer(props: { timeline: Timeline; width: number; height: number }) {
-	let svg: SVGSVGElement
-
+function Buffer(props: { timeline: Timeline }) {
 	const playhead = createMemo(() => {
 		return props.timeline.timestamp ?? 0
 	})
 
-	//setInterval(() => setPlayhead((x) => x + 0.01), 10)
+	const maxEnd = (ranges: Range[]) => {
+		return ranges.reduce((max, range) => Math.max(max, range.end), 0)
+	}
 
 	const bounds = createMemo(() => {
-		const width = props.width / 100
-		return { start: playhead() - width / 2, end: playhead() + width / 2 }
+		const start = Math.max(playhead() - 2, 0)
+		const end =
+			Math.max(
+				maxEnd(props.timeline.audio.buffer) + 1,
+				maxEnd(props.timeline.video.buffer) + 1,
+				playhead() + 3,
+				start + 4
+			) + 1
+		return { start, end }
 	})
 
 	const click = (e: MouseEvent) => {
@@ -134,57 +143,50 @@ function Buffer(props: { timeline: Timeline; width: number; height: number }) {
 	}
 
 	return (
-		<svg
-			ref={svg!}
-			width={props.width}
-			height={props.height}
-			viewBox={`${bounds().start} 0 ${bounds().end - bounds().start} 0.24`}
-			preserveAspectRatio="xMidYMid meet"
-			onClick={click}
-		>
-			<Component y={0} height={0.12} ranges={props.timeline.audio.buffer} />
-			<Component y={0.12} height={0.12} ranges={props.timeline.video.buffer} />
-			<Legend playhead={playhead()} />
-			<Playhead playhead={playhead()} />
-		</svg>
+		<div class="relative flex h-6 flex-col transition-all duration-100" onClick={click}>
+			<Component bounds={bounds()} ranges={props.timeline.audio.buffer} />
+			<Component bounds={bounds()} ranges={props.timeline.video.buffer} />
+			<Legend bounds={bounds()} playhead={playhead()} />
+			<Playhead bounds={bounds()} playhead={playhead()} />
+		</div>
 	)
 }
 
-function Component(props: { y: number; height: number; ranges: Range[] }) {
+function Component(props: { bounds: Range; ranges: Range[] }) {
 	return (
-		<For each={props.ranges}>
-			{(range) => {
-				return (
-					<rect
-						x={range.start}
-						width={range.end - range.start}
-						y={props.y}
-						height={props.height}
-						class="fill-indigo-500"
-					></rect>
-				)
+		<div class="relative basis-1/2">
+			<For each={props.ranges}>
+				{(range) => {
+					return (
+						<div
+							class="absolute bottom-0 top-0 bg-indigo-500 transition-all"
+							style={{
+								left: `${asPercent(range.start, props.bounds)}%`,
+								width: `${asPercent(range.end, props.bounds) - asPercent(range.start, props.bounds)}%`,
+							}}
+						></div>
+					)
+				}}
+			</For>
+		</div>
+	)
+}
+
+function Playhead(props: { bounds: Range; playhead: number }) {
+	return (
+		<div
+			class="absolute bottom-0 top-0 w-1 bg-indigo-50/50 transition-[left]"
+			style={{
+				left: `${asPercent(props.playhead, props.bounds)}%`,
 			}}
-		</For>
+		></div>
 	)
 }
 
-function Playhead(props: { playhead: number }) {
-	return (
-		<line
-			x1={props.playhead}
-			x2={props.playhead}
-			y1="0.02"
-			y2="0.22"
-			stroke-width="0.01"
-			class="stroke-indigo-50/50"
-		></line>
-	)
-}
-
-function Legend(props: { playhead: number }) {
+function Legend(props: { bounds: Range; playhead: number }) {
 	const breakpoints = createMemo(() => {
-		const start = Math.floor(props.playhead - 10)
-		const end = Math.ceil(props.playhead + 10)
+		const start = Math.floor(props.bounds.start)
+		const end = Math.ceil(props.bounds.end)
 
 		const breakpoints = []
 		for (let i = start; i <= end; i++) {
@@ -198,17 +200,19 @@ function Legend(props: { playhead: number }) {
 		<For each={breakpoints()}>
 			{(breakpoint) => {
 				return (
-					<text
-						x={breakpoint}
-						y="0.16"
-						font-size="0.14"
-						class="fill-white"
-						style={{ "text-anchor": "middle" }}
+					<div
+						class="absolute bottom-0 top-0 text-sm text-white transition-[left]"
+						style={{ left: `${asPercent(breakpoint, props.bounds)}%` }}
 					>
 						{breakpoint}
-					</text>
+					</div>
 				)
 			}}
 		</For>
 	)
+}
+
+// Converts a value from to a 0-100 range based on the bounds.
+function asPercent(value: number, bounds: Range) {
+	return (100 * (value - bounds.start)) / (bounds.end - bounds.start)
 }

@@ -180,13 +180,43 @@ export class Component {
 		return { start: first.timestamp, end: last.timestamp }
 	}
 
-	// TODO implement gaps
 	ranges(): Range[] {
 		if (!this.#queue.length) return []
-		const first = this.#queue[0]
-		const last = this.#queue[this.#queue.length - 1]
 
-		return [{ start: first.timestamp, end: last.timestamp }]
+		// Compute the minimum distance between two samples if the duration is unknown.
+		let gap = Infinity
+		for (let i = 1; i < this.#queue.length; i++) {
+			const [prev, next] = [this.#queue[i - 1].sample, this.#queue[i].sample]
+			if (prev.dts === next.dts || prev.timescale !== next.timescale) continue
+			gap = Math.min(gap, next.dts - prev.dts)
+		}
+
+		if (gap === Infinity) gap = 0 // just in case
+
+		// Start with the first sample.
+		const first = this.#queue[0].sample
+		const ranges = [{ start: first.dts, end: first.dts + first.duration || gap, timescale: first.timescale }]
+
+		// Loop over every sample, merging ranges while there's no gap.
+		for (const frame of this.#queue.slice(1)) {
+			const sample = frame.sample
+			const prev = ranges[ranges.length - 1]
+
+			// Make sure the timescale is the same, and there's no gap.
+			if (sample.dts <= prev.end && sample.timescale === prev.timescale) {
+				prev.end += sample.duration || gap
+			} else {
+				// Otherwise, start a new range.
+				ranges.push({
+					start: sample.dts,
+					end: sample.dts + sample.duration || gap,
+					timescale: sample.timescale,
+				})
+			}
+		}
+
+		// Convert to seconds
+		return ranges.map((range) => ({ start: range.start / range.timescale, end: range.end / range.timescale }))
 	}
 }
 
