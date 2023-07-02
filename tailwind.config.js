@@ -2,7 +2,12 @@
 module.exports = {
 	content: ["./src/ui/**/*.{html,js,ts,jsx,tsx}"],
 	theme: {
-		extend: {},
+		extend: {
+			transitionProperty: {
+				size: "height, width, flex-basis",
+				pos: "top, right, bottom, left",
+			},
+		},
 	},
 	plugins: [require("@tailwindcss/forms")],
 }

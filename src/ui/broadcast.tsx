@@ -3,11 +3,11 @@ import { Broadcaster } from "../broadcast"
 import { For } from "solid-js"
 import { createStore } from "solid-js/store"
 
-export function Main(props: { broadcaster: Broadcaster }) {
+export function Main(props: { active: boolean; broadcaster: Broadcaster }) {
 	return <></>
 }
 
-export function Setup(props: { broadcaster: Broadcaster }) {
+export function Setup(props: { select: () => void; broadcaster: Broadcaster }) {
 	const [state, setState] = createStore({
 		name: "",
 		codec: "h.264",
