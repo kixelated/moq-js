@@ -28,7 +28,7 @@ export class Transport {
 		return stream
 	}
 
-	async recv(): Promise<[Header, ReadableStream] | undefined> {
+	async recv(): Promise<{ header: Header; stream: ReadableStream } | undefined> {
 		const streams = this.quic.incomingUnidirectionalStreams.getReader()
 
 		const { value, done } = await streams.read()
@@ -37,7 +37,7 @@ export class Transport {
 		if (done) return
 
 		const header = await this.#decode(value)
-		return [header, value]
+		return { header, stream: value }
 	}
 
 	async #decode(s: ReadableStream): Promise<Header> {

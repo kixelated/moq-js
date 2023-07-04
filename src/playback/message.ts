@@ -1,7 +1,5 @@
-import { Info } from "../shared/mp4"
-
-import { Object } from "../transport"
-import * as Ring from "./ring"
+import { Header } from "../transport/object"
+import { RingShared } from "../common/ring"
 
 export interface Config {
 	audio: ConfigAudio
@@ -12,7 +10,7 @@ export interface ConfigAudio {
 	channels: number
 	sampleRate: number
 
-	ring: Ring.Init
+	ring: RingShared
 }
 
 export interface ConfigVideo {
@@ -20,9 +18,8 @@ export interface ConfigVideo {
 }
 
 export interface Segment {
-	broadcast: string
-
-	header: Object.Header
+	init: Uint8Array
+	header: Header
 	stream: ReadableStream
 }
 
@@ -33,15 +30,6 @@ export interface Play {
 
 export interface Seek {
 	timestamp: number
-}
-
-// Sent by the worker when the catalog is parsed and the broadcast info is known.
-export interface Catalog {
-	// The name of the broadcast
-	broadcast: string
-
-	// The contents of the MP4 container
-	info: Info
 }
 
 // Sent periodically with the current timeline info.
@@ -86,9 +74,6 @@ export interface ToWorker {
 
 // Any top-level messages that can be sent from the worker.
 export interface FromWorker {
-	// Sent to the main thread after the catalog has been parsed
-	catalog?: Catalog
-
 	// Sent back to the main thread regularly to update the UI
 	timeline?: Timeline
 }
@@ -99,3 +84,60 @@ interface ToWorklet {
 }
 
 */
+
+export type Callback = (e: FromWorker) => void
+
+// Responsible for sending messages to the worker and worklet.
+export class Port {
+	// General worker
+	#worker: Worker
+
+	#callback: Callback
+
+	constructor(callback: Callback) {
+		const url = new URL("worker.ts", import.meta.url)
+
+		this.#callback = callback
+
+		// TODO does this block the main thread? If so, make this async
+		this.#worker = new Worker(url, {
+			type: "module",
+			name: "media",
+		})
+
+		this.#worker.addEventListener("message", this.on.bind(this))
+	}
+
+	// Just to enforce we're sending valid types to the worker
+	private send(msg: ToWorker, ...transfer: Transferable[]) {
+		//console.log("sent message from main to worker", msg)
+		this.#worker.postMessage(msg, transfer)
+	}
+
+	sendConfig(config: Config) {
+		this.send({ config }, config.video.canvas)
+	}
+
+	sendSegment(segment: Segment) {
+		this.send({ segment }, segment.stream)
+	}
+
+	sendPlay(play: Play) {
+		this.send({ play })
+	}
+
+	sendSeek(seek: Seek) {
+		this.send({ seek })
+	}
+
+	private on(e: MessageEvent) {
+		const msg = e.data as FromWorker
+
+		// Don't print the verbose timeline message.
+		if (!msg.timeline) {
+			//console.log("received message from worker to main", msg)
+		}
+
+		this.#callback(msg)
+	}
+}

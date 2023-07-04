@@ -1,129 +1,129 @@
 import { Player } from "../playback"
 import { Broadcaster } from "../broadcast"
-import { Connection } from "../transport"
+import { Connection } from "../transport/connection"
+import { connect } from "../transport/client"
+import { asError } from "../common/error"
 
-import {
-	createSignal,
-	JSX,
-	createEffect,
-	onMount,
-	Show,
-	For,
-	Switch,
-	Match,
-	ErrorBoundary,
-	createMemo,
-	onCleanup,
-	catchError,
-} from "solid-js"
-import { createStore } from "solid-js/store"
+import { createSignal, Show, createEffect, onCleanup, createMemo } from "solid-js"
 
 import * as Playback from "./playback"
 import * as Broadcast from "./broadcast"
 
 export function App(props: { url: string }) {
-	const conn = new Connection({
-		url: props.url,
-		role: "both",
-		fingerprint: props.url + "/fingerprint",
-	})
+	const [connection, setConnection] = createSignal<Connection | undefined>()
+	const [player, setPlayer] = createSignal<Player | undefined>()
+	const [broadcaster, setBroadcaster] = createSignal<Broadcaster | undefined>()
 
-	const player = new Player(conn)
-	const broadcaster = new Broadcaster(conn)
-
-	const [nav, setNav] = createSignal("setup")
+	const setup = createMemo(() => !player() && !broadcaster())
 
 	return (
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
-			<Notice conn={conn} player={player}>
-				<Playback.Main active={nav() === "playback"} player={player} />
-				<Broadcast.Main active={nav() === "broadcast"} broadcaster={broadcaster} />
-				<Setup active={nav() === "setup"} select={setNav} player={player} broadcaster={broadcaster} />
-			</Notice>
+			<Connecting url={props.url} setConnection={setConnection} />
+
+			<div
+				class="flex flex-col overflow-hidden transition-size duration-1000"
+				classList={{ "h-[500]": !!player(), "h-0": !player() }}
+			>
+				<Show when={player()}>
+					<Playback.Main player={player()!} />
+				</Show>
+			</div>
+
+			<div
+				class="flex flex-col overflow-hidden transition-size duration-1000"
+				classList={{ "h-[500]": !!player(), "h-0": !player() }}
+			>
+				<Show when={broadcaster()}>
+					<Broadcast.Main broadcaster={broadcaster()!} />
+				</Show>
+			</div>
+
+			<div
+				class="flex flex-row bg-white/90 transition-size duration-1000"
+				classList={{ "h-96": setup(), "h-0": setup() }}
+			>
+				<div class="basis-1/2 p-6">
+					<Playback.Setup connection={connection()} setPlayer={setPlayer} />
+				</div>
+				<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
+				<div class="basis-1/2 p-6">
+					<Broadcast.Setup connection={connection()} setBroadcaster={setBroadcaster} />
+				</div>
+			</div>
 		</div>
 	)
 }
 
-function Notice(props: { conn: Connection; player: Player; children: JSX.Element }) {
-	const [error, setError] = createSignal<any>()
+function Connecting(props: { url: string; setConnection: (v: Connection | undefined) => void }) {
+	const [state, setState] = createSignal<"connecting" | "connected" | "hidden" | "closed" | "error">("connecting")
+	const [error, setError] = createSignal<Error>()
 
-	const [state, setState] = createSignal("loading")
-	const [hidden, setHidden] = createSignal(false)
-
-	// Hide the notice after a few seconds when state == "connected"
-	createEffect(() => {
-		if (error() || state() !== "connected") {
-			return
-		}
-
-		const timeout = setTimeout(() => {
-			setHidden(true)
-		}, 3000)
-
-		// Cleanup the timeout if the state changes
-		onCleanup(() => {
-			clearTimeout(timeout)
-		})
-	})
-
-	onMount(async () => {
+	createEffect(async () => {
 		try {
-			await props.conn.connected
-			setState("handshake")
-			await props.player.connected
+			props.setConnection(undefined)
+			setState("connecting")
+
+			const connection = await connect({
+				url: props.url,
+				role: "both",
+				fingerprint: props.url + "/fingerprint",
+			})
+
+			onCleanup(connection.close)
+
+			props.setConnection(connection)
 			setState("connected")
-			await props.player.running
+
+			// After, 3s hide the banner
+			const timeout = setTimeout(() => setState("hidden"), 3000)
+			onCleanup(() => clearTimeout(timeout))
+
+			await connection.run()
+
 			setState("closed")
 		} catch (e) {
-			setError(e)
+			setError(asError(e))
+			setState("error")
 		}
 	})
 
 	return (
 		<>
 			<div
-				class="overflow-hidden transition-size duration-1000 ease-in-out"
-				classList={{ "h-10": !hidden(), "h-0": hidden() }}
+				class="overflow-hidden bg-red-400 transition-size duration-1000 ease-in-out"
+				classList={{ "h-10": state() === "error", "h-0": state() !== "error" }}
 			>
-				<div
-					class="px-4 py-2 font-bold transition-colors duration-1000 ease-in-out"
-					classList={{
-						"bg-indigo-400": state() == "loading" || state() == "handshake",
-						"bg-green-400": state() == "connected",
-						"bg-grey-700": state() == "closed",
-						"bg-red-400": error(),
-					}}
-				>
-					<Switch>
-						<Match when={error()}>{error() + ""}</Match>
-						<Match when={state() == "loading"}>Connecting to QUIC server</Match>
-						<Match when={state() == "handshake"}>Connecting to MoQ server</Match>
-						<Match when={state() == "connected"}>Connected to server</Match>
-						<Match when={state() == "closed"}>Connection closed</Match>
-					</Switch>
-				</div>
+				<Show when={error()}>
+					<div class="px-4 py-2 font-bold">{error()!.message}</div>
+				</Show>
 			</div>
-			{catchError(
-				() => props.children,
-				(e) => setError(e)
-			)}
+			<div
+				class="overflow-hidden bg-green-400 transition-size duration-1000 ease-in-out"
+				classList={{
+					"h-10": state() === "connected",
+					"h-0": state() !== "connected",
+				}}
+			>
+				<div class="px-4 py-2 font-bold">Connected to {props.url}</div>
+			</div>
+			<div
+				class="overflow-hidden bg-indigo-400 transition-size duration-1000 ease-in-out"
+				classList={{
+					"h-10": state() === "connecting",
+					"h-0": state() !== "connecting",
+				}}
+			>
+				<div class="px-4 py-2 font-bold">Connecting to {props.url}</div>
+			</div>
+			<div
+				class="overflow-hidden bg-gray-400 transition-size duration-1000 ease-in-out"
+				classList={{
+					"h-10": state() === "closed",
+					"h-0": state() !== "closed",
+				}}
+			>
+				<div class="px-4 py-2 font-bold">Closed</div>
+			</div>
 		</>
-	)
-}
-
-function Setup(props: { active: boolean; select: (name: string) => void; player: Player; broadcaster: Broadcaster }) {
-	return (
-		<div
-			class="flex flex-row bg-white/90 transition-size duration-1000"
-			classList={{ "h-96": props.active, "h-0": !props.active }}
-		>
-			<div class="basis-1/2 p-6">
-				<Playback.Setup start={props.select.bind(null, "playback")} player={props.player} />
-			</div>
-			<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
-			<div class="basis-1/2 p-6">
-				<Broadcast.Setup select={props.select.bind(null, "broadcast")} broadcaster={props.broadcaster} />
-			</div>
-		</div>
 	)
 }

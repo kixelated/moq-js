@@ -1,12 +1,22 @@
-import { Deferred } from "../shared/async"
+import { Deferred } from "../common/async"
+
+export interface Config {
+	audio?: TrackConfig
+	video?: TrackConfig
+}
+
+export interface TrackConfig {
+	codec?: string
+	bitrate?: number
+}
 
 export class Encoder {
-	tracks: Array<EncoderTrack> = []
+	tracks: EncoderTrack[] = []
 
-	constructor(source: MediaStream) {
+	constructor(source: MediaStream, config: Config = {}) {
 		for (const t of source.getTracks()) {
 			if (isVideoTrack(t)) {
-				const track = new EncoderTrack(t)
+				const track = new EncoderTrack(t, config.video)
 				this.tracks.push(track)
 			} else if (isAudioTrack(t)) {
 				// TODO
@@ -17,6 +27,7 @@ export class Encoder {
 
 export class EncoderTrack {
 	#encoder?: VideoEncoder
+	#config: TrackConfig
 	#keyframeCounter = 0 // insert a keyframe every 2s at least
 
 	// inputs
@@ -24,11 +35,12 @@ export class EncoderTrack {
 	#settings: MediaTrackSettings
 
 	// outputs
-	#init: Deferred<VideoDecoderConfig>
+	#init = new Deferred<VideoDecoderConfig>()
 	frames: ReadableStream<EncodedVideoChunk>
 
-	constructor(input: MediaStreamVideoTrack) {
-		this.#init = new Deferred()
+	constructor(input: MediaStreamVideoTrack, config: TrackConfig = {}) {
+		this.#config = config
+
 		this.frames = new ReadableStream({
 			start: this.#start.bind(this),
 			pull: this.#pull.bind(this),
@@ -43,20 +55,22 @@ export class EncoderTrack {
 		return this.#init.promise
 	}
 
-	async #start(controller: ReadableStreamDefaultController<EncodedVideoChunk>) {
+	#start(controller: ReadableStreamDefaultController<EncodedVideoChunk>) {
 		this.#encoder = new VideoEncoder({
-			output: this.#enqueue.bind(this, controller),
+			output: (frame, metadata) => {
+				this.#enqueue(controller, frame, metadata)
+			},
 			error: (err) => {
 				throw err
 			},
 		})
 
-		await this.#encoder.configure({
-			codec: "avc1",
+		this.#encoder.configure({
+			codec: this.#config.codec ?? "av1",
 			width: this.#settings.width!,
 			height: this.#settings.height!,
 			framerate: this.#settings.frameRate!,
-			bitrate: 2_000_000, // TODO configurable
+			bitrate: this.#config.bitrate ?? 2_000_000,
 			latencyMode: "realtime", // TODO configurable
 		})
 	}
@@ -80,21 +94,21 @@ export class EncoderTrack {
 			this.#keyframeCounter += 1
 		}
 
-		await encoder.encode(frame, { keyFrame: insertKeyframe })
+		encoder.encode(frame, { keyFrame: insertKeyframe })
 
 		frame.close()
 	}
 
-	async #cancel() {
+	#cancel() {
 		this.#encoder!.close()
 	}
 
-	async #enqueue(
+	#enqueue(
 		controller: ReadableStreamDefaultController<EncodedVideoChunk>,
 		frame: EncodedVideoChunk,
 		metadata?: EncodedVideoChunkMetadata
 	) {
-		if (metadata && metadata.decoderConfig && this.#init.pending) {
+		if (metadata?.decoderConfig && this.#init.pending) {
 			this.#init.resolve(metadata.decoderConfig)
 		}
 

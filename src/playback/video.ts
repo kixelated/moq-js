@@ -1,17 +1,17 @@
-import * as Timeline from "./timeline"
-import * as MP4 from "../shared/mp4"
-import * as Message from "../shared/message"
+import { Frame, Timeline, findTimestamp } from "./timeline"
+import * as MP4 from "../common/mp4"
+import * as Message from "./message"
 
 export class Renderer {
 	private canvas: OffscreenCanvas
-	private timeline: Timeline.Sync
+	private timeline: Timeline
 
 	private queue: VideoFrame[]
 	private decoder?: VideoDecoder
 	private continuity?: number // the continuity of the last decoded frame
 	private rendered?: number // the timestamp of the last rendered frame
 
-	constructor(config: Message.ConfigVideo, timeline: Timeline.Sync) {
+	constructor(config: Message.ConfigVideo, timeline: Timeline) {
 		this.canvas = config.canvas
 		this.timeline = timeline
 
@@ -34,7 +34,7 @@ export class Renderer {
 		}
 
 		// Insert the frame into the queue based on the timestamp.
-		const index = Timeline.search(this.queue, frame.timestamp)
+		const index = findTimestamp(this.queue, frame.timestamp)
 		this.queue.splice(index, 0, frame)
 	}
 
@@ -124,7 +124,7 @@ export class Renderer {
 		}
 	}
 
-	private makeDecoder(frame: Timeline.Frame): VideoDecoder {
+	private makeDecoder(frame: Frame): VideoDecoder {
 		// Reuse the decoder if it's not a sync frame
 		if (this.decoder && !frame.sample.is_sync) return this.decoder
 

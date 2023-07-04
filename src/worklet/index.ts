@@ -1,8 +1,15 @@
-import { Buffer } from "../shared/ring"
-import * as Message from "../shared/message"
+import { Ring, RingShared } from "../common/ring"
+//import * as Message from "../common/message"
+
+interface Config {
+	channels: number
+	sampleRate: number
+
+	ring: RingShared
+}
 
 class Renderer extends AudioWorkletProcessor {
-	ring?: Buffer
+	ring?: Ring
 	base: number
 
 	constructor() {
@@ -13,8 +20,8 @@ class Renderer extends AudioWorkletProcessor {
 		this.port.onmessage = this.onMessage.bind(this)
 	}
 
-	onConfig(config: Message.ConfigAudio) {
-		this.ring = new Buffer(config.ring)
+	onConfig(config: Config) {
+		this.ring = new Ring(config.ring)
 	}
 
 	onMessage(e: MessageEvent) {

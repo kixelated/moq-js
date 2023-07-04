@@ -1,144 +1,96 @@
-import { Connection, Control } from "../transport"
-import { Encoder } from "./encoder"
-import { Container, ContainerTrack } from "./container"
+import { Connection } from "../transport/connection"
+import { Encoder, Config } from "./encoder"
+import { Container, ContainerSegment, ContainerTrack } from "./container"
+import { SubscribeRecv } from "../transport/subscribe"
 
 export class Broadcaster {
 	#conn: Connection
 
-	// A map of track IDs to subscription IDs
-	#subscriptions = new Map<string, bigint>()
+	// A map of track IDs to subscriptions
+	#subscriptions = new Map<string, SubscribeRecv[]>()
 
-	#namespace?: string
+	running: Promise<void>
 
 	constructor(conn: Connection) {
 		this.#conn = conn
+		this.running = this.#run() // async
 	}
 
-	async run(namespace: string) {
-		this.#namespace = namespace
-		await Promise.all([this.#runEncoder(), this.#runControl()])
-	}
+	async serve(name: string, stream: MediaStream, config: Config = {}) {
+		const announce = await this.#conn.announce.send(name)
 
-	async #runEncoder() {
-		const constraints = {
-			audio: false,
-			video: {
-				aspectRatio: { ideal: 16 / 9 },
-				width: { max: 1280 },
-				height: { max: 720 },
-				frameRate: { max: 60 },
-			},
+		try {
+			const encoder = new Encoder(stream, config)
+			const container = new Container(encoder)
+
+			const tracks = []
+			for (const track of container.tracks) {
+				tracks.push(this.#serveTrack(track))
+			}
+
+			await Promise.all(tracks)
+			await announce.close()
+		} catch (err) {
+			await announce.close(1n, `error serving track: ${err}`)
 		}
-
-		const stream = await window.navigator.mediaDevices.getUserMedia(constraints)
-		const encoder = new Encoder(stream)
-		const container = new Container(encoder)
-
-		const tracks = []
-		for (const track of container.tracks) {
-			tracks.push(this.#runTrack(track))
-		}
-
-		await Promise.all(tracks)
 	}
 
-	async #runTrack(track: ContainerTrack) {
-		const objects = await this.#conn.objects
+	async #serveTrack(track: ContainerTrack) {
+		const waiting: SubscribeRecv[] = []
+		this.#subscriptions.set(track.name, waiting)
+
 		const reader = track.segments.getReader()
 
 		for (;;) {
-			const res = await reader.read()
-			if (res.done) break
+			const { value, done } = await reader.read()
+			if (done) break
 
-			const segment = res.value
-
-			// TODO keep recent segments in memory for new subscribers
-			const subscribeId = this.#subscriptions.get(track.name)
-			if (subscribeId === undefined) {
-				segment.cancel()
-				continue
+			for (let i = 0; i < waiting.length; i += 1) {
+				const subscriber = waiting[i]
+				if (!subscriber.closed) {
+					this.#serveSegment(subscriber, value) // async
+				} else {
+					// Remove from future iterations
+					waiting.splice(i, 1)
+					i -= 1
+				}
 			}
+		}
+	}
 
-			const stream = await objects.send({
-				track: subscribeId,
+	async #serveSegment(subscriber: SubscribeRecv, segment: ContainerSegment) {
+		try {
+			const stream = await subscriber.data({
 				group: BigInt(segment.sequence),
 				sequence: 0n,
 				send_order: 0n, // TODO
 			})
 
-			segment.fragments.pipeTo(stream) // async
+			await segment.fragments.pipeTo(stream)
+		} catch (e) {
+			subscriber.close(1n, `failed to serve stream: ${e}`)
 		}
 	}
 
-	async #runControl() {
-		// Immediately announce our namespace
-		this.#sendControl({
-			type: Control.Type.Announce,
-			namespace: this.#namespace,
-		})
-
-		// Wait for the connection to be established.
-		const control = await this.#conn.control
-
-		// Read any messages.
+	async #run() {
 		for (;;) {
-			const msg = await control.recv()
-			await this.#receiveControl(msg)
-		}
-	}
+			const subscriber = await this.#conn.subscribe.recv()
 
-	async #receiveControl(msg: Control.Message) {
-		console.log("received message", msg)
-
-		switch (msg.type) {
-			case Control.Type.AnnounceOk:
-				return // cool i guess
-			case Control.Type.AnnounceError:
-				return new Error(`failed to announce: ${msg.reason} (${msg.code})`)
-			case Control.Type.Subscribe:
-				try {
-					await this.#receiveSubscribe(msg)
-
-					await this.#sendControl({
-						type: Control.Type.SubscribeOk,
-						id: msg.id,
-					})
-				} catch (err) {
-					await this.#sendControl({
-						type: Control.Type.SubscribeError,
-						id: msg.id,
-						reason: `${err}`,
-						code: 1n,
-					})
+			try {
+				// TODO verify that the namespace is valid
+				const waiting = this.#subscriptions.get(subscriber.name)
+				if (waiting === undefined) {
+					throw new Error("track name does not exist")
 				}
-				break
-			default:
-				throw new Error(`unknown message type: ${msg.type}`)
-		}
-	}
 
-	async #receiveSubscribe(msg: Control.Subscribe) {
-		if (msg.namespace !== this.#namespace) {
-			throw new Error(`unknown namespace: ${msg.namespace}`)
-		}
+				// TODO serve any existing segments for the track
 
-		// Track names are integers,
-		for (const [trackName, subscriptionID] of this.#subscriptions) {
-			if (subscriptionID === msg.id) {
-				throw new Error("duplicate subscription ID")
-			} else if (trackName === msg.name) {
-				throw new Error("duplicate track name")
+				waiting.push(subscriber)
+
+				await subscriber.ack()
+			} catch (e) {
+				await subscriber.close(1n, `failed to process subscribe: ${e}`)
 			}
 		}
-
-		this.#subscriptions.set(msg.name, msg.id)
-	}
-
-	async #sendControl(msg: Control.Message) {
-		// Wait for the connection to be established.
-		const control = await this.#conn.control
-
-		console.log("sending message", msg)
-		return control.send(msg)
 	}
 }

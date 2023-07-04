@@ -3,10 +3,10 @@ export function segmented(): TransformStream<EncodedVideoChunk, ReadableStream<E
 	let current: WritableStreamDefaultWriter<EncodedVideoChunk> | undefined
 
 	const transformer = new TransformStream({
-		transform: (frame, controller) => {
+		transform: async (frame: EncodedVideoChunk, controller: ReadableStream<EncodedVideoChunk>) => {
 			if (frame.type === "key") {
 				if (current) {
-					current.close()
+					await current.close()
 				}
 
 				const transformer = new TransformStream()
@@ -19,7 +19,7 @@ export function segmented(): TransformStream<EncodedVideoChunk, ReadableStream<E
 				throw new Error("stream did not start with a keyframe")
 			}
 
-			current.write(frame)
+			await current.write(frame)
 		},
 	})
 

@@ -15,10 +15,7 @@
 	},
 	"references": [
 		{
-			"path": "../worker"
-		},
-		{
-			"path": "../shared"
+			"path": "../common"
 		},
 		{
 			"path": "../transport"

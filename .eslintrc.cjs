@@ -3,7 +3,7 @@ module.exports = {
 	extends: [
 		"eslint:recommended",
 		"plugin:@typescript-eslint/recommended",
-		// "plugin:@typescript-eslint/recommended-requiring-type-checking", TODO debug whey this doesn't work
+		"plugin:@typescript-eslint/recommended-requiring-type-checking",
 		"plugin:@typescript-eslint/strict",
 		"prettier",
 	],
@@ -28,7 +28,8 @@ module.exports = {
 
 	parserOptions: {
 		project: true,
-		tsconfigRootDir: "./src",
+		//tsconfigRootDir: "./src",
+		//project: ["./src/playback/tsconfig.json"],
 		ecmaFeatures: {
 			jsx: true,
 		},

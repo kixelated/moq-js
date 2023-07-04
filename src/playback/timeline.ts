@@ -1,4 +1,4 @@
-import * as MP4 from "../shared/mp4"
+import * as MP4 from "../common/mp4"
 
 export interface Range {
 	start: number
@@ -11,7 +11,7 @@ export interface Frame {
 	timestamp: number // The presentation timestamp of the frame
 }
 
-export class Sync {
+export class Timeline {
 	// Maintain audio and video seprarately
 	audio: Component
 	video: Component
@@ -131,7 +131,7 @@ export class Component {
 			this.#queue.push(frame)
 		} else {
 			// Find the index (binary search) and insert the sample.
-			const index = search(this.#queue, frame.timestamp)
+			const index = findTimestamp(this.#queue, frame.timestamp)
 			this.#queue.splice(index, 0, frame)
 
 			if (this.#index && this.#index >= index) this.#index += 1
@@ -146,7 +146,7 @@ export class Component {
 
 	reset(timestamp: number) {
 		// Find the frame for this timestamp, and keep seeking backwards until a keyframe.
-		let index = search(this.#queue, timestamp)
+		let index = findTimestamp(this.#queue, timestamp)
 		if (index >= this.#queue.length) index = this.#queue.length - 1
 
 		// Seek backwards to the nearest keyframe
@@ -224,7 +224,7 @@ interface Timed {
 	timestamp: number
 }
 
-export function search(queue: Timed[], timestamp: number): number {
+export function findTimestamp(queue: Timed[], timestamp: number): number {
 	// Do binary search
 	let low = 0
 	let high = queue.length

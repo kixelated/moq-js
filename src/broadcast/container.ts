@@ -1,4 +1,4 @@
-import * as MP4 from "../shared/mp4"
+import * as MP4 from "../common/mp4"
 import { Encoder, EncoderTrack } from "./encoder"
 import { segmented } from "./segment"
 
@@ -7,7 +7,7 @@ export class Container {
 	#mp4: MP4.ISOFile
 
 	init: Promise<Uint8Array>
-	tracks: Array<ContainerTrack> = []
+	tracks: ContainerTrack[] = []
 
 	constructor(encoder: Encoder) {
 		this.#encoder = encoder
@@ -131,7 +131,7 @@ export class ContainerSegment {
 		)
 	}
 
-	cancel() {
-		this.fragments.cancel()
+	async cancel() {
+		await this.fragments.cancel()
 	}
 }

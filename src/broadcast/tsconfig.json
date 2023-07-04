@@ -15,7 +15,7 @@
 	},
 	"references": [
 		{
-			"path": "../shared"
+			"path": "../common"
 		},
 		{
 			"path": "../transport"

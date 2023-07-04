@@ -1,26 +1,64 @@
 import { Broadcaster } from "../broadcast"
+import { Connection } from "../transport/connection"
 
-import { For } from "solid-js"
+import { For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 
-export function Main(props: { active: boolean; broadcaster: Broadcaster }) {
+export function Main(props: { broadcaster: Broadcaster }) {
 	return <></>
 }
 
-export function Setup(props: { select: () => void; broadcaster: Broadcaster }) {
+export function Setup(props: { connection: Connection | undefined; setBroadcaster: (set: Broadcaster) => void }) {
+	const [error, setError] = createStore<any | undefined>()
 	const [state, setState] = createStore({
 		name: "",
-		codec: "h.264",
-		resolution: "720p",
+		codec: "av1",
+		height: 720,
 		fps: 30,
 		bitrate: 2000,
 	})
 
 	const options = {
-		codec: ["h.264"],
-		resolution: ["480p", "720p", "1080p", "1440p"],
+		codec: ["av1"],
+		height: [480, 720, 1080, 1440],
 		fps: [15, 30, 60],
 		bitrate: { min: 500, max: 4000 },
+	}
+
+	const submit = async (e: Event) => {
+		e.preventDefault()
+
+		if (!props.connection) {
+			// TODO show a message or queue the submit?
+			return
+		}
+
+		const constraints = {
+			audio: false, // TODO
+			video: {
+				aspectRatio: { ideal: 16 / 9 },
+				height: { ideal: state.height },
+				frameRate: { ideal: state.fps },
+			},
+		}
+
+		let stream
+		try {
+			stream = await window.navigator.mediaDevices.getUserMedia(constraints)
+		} catch (e) {
+			setError(e)
+			return
+		}
+
+		const config = {
+			connection: props.connection,
+			name: state.name,
+			video: { codec: state.codec, bitrate: state.bitrate },
+			media: stream,
+		}
+
+		const broadcaster = new Broadcaster(config)
+		props.setBroadcaster(broadcaster)
 	}
 
 	return (
@@ -66,13 +104,13 @@ export function Setup(props: { select: () => void; broadcaster: Broadcaster }) {
 				<select
 					name="resolution"
 					class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-					onInput={(e) => setState({ resolution: e.target.value })}
+					onInput={(e) => setState({ height: parseInt(e.target.value) })}
 				>
-					<For each={options.resolution}>
+					<For each={options.height}>
 						{(res) => {
 							return (
-								<option value="{res}" selected={res === state.resolution}>
-									{res}
+								<option value={res} selected={res === state.height}>
+									{res}p
 								</option>
 							)
 						}}
@@ -89,7 +127,7 @@ export function Setup(props: { select: () => void; broadcaster: Broadcaster }) {
 					<For each={options.fps}>
 						{(fps) => {
 							return (
-								<option value="{fps}" selected={fps === state.fps}>
+								<option value={fps} selected={fps === state.fps}>
 									{fps}
 								</option>
 							)
@@ -112,9 +150,13 @@ export function Setup(props: { select: () => void; broadcaster: Broadcaster }) {
 				<button
 					class="col-span-2 col-start-2 mt-3 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
 					type="submit"
+					onClick={submit}
 				>
 					Go Live
 				</button>
+				<Show when={error}>
+					<p class="col-span-3 text-red-500">{error}</p>
+				</Show>
 			</form>
 		</>
 	)

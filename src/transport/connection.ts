@@ -1,105 +1,70 @@
-import * as Stream from "./stream"
-import * as Setup from "./setup"
 import * as Control from "./control"
 import * as Object from "./object"
 
-export interface Config {
-	url: string
-
-	// Parameters used to create the MoQ session
-	role: Setup.Role
-
-	// If set, the server fingerprint will be fetched from this URL.
-	// This is required to use self-signed certificates with Chrome (May 2023)
-	fingerprint?: string
-}
+import { Announce } from "./announce"
+import { Subscribe } from "./subscribe"
 
 export class Connection {
-	quic: Promise<WebTransport>
+	#quic: WebTransport
 
 	// Use to receive/send control messages.
-	control: Promise<Control.Stream>
+	#control: Control.Stream
 
 	// Use to receive/send objects.
-	objects: Promise<Object.Transport>
+	#objects: Object.Transport
 
-	// Use just to tell when we're connected
-	connected: Promise<void>
+	// Module for announcing tracks.
+	readonly announce: Announce
 
-	constructor(config: Config) {
-		this.quic = this.#connect(config)
+	// Module for subscribing to tracks
+	readonly subscribe: Subscribe
 
-		// Create a bidirection stream to control the connection
-		this.control = this.#setup({
-			versions: [Setup.Version.DRAFT_00],
-			role: config.role,
-		})
+	constructor(quic: WebTransport, control: Control.Stream, objects: Object.Transport) {
+		this.#quic = quic
+		this.#control = control
+		this.#objects = objects
 
-		// Create unidirectional streams to send media.
-		this.objects = this.quic.then((quic) => {
-			return new Object.Transport(quic)
-		})
-
-		this.connected = this.control.then(() => {
-			/* noop */
-		})
+		this.subscribe = new Subscribe(this.#control, this.#objects)
+		this.announce = new Announce(this.#control, this.subscribe)
 	}
 
-	async close() {
-		;(await this.quic).close()
+	close(err: any = new Error("closed by application")) {
+		this.announce.close(err)
+		this.subscribe.close(err)
+		this.#quic.close()
 	}
 
-	async #fingerprint(url: string): Promise<WebTransportHash> {
-		// TODO remove this fingerprint when Chrome WebTransport accepts the system CA
-		const response = await fetch(url)
-		const hexString = await response.text()
+	async run() {
+		// Wait for the connection to be established.
+		const control = this.#control
 
-		const hexBytes = new Uint8Array(hexString.length / 2)
-		for (let i = 0; i < hexBytes.length; i += 1) {
-			hexBytes[i] = parseInt(hexString.slice(2 * i, 2 * i + 2), 16)
-		}
-
-		return {
-			algorithm: "sha-256",
-			value: hexBytes,
+		// Receive messages until the connection is closed.
+		for (;;) {
+			const msg = await control.recv()
+			await this.#receive(msg)
 		}
 	}
 
-	// Helper function to make creating a promise easier
-	async #connect(config: Config): Promise<WebTransport> {
-		const options: WebTransportOptions = {}
-
-		if (config.fingerprint) {
-			try {
-				const fingerprint = await this.#fingerprint(config.fingerprint)
-				options.serverCertificateHashes = [fingerprint]
-			} catch (e) {
-				console.warn("failed to fetch fingerprint: ", e)
-			}
+	async #receive(msg: Control.Message) {
+		console.log("received", msg)
+		switch (msg.type) {
+			case Control.Type.Announce:
+				return this.announce.onAnnounce(msg)
+			case Control.Type.AnnounceOk:
+				return this.announce.onOk(msg)
+			case Control.Type.AnnounceError:
+				return this.announce.onError(msg)
+			case Control.Type.Subscribe:
+				return this.announce.onSubscribe(msg)
+			case Control.Type.SubscribeOk:
+				return this.subscribe.onOk(msg)
+			case Control.Type.SubscribeError:
+				return this.subscribe.onError(msg)
 		}
-
-		const quic = new WebTransport(config.url, options)
-		await quic.ready
-
-		return quic
 	}
 
-	async #setup(client: Setup.Client): Promise<Control.Stream> {
-		const quic = await this.quic
-		const stream = await quic.createBidirectionalStream()
-
-		const writer = new Stream.Writer(stream.writable)
-		const reader = new Stream.Reader(stream.readable)
-
-		const setup = new Setup.Stream(reader, writer)
-
-		// Send the setup message.
-		await setup.send.client(client)
-
-		// Receive the setup message.
-		// TODO verify the SETUP response.
-		const _server = await setup.recv.server()
-
-		return new Control.Stream(reader, writer)
+	// Returns the next data stream and the cooresponding subscription.
+	async data() {
+		return this.subscribe.data()
 	}
 }

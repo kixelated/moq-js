@@ -200,7 +200,7 @@ export class Encoder {
 
 	async subscribe_ok(s: SubscribeOk) {
 		await this.w.vint62(s.id)
-		await this.w.vint62(s.expires || 0n)
+		await this.w.vint62(s.expires ?? 0n)
 	}
 
 	async subscribe_error(s: SubscribeError) {

@@ -19,7 +19,7 @@ interface Frame {
 }
 
 // No prototype to make this easier to send via postMessage
-export class Init {
+export class RingShared {
 	state: SharedArrayBuffer
 
 	channels: SharedArrayBuffer[]
@@ -40,20 +40,20 @@ export class Init {
 	}
 }
 
-export class Buffer {
+export class Ring {
 	state: Int32Array
 	channels: Float32Array[]
 	capacity: number
 
-	constructor(buffer: Init) {
-		this.state = new Int32Array(buffer.state)
+	constructor(shared: RingShared) {
+		this.state = new Int32Array(shared.state)
 
 		this.channels = []
-		for (const channel of buffer.channels) {
+		for (const channel of shared.channels) {
 			this.channels.push(new Float32Array(channel))
 		}
 
-		this.capacity = buffer.capacity
+		this.capacity = shared.capacity
 	}
 
 	// Write samples for single audio frame, returning the total number written.

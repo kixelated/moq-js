@@ -1,4 +1,6 @@
-import * as Message from "../shared/message"
+import * as Message from "./message"
+import { Ring } from "../common/ring"
+import { Timeline } from "./timeline"
 
 // NOTE: This must be on the main thread
 export class Context {
@@ -11,13 +13,10 @@ export class Context {
 			sampleRate: config.sampleRate,
 		})
 
-		this.worklet = this.load()
-		this.worklet.then((worklet) => {
-			worklet.port.postMessage({ config })
-		})
+		this.worklet = this.load(config)
 	}
 
-	private async load(): Promise<AudioWorkletNode> {
+	private async load(config: Message.ConfigAudio): Promise<AudioWorkletNode> {
 		// Load the worklet source code.
 		const url = new URL("../worklet/index.ts", import.meta.url)
 		await this.context.audioWorklet.addModule(url)
@@ -37,6 +36,8 @@ export class Context {
 		worklet.connect(volume)
 		volume.connect(this.context.destination)
 
+		worklet.port.postMessage({ config })
+
 		return worklet
 	}
 
@@ -44,7 +45,75 @@ export class Context {
 		// TODO
 	}
 
-	resume() {
-		this.context.resume()
+	async resume() {
+		await this.context.resume()
+	}
+}
+
+// This is run in a worker.
+export class Renderer {
+	ring?: Ring
+	timeline: Timeline
+
+	queue: AudioData[]
+	interval?: number
+	last?: number // the timestamp of the last rendered frame, in microseconds
+
+	constructor(config: Message.ConfigAudio, timeline: Timeline) {
+		this.timeline = timeline
+		this.queue = []
+	}
+
+	render(frame: AudioData) {
+		// Drop any old frames
+		if (this.last && frame.timestamp <= this.last) {
+			frame.close()
+			return
+		}
+
+		// Insert the frame into the queue sorted by timestamp.
+		if (this.queue.length > 0 && this.queue[this.queue.length - 1].timestamp <= frame.timestamp) {
+			// Fast path because we normally append to the end.
+			this.queue.push(frame)
+		} else {
+			// Do a full binary search
+			let low = 0
+			let high = this.queue.length
+
+			while (low < high) {
+				const mid = (low + high) >>> 1
+				if (this.queue[mid].timestamp < frame.timestamp) low = mid + 1
+				else high = mid
+			}
+
+			this.queue.splice(low, 0, frame)
+		}
+
+		this.emit()
+	}
+
+	emit() {
+		const ring = this.ring
+		if (!ring) {
+			return
+		}
+
+		while (this.queue.length) {
+			const frame = this.queue[0]
+			if (ring.size() + frame.numberOfFrames > ring.capacity) {
+				// Buffer is full
+				break
+			}
+
+			const size = ring.write(frame)
+			if (size < frame.numberOfFrames) {
+				throw new Error("audio buffer is full")
+			}
+
+			this.last = frame.timestamp
+
+			frame.close()
+			this.queue.shift()
+		}
 	}
 }

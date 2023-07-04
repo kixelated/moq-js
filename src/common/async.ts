@@ -19,11 +19,15 @@ export class Deferred<T> {
 }
 
 export class Notify {
-	#next: Deferred<void> = new Deferred<void>()
+	#next = new Deferred<void>()
 
 	broadcast() {
 		this.#next.resolve()
 		this.#next = new Deferred<void>()
+	}
+
+	close(e: any) {
+		this.#next.reject(e)
 	}
 
 	async wait() {
