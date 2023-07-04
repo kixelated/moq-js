@@ -1,12 +1,5 @@
-import { Ring, RingShared } from "../common/ring"
-//import * as Message from "../common/message"
-
-interface Config {
-	channels: number
-	sampleRate: number
-
-	ring: RingShared
-}
+import { Ring } from "../common/ring"
+import * as Message from "./message"
 
 class Renderer extends AudioWorkletProcessor {
 	ring?: Ring
@@ -20,14 +13,15 @@ class Renderer extends AudioWorkletProcessor {
 		this.port.onmessage = this.onMessage.bind(this)
 	}
 
-	onConfig(config: Config) {
-		this.ring = new Ring(config.ring)
+	onMessage(e: MessageEvent) {
+		const msg = e.data as Message.From
+		if (msg.config) {
+			this.onConfig(msg.config)
+		}
 	}
 
-	onMessage(e: MessageEvent) {
-		if (e.data.config) {
-			this.onConfig(e.data.config)
-		}
+	onConfig(config: Message.Config) {
+		this.ring = new Ring(config.ring)
 	}
 
 	// Inputs and outputs in groups of 128 samples.

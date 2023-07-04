@@ -1119,6 +1119,11 @@
   resolved "https://registry.yarnpkg.com/@trysound/sax/-/sax-0.2.0.tgz#cccaab758af56761eb7bf37af6f03f326dd798ad"
   integrity sha512-L7z9BgrNEcYyUYtF+HaEfiS5ebkh9jXqbszz7pC0hRBPaatV0XjSD3+eHrpqFemQfgwiFF0QPIarnIihIDn7OA==
 
+"@types/audioworklet@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@types/audioworklet/-/audioworklet-0.0.48.tgz#b31060e571c8fb800ec0311537e22ba676672a99"
+  integrity sha512-p5XQ+iuQ9fBPch52memypxYsGRiaHXdwoIXoPACGlaEhje5eO6ECiKYs1oEK1oaNyvHyVJElgVRASfSfbMag3g==
+
 "@types/dom-mediacapture-transform@^0.1.6":
   version "0.1.6"
   resolved "https://registry.yarnpkg.com/@types/dom-mediacapture-transform/-/dom-mediacapture-transform-0.1.6.tgz#26890dbfa4b3e5d81fba370e49f579892bcf89a3"

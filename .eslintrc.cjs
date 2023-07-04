@@ -12,7 +12,7 @@ module.exports = {
 	root: true,
 	env: {
 		browser: true,
-		es2020: true,
+		es2022: true,
 		worker: true,
 	},
 	ignorePatterns: ["dist", "node_modules", "tailwind.config.js", ".eslintrc.cjs"],
@@ -37,5 +37,6 @@ module.exports = {
 		ecmaFeatures: {
 			jsx: true,
 		},
+		EXPERIMENTAL_useSourceOfProjectReferenceRedirect: true, // "Fixes" use of references
 	},
 }

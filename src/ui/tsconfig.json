@@ -1,0 +1,24 @@
+{
+	"extends": "../tsconfig.json",
+	"include": [
+		"."
+	],
+	"compilerOptions": {
+		"target": "es2022",
+		"lib": [
+			"es2022",
+			"dom"
+		],
+		"types": [
+			"mp4box"
+		],
+	},
+	"references": [
+		{
+			"path": "../playback"
+		},
+		{
+			"path": "../broadcast"
+		},
+	],
+}

@@ -1,11 +1,10 @@
 {
-	"include": [
-		".",
-	],
+	"files": [], // don't build anything with these settings.
 	"compilerOptions": {
 		"target": "es2022",
 		"module": "es2022",
 		"moduleResolution": "node",
+		"rootDir": ".",
 		"outDir": "../dist",
 		"declaration": true,
 		"strict": true,
@@ -13,8 +12,33 @@
 		"declarationMap": true,
 		"sourceMap": true,
 		"isolatedModules": true,
-		"esModuleInterop": true,
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
+		"types": [], // Don't automatically import any @types modules.
+		"lib": [
+			"dom",
+			"es2022"
+		],
+		"typeRoots": [
+			"./types",
+			"../node_modules/@types"
+		]
 	},
+	"references": [
+		{
+			"path": "./common"
+		},
+		{
+			"path": "./playback"
+		},
+		{
+			"path": "./broadcast"
+		},
+		{
+			"path": "./worklet"
+		},
+		{
+			"path": "./transport"
+		}
+	]
 }
