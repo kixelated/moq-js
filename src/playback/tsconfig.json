@@ -4,13 +4,10 @@
 		"."
 	],
 	"compilerOptions": {
-		"lib": [
-			"es2022",
-			"dom"
-		],
 		"types": [
 			"dom-mediacapture-transform",
 			"dom-webcodecs",
+			"web"
 		]
 	},
 	"references": [

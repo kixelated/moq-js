@@ -4,14 +4,12 @@
 		"."
 	],
 	"compilerOptions": {
-		"target": "es2022",
-		"lib": [
-			"es2022",
-			"dom"
-		],
 		"types": [
-			"mp4box"
+			"mp4box",
+			"web"
 		],
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
 	},
 	"references": [
 		{

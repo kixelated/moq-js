@@ -3,9 +3,4 @@
 	"include": [
 		"."
 	],
-	"compilerOptions": {
-		"lib": [
-			"es2022",
-		],
-	},
 }

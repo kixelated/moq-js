@@ -12,12 +12,9 @@
 		"declarationMap": true,
 		"sourceMap": true,
 		"isolatedModules": true,
-		"jsx": "preserve",
-		"jsxImportSource": "solid-js",
 		"types": [], // Don't automatically import any @types modules.
 		"lib": [
-			"dom",
-			"es2022"
+			"es2022",
 		],
 		"typeRoots": [
 			"./types",

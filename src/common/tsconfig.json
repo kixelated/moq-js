@@ -4,10 +4,6 @@
 		"."
 	],
 	"compilerOptions": {
-		"lib": [
-			"es2022",
-			"dom" // TODO isolate the dom elements shared between the worker and main thread
-		],
 		"types": [
 			"mp4box"
 		],
