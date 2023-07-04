@@ -16,9 +16,11 @@ export type {
 import { MP4Track, MP4AudioTrack, MP4VideoTrack } from "mp4box"
 
 export function isAudioTrack(track: MP4Track): track is MP4AudioTrack {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	return (track as MP4AudioTrack).audio !== undefined
 }
 
 export function isVideoTrack(track: MP4Track): track is MP4VideoTrack {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	return (track as MP4VideoTrack).video !== undefined
 }

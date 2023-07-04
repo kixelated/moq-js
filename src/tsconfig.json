@@ -1,0 +1,20 @@
+{
+	"include": [
+		".",
+	],
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "es2022",
+		"moduleResolution": "node",
+		"outDir": "../dist",
+		"declaration": true,
+		"strict": true,
+		"composite": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"isolatedModules": true,
+		"esModuleInterop": true,
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
+	},
+}

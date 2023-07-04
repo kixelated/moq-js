@@ -5,10 +5,10 @@ module.exports = {
 		"plugin:@typescript-eslint/recommended",
 		"plugin:@typescript-eslint/recommended-requiring-type-checking",
 		"plugin:@typescript-eslint/strict",
-		//"prettier",
+		"prettier",
 	],
 	parser: "@typescript-eslint/parser",
-	plugins: ["@typescript-eslint" /*"prettier"*/],
+	plugins: ["@typescript-eslint", "prettier"],
 	root: true,
 	env: {
 		browser: true,
@@ -28,7 +28,7 @@ module.exports = {
 				caughtErrorsIgnorePattern: "^_",
 			},
 		],
-		//"prettier/prettier": 2, // Means error
+		"prettier/prettier": 2, // Means error
 	},
 
 	parserOptions: {
@@ -37,6 +37,5 @@ module.exports = {
 		ecmaFeatures: {
 			jsx: true,
 		},
-		//sourceType: "module",
 	},
 }

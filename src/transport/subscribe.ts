@@ -1,6 +1,6 @@
 import * as Control from "./control"
 import * as Object from "./object"
-import { Notify, Deferred } from "~/src/common/async"
+import { Notify, Deferred } from "../common/async"
 import { AnnounceSend, AnnounceRecv } from "./announce"
 
 export class Subscribe {
