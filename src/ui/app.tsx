@@ -1,20 +1,20 @@
-import { Player } from "../playback"
-import { Broadcaster } from "../broadcast"
 import { Connection } from "../transport/connection"
 import { connect } from "../transport/client"
 import { asError } from "../common/error"
 
-import { createSignal, Show, createEffect, onCleanup, createMemo } from "solid-js"
+import { createSignal, Show, createSelector, createEffect, onCleanup, createMemo } from "solid-js"
 
 import * as Playback from "./playback"
 import * as Broadcast from "./broadcast"
+import { Player } from "../playback"
+import { Broadcaster } from "../broadcast"
 
 export function App(props: { url: string }) {
 	const [connection, setConnection] = createSignal<Connection | undefined>()
 
-	const playback = Playback.Setup({ connection: connection() })
-	const broadcast = Broadcast.Setup({ connection: connection() })
-	const setup = createMemo(() => !playback.active() && !broadcast.active())
+	const [player, setPlayer] = createSignal<Player | undefined>()
+	const [broadcaster, setBroadcaster] = createSignal<Broadcaster | undefined>()
+	const setup = createMemo(() => !player() && !broadcaster())
 
 	return (
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
@@ -22,19 +22,19 @@ export function App(props: { url: string }) {
 
 			<div
 				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!playback.active(), "h-0": !playback.active() }}
+				classList={{ "h-[500]": !!player(), "h-0": !player() }}
 			>
-				<Show when={playback.active()}>
-					<Playback.Main player={playback.active()!} />
+				<Show when={player()}>
+					<Playback.Main player={player()!} />
 				</Show>
 			</div>
 
 			<div
 				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!broadcast.active(), "h-0": !broadcast.active() }}
+				classList={{ "h-[500]": !!broadcaster(), "h-0": !broadcaster() }}
 			>
-				<Show when={broadcast.active()}>
-					<Broadcast.Main broadcaster={broadcast.active()!} />
+				<Show when={broadcaster()}>
+					<Broadcast.Main broadcaster={broadcaster()!} />
 				</Show>
 			</div>
 
@@ -42,9 +42,13 @@ export function App(props: { url: string }) {
 				class="flex flex-row bg-white/90 transition-size duration-1000"
 				classList={{ "h-96": setup(), "h-0": setup() }}
 			>
-				<div class="basis-1/2 p-6">{playback.render}</div>
+				<div class="basis-1/2 p-6">
+					<Playback.Setup connection={connection()} setPlayer={setPlayer} />
+				</div>
 				<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
-				<div class="basis-1/2 p-6">{broadcast.render}</div>
+				<div class="basis-1/2 p-6">
+					<Broadcast.Setup connection={connection()} setBroadcaster={setBroadcaster} />
+				</div>
 			</div>
 		</div>
 	)
@@ -85,21 +89,25 @@ function Connecting(props: { url: string; setConnection: (v: Connection | undefi
 		}
 	})
 
+	const isState = createSelector(state)
+
 	return (
 		<>
 			<div
 				class="overflow-hidden bg-red-400 transition-size duration-1000 ease-in-out"
-				classList={{ "h-10": state() === "error", "h-0": state() !== "error" }}
+				classList={{ "h-10": isState("error"), "h-0": !isState("error") }}
 			>
 				<Show when={error()}>
-					<div class="px-4 py-2 font-bold">{error()!.message}</div>
+					<div class="px-4 py-2 font-bold">
+						{error()?.name}: {error()!.message}
+					</div>
 				</Show>
 			</div>
 			<div
 				class="overflow-hidden bg-green-400 transition-size duration-1000 ease-in-out"
 				classList={{
-					"h-10": state() === "connected",
-					"h-0": state() !== "connected",
+					"h-10": isState("connected"),
+					"h-0": !isState("connected"),
 				}}
 			>
 				<div class="px-4 py-2 font-bold">Connected to {props.url}</div>
@@ -107,8 +115,8 @@ function Connecting(props: { url: string; setConnection: (v: Connection | undefi
 			<div
 				class="overflow-hidden bg-indigo-400 transition-size duration-1000 ease-in-out"
 				classList={{
-					"h-10": state() === "connecting",
-					"h-0": state() !== "connecting",
+					"h-10": isState("connecting"),
+					"h-0": !isState("connecting"),
 				}}
 			>
 				<div class="px-4 py-2 font-bold">Connecting to {props.url}</div>
@@ -116,8 +124,8 @@ function Connecting(props: { url: string; setConnection: (v: Connection | undefi
 			<div
 				class="overflow-hidden bg-gray-400 transition-size duration-1000 ease-in-out"
 				classList={{
-					"h-10": state() === "closed",
-					"h-0": state() !== "closed",
+					"h-10": isState("closed"),
+					"h-0": !isState("closed"),
 				}}
 			>
 				<div class="px-4 py-2 font-bold">Closed</div>

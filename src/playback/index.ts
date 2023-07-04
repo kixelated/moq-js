@@ -103,26 +103,37 @@ export class Player {
 
 	// Returns the next available broadcast.
 	async broadcast() {
-		const announce = await this.#conn.announce.recv()
-		await announce.ok()
+		console.log("waiting")
+		for (;;) {
+			const announce = await this.#conn.announce.recv()
+			console.log("got announce", announce)
+			await announce.ok()
 
-		// TODO do this in parallel
-		const subscribe = await announce.subscribe("catalog")
-		try {
-			const [header, stream] = await subscribe.data()
+			console.log("sent ok", announce)
 
-			if (header.sequence !== 0n) {
-				throw new Error("TODO delta updates not supported")
+			// TODO do this in parallel
+			const subscribe = await announce.subscribe("catalog")
+			console.log("subscribing to catalog", subscribe)
+			try {
+				const [header, stream] = await subscribe.data()
+				console.log("got the first piece", header)
+
+				if (header.sequence !== 0n) {
+					throw new Error("TODO delta updates not supported")
+				}
+
+				const { info, raw } = await decodeInit(stream)
+				console.log("decoded init", info, raw)
+				return { announce, info, init: raw }
+			} catch (e) {
+				// JK loop again and try the next announce
+				// Optional: Tell the other side we failed and won't use this broadcast
+				await announce.close()
+				console.log("jk try the next ", e)
+			} finally {
+				// Close the subscription after we're done.
+				await subscribe.close()
 			}
-
-			const { info, raw } = await decodeInit(stream)
-			return { announce, info, init: raw }
-		} catch (e) {
-			// Optional: Tell the other side we failed and won't use this broadcast
-			await announce.close()
-		} finally {
-			// Close the subscription after we're done.
-			await subscribe.close()
 		}
 	}
 }

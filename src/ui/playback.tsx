@@ -24,9 +24,8 @@ export function Main(props: { player: Player }) {
 	)
 }
 
-export function Setup(props: { connection: Connection | undefined }) {
+export function Setup(props: { connection: Connection | undefined; setPlayer: (v: Player | undefined) => void }) {
 	const [error, setError] = createSignal<Error | undefined>()
-	const [player, setPlayer] = createSignal<Player | undefined>()
 
 	// Create a player that we'll use to list all of the broadcasts
 	const pending = createMemo(() => {
@@ -39,13 +38,13 @@ export function Setup(props: { connection: Connection | undefined }) {
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
 
 	createEffect(async () => {
+		console.log("pending be", pending())
+
 		const player = pending()
 		if (!player) return
 
 		for (;;) {
 			const broadcast = await player.broadcast()
-			if (!broadcast) return
-
 			setBroadcasts((prev) => prev.concat(broadcast))
 		}
 	})
@@ -57,7 +56,7 @@ export function Setup(props: { connection: Connection | undefined }) {
 		const selected = broadcast()
 		if (!selected) return
 
-		setPlayer(player)
+		props.setPlayer(player)
 
 		try {
 			await player.play(selected)
@@ -65,35 +64,32 @@ export function Setup(props: { connection: Connection | undefined }) {
 			const err = asError(e)
 			setError(err)
 		} finally {
-			setPlayer(undefined)
+			props.setPlayer(undefined)
 		}
 	})
 
-	return {
-		active: player,
-		render: (
-			<>
-				<p class="mb-6 text-center font-mono text-xl">Watch</p>
-				<Show when={error()}>
-					<p>{error()?.message}</p>
-				</Show>
-				<ul>
-					<For each={broadcasts()} fallback={"No live broadcasts"}>
-						{(broadcast) => {
-							const select = () => {
-								setBroadcast(broadcast)
-							}
-							return (
-								<li class="mt-4">
-									<Available broadcast={broadcast} select={select} />
-								</li>
-							)
-						}}
-					</For>
-				</ul>
-			</>
-		),
-	}
+	return (
+		<>
+			<p class="mb-6 text-center font-mono text-xl">Watch</p>
+			<Show when={error()}>
+				<p>{error()?.message}</p>
+			</Show>
+			<ul>
+				<For each={broadcasts()} fallback={"No live broadcasts"}>
+					{(broadcast) => {
+						const select = () => {
+							setBroadcast(broadcast)
+						}
+						return (
+							<li class="mt-4">
+								<Available broadcast={broadcast} select={select} />
+							</li>
+						)
+					}}
+				</For>
+			</ul>
+		</>
+	)
 }
 
 function Available(props: { broadcast: Broadcast; select: () => void }) {
