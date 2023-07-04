@@ -11,10 +11,10 @@ import * as Broadcast from "./broadcast"
 
 export function App(props: { url: string }) {
 	const [connection, setConnection] = createSignal<Connection | undefined>()
-	const [player, setPlayer] = createSignal<Player | undefined>()
-	const [broadcaster, setBroadcaster] = createSignal<Broadcaster | undefined>()
 
-	const setup = createMemo(() => !player() && !broadcaster())
+	const playback = Playback.Setup({ connection: connection() })
+	const broadcast = Broadcast.Setup({ connection: connection() })
+	const setup = createMemo(() => !playback.active() && !broadcast.active())
 
 	return (
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
@@ -22,19 +22,19 @@ export function App(props: { url: string }) {
 
 			<div
 				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!player(), "h-0": !player() }}
+				classList={{ "h-[500]": !!playback.active(), "h-0": !playback.active() }}
 			>
-				<Show when={player()}>
-					<Playback.Main player={player()!} />
+				<Show when={playback.active()}>
+					<Playback.Main player={playback.active()!} />
 				</Show>
 			</div>
 
 			<div
 				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!player(), "h-0": !player() }}
+				classList={{ "h-[500]": !!broadcast.active(), "h-0": !broadcast.active() }}
 			>
-				<Show when={broadcaster()}>
-					<Broadcast.Main broadcaster={broadcaster()!} />
+				<Show when={broadcast.active()}>
+					<Broadcast.Main broadcaster={broadcast.active()!} />
 				</Show>
 			</div>
 
@@ -42,13 +42,9 @@ export function App(props: { url: string }) {
 				class="flex flex-row bg-white/90 transition-size duration-1000"
 				classList={{ "h-96": setup(), "h-0": setup() }}
 			>
-				<div class="basis-1/2 p-6">
-					<Playback.Setup connection={connection()} setPlayer={setPlayer} />
-				</div>
+				<div class="basis-1/2 p-6">{playback.render}</div>
 				<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
-				<div class="basis-1/2 p-6">
-					<Broadcast.Setup connection={connection()} setBroadcaster={setBroadcaster} />
-				</div>
+				<div class="basis-1/2 p-6">{broadcast.render}</div>
 			</div>
 		</div>
 	)
@@ -69,7 +65,9 @@ function Connecting(props: { url: string; setConnection: (v: Connection | undefi
 				fingerprint: props.url + "/fingerprint",
 			})
 
-			onCleanup(connection.close)
+			onCleanup(() => {
+				connection.close()
+			})
 
 			props.setConnection(connection)
 			setState("connected")

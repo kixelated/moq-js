@@ -130,10 +130,14 @@ export class Renderer {
 
 		// Configure the decoder using the AVC box for H.264
 		// TODO it should be easy to support other codecs, just need to know the right boxes.
+		// TODO make a type for each codec
+		// eslint-disable-next-line
 		const avcc = frame.sample.description.avcC
 		if (!avcc) throw new Error("TODO only h264 is supported")
 
+		// eslint-disable-next-line
 		const description = new MP4.Stream(new Uint8Array(avcc.size), 0, false)
+		// eslint-disable-next-line
 		avcc.write(description)
 
 		const decoder = new VideoDecoder({

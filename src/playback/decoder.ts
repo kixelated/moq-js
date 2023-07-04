@@ -2,7 +2,7 @@ import { Frame } from "./timeline"
 
 import * as MP4 from "../common/mp4"
 
-export async function decodeInit(stream: ReadableStream) {
+export async function decodeInit(stream: ReadableStream<Uint8Array>) {
 	const mp4 = MP4.New()
 
 	mp4.onError = (err) => {
@@ -52,7 +52,7 @@ export async function decodeInit(stream: ReadableStream) {
 	}
 }
 
-export async function* decodeSegment(init: Uint8Array, stream: ReadableStream) {
+export async function* decodeSegment(init: Uint8Array, stream: ReadableStream<Uint8Array>) {
 	const mp4 = MP4.New()
 
 	mp4.onError = (err) => {

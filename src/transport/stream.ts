@@ -1,9 +1,9 @@
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 export class Reader {
-	#reader: ReadableStream
+	#reader: ReadableStream<Uint8Array>
 	#scratch: Uint8Array
 
-	constructor(reader: ReadableStream) {
+	constructor(reader: ReadableStream<Uint8Array>) {
 		this.#reader = reader
 		this.#scratch = new Uint8Array(8)
 	}
@@ -41,7 +41,7 @@ export class Reader {
 		while (offset < dst.byteLength) {
 			const { value, done } = await reader.read(dst.slice(offset))
 			if (done) {
-				throw "short buffer"
+				throw new Error("short buffer")
 			}
 
 			offset += value.byteLength
@@ -90,7 +90,7 @@ export class Reader {
 	async uint52(): Promise<number> {
 		const v = await this.uint64()
 		if (v > Number.MAX_SAFE_INTEGER) {
-			throw "value larger than 52-bits; use vint62 instead"
+			throw new Error("value larger than 52-bits; use vint62 instead")
 		}
 
 		return Number(v)
@@ -100,7 +100,7 @@ export class Reader {
 	async vint52(): Promise<number> {
 		const v = await this.vint62()
 		if (v > Number.MAX_SAFE_INTEGER) {
-			throw "value larger than 52-bits; use vint62 instead"
+			throw new Error("value larger than 52-bits; use vint62 instead")
 		}
 
 		return Number(v)
@@ -139,7 +139,7 @@ export class Reader {
 				return v & 0x3fffffffffffffffn
 			}
 			default:
-				throw "impossible"
+				throw new Error("impossible")
 		}
 	}
 
@@ -152,10 +152,10 @@ export class Reader {
 
 // Writer wraps a stream and writes chunks of data
 export class Writer {
-	#writer: WritableStream
+	#writer: WritableStream<Uint8Array>
 	#scratch: Uint8Array
 
-	constructor(writer: WritableStream) {
+	constructor(writer: WritableStream<Uint8Array>) {
 		this.#scratch = new Uint8Array(8)
 		this.#writer = writer
 	}

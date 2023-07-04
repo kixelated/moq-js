@@ -1,9 +1,13 @@
 // Split a stream of frames at keyframe boundaries.
+// TODO try with fewer types and see if typescript can figure it out
 export function segmented(): TransformStream<EncodedVideoChunk, ReadableStream<EncodedVideoChunk>> {
 	let current: WritableStreamDefaultWriter<EncodedVideoChunk> | undefined
 
-	const transformer = new TransformStream({
-		transform: async (frame: EncodedVideoChunk, controller: ReadableStream<EncodedVideoChunk>) => {
+	const transformer = new TransformStream<EncodedVideoChunk, ReadableStream<EncodedVideoChunk>>({
+		transform: async (
+			frame: EncodedVideoChunk,
+			controller: TransformStreamDefaultController<ReadableStream<EncodedVideoChunk>>
+		) => {
 			if (frame.type === "key") {
 				if (current) {
 					await current.close()

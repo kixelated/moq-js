@@ -5,6 +5,7 @@ import * as Video from "./video"
 
 import { decodeSegment } from "./decoder"
 import * as Message from "./message"
+import { asError } from "../common/error"
 
 class Worker {
 	// Timeline receives samples, buffering them and choosing the timestamp to render.
@@ -13,10 +14,6 @@ class Worker {
 	// Renderer requests samples, rendering video frames and emitting audio frames.
 	#audio?: Audio.Renderer
 	#video?: Video.Renderer
-
-	constructor() {
-		this.#runTimeline() // async
-	}
 
 	async on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
@@ -40,39 +37,38 @@ class Worker {
 		const decode = decodeSegment(msg.init, msg.stream)
 		for await (const frame of decode) {
 			this.#timeline.push(frame)
+			this.#sendTimeline()
 		}
 	}
 
-	async #runTimeline() {
-		for (;;) {
-			// TODO support gaps
-			const audio = this.#timeline.audio.ranges()
-			const video = this.#timeline.video.ranges()
+	// TODO limit the frequency?
+	#sendTimeline() {
+		const audio = this.#timeline.audio.ranges()
+		const video = this.#timeline.video.ranges()
 
-			// TODO send on each update, not at an interval
-			const timeline: Message.Timeline = {
-				audio: { buffer: audio },
-				video: { buffer: video },
-			}
-
-			const ref = this.#timeline.sync(0)
-			if (ref) {
-				const now = performance.now() / 1000
-				timeline.timestamp = now - ref
-			}
-
-			send({ timeline })
-
-			// Send every 100ms
-			// TODO send when the timeline changes
-			await new Promise((resolve) => setTimeout(resolve, 100))
+		const timeline: Message.Timeline = {
+			audio: { buffer: audio },
+			video: { buffer: video },
 		}
+
+		const ref = this.#timeline.sync(0)
+		if (ref) {
+			const now = performance.now() / 1000
+			timeline.timestamp = now - ref
+		}
+
+		send({ timeline })
 	}
 }
 
 // Pass all events to the worker
 const worker = new Worker()
-self.addEventListener("message", worker.on.bind(worker))
+self.addEventListener("message", (msg) => {
+	worker.on(msg).catch((e) => {
+		const err = asError(e)
+		send({ fail: { err } })
+	})
+})
 
 // Validates this is an expected message
 function send(msg: Message.FromWorker) {

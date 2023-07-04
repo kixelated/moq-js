@@ -1,6 +1,6 @@
 import * as Control from "./control"
 import * as Object from "./object"
-import { Notify, Deferred } from "../common/async"
+import { Notify, Deferred } from "~/src/common/async"
 import { AnnounceSend, AnnounceRecv } from "./announce"
 
 export class Subscribe {
@@ -22,21 +22,6 @@ export class Subscribe {
 	constructor(control: Control.Stream, objects: Object.Transport) {
 		this.#control = control
 		this.#objects = objects
-	}
-
-	async close(err: any) {
-		this.#recvNotify.close(err)
-
-		for (const subscribe of this.#send.values()) {
-			subscribe.close(err)
-		}
-
-		for (const subscribe of this.#recv.values()) {
-			subscribe.close(err)
-		}
-
-		this.#send.clear()
-		this.#recv.clear()
 	}
 
 	async send(name: string, announce: AnnounceRecv) {
@@ -81,16 +66,16 @@ export class Subscribe {
 		await this.#control.send({ type: Control.Type.SubscribeOk, id: msg.id })
 	}
 
-	async onData(msg: Object.Header, stream: ReadableStream) {
+	async onData(msg: Object.Header, stream: ReadableStream<Uint8Array>) {
 		const subscribe = this.#send.get(msg.track)
 		if (!subscribe) {
 			throw new Error(`data for for unknown track: ${msg.track}`)
 		} else {
-			subscribe.onData(msg, stream)
+			await subscribe.onData(msg, stream)
 		}
 	}
 
-	async onOk(msg: Control.SubscribeOk) {
+	onOk(msg: Control.SubscribeOk) {
 		const subscribe = this.#send.get(msg.id)
 		if (!subscribe) {
 			throw new Error(`subscribe ok for unknown id: ${msg.id}`)
@@ -105,7 +90,7 @@ export class Subscribe {
 			throw new Error(`subscribe error for unknown id: ${msg.id}`)
 		}
 
-		subscribe.onError(msg.code, msg.reason)
+		await subscribe.onError(msg.code, msg.reason)
 	}
 }
 
@@ -185,7 +170,7 @@ export class SubscribeSend {
 	#active = new Deferred()
 
 	// A queue of received streams for this subscription.
-	#data = new Array<[Object.Header, ReadableStream]>()
+	#data = new Array<[Object.Header, ReadableStream<Uint8Array>]>()
 	#dataNotify = new Notify()
 
 	constructor(control: Control.Stream, id: bigint, announce: AnnounceRecv, name: string) {
@@ -218,7 +203,7 @@ export class SubscribeSend {
 		// await this.#inner.sendReset(code, reason)
 
 		const err = new Error(`local error (${code})` + reason ? `: ${reason}` : "")
-		this.#close(err)
+		await this.#close(err)
 	}
 
 	onOk() {
@@ -229,18 +214,18 @@ export class SubscribeSend {
 		this.#ok.resolve(undefined)
 	}
 
-	onError(code: bigint, reason: string) {
+	async onError(code: bigint, reason: string) {
 		if (!this.#active.pending) {
 			throw new Error("error already received")
 		}
 
 		const err = new Error(`remote error (${code})` + reason ? `: ${reason}` : "")
-		this.#close(err)
+		await this.#close(err)
 	}
 
-	onData(msg: Object.Header, stream: ReadableStream) {
+	async onData(msg: Object.Header, stream: ReadableStream<Uint8Array>) {
 		if (this.closed) {
-			stream.cancel()
+			await stream.cancel()
 		} else {
 			console.log("broadcasting")
 			this.#data.push([msg, stream])
@@ -248,20 +233,20 @@ export class SubscribeSend {
 		}
 	}
 
-	#close(err: Error) {
+	async #close(err: Error) {
 		this.#ok.reject(err)
 		this.#active.reject(err)
 		this.#dataNotify.close(err)
 
 		for (const [_, stream] of this.#data) {
-			stream.cancel()
+			await stream.cancel()
 		}
 
 		this.#data = []
 	}
 
 	// Receive the next a readable data stream
-	async data(): Promise<[Object.Header, ReadableStream]> {
+	async data(): Promise<[Object.Header, ReadableStream<Uint8Array>]> {
 		for (;;) {
 			const data = this.#data.shift()
 			if (data) return data

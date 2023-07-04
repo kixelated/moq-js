@@ -20,6 +20,7 @@ export class Connection {
 	readonly subscribe: Subscribe
 
 	constructor(quic: WebTransport, control: Control.Stream, objects: Object.Transport) {
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		this.#quic = quic
 		this.#control = control
 		this.#objects = objects
@@ -28,10 +29,9 @@ export class Connection {
 		this.announce = new Announce(this.#control, this.subscribe)
 	}
 
-	close(err: any = new Error("closed by application")) {
-		this.announce.close(err)
-		this.subscribe.close(err)
-		this.#quic.close()
+	close(code = 0, reason = "") {
+		// eslint-disable-next-line
+		this.#quic.close({ closeCode: code, reason })
 	}
 
 	async run() {
@@ -61,10 +61,5 @@ export class Connection {
 			case Control.Type.SubscribeError:
 				return this.subscribe.onError(msg)
 		}
-	}
-
-	// Returns the next data stream and the cooresponding subscription.
-	async data() {
-		return this.subscribe.data()
 	}
 }

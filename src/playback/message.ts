@@ -14,13 +14,13 @@ export interface ConfigAudio {
 }
 
 export interface ConfigVideo {
-	canvas: any // OffscreenCanvas
+	canvas: OffscreenCanvas
 }
 
 export interface Segment {
 	init: Uint8Array
 	header: Header
-	stream: ReadableStream
+	stream: ReadableStream<Uint8Array>
 }
 
 export interface Play {
@@ -76,6 +76,8 @@ export interface ToWorker {
 export interface FromWorker {
 	// Sent back to the main thread regularly to update the UI
 	timeline?: Timeline
+
+	fail?: Fail
 }
 
 /*
@@ -84,6 +86,10 @@ interface ToWorklet {
 }
 
 */
+
+export interface Fail {
+	err: Error
+}
 
 export type Callback = (e: FromWorker) => void
 

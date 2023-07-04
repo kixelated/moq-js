@@ -2,6 +2,7 @@ import { Connection } from "../transport/connection"
 import { Encoder, Config } from "./encoder"
 import { Container, ContainerSegment, ContainerTrack } from "./container"
 import { SubscribeRecv } from "../transport/subscribe"
+import { asError } from "../common/error"
 
 export class Broadcaster {
 	#conn: Connection
@@ -30,8 +31,9 @@ export class Broadcaster {
 
 			await Promise.all(tracks)
 			await announce.close()
-		} catch (err) {
-			await announce.close(1n, `error serving track: ${err}`)
+		} catch (e) {
+			const err = asError(e)
+			await announce.close(1n, `error serving track: ${err.message}`)
 		}
 	}
 
@@ -47,29 +49,31 @@ export class Broadcaster {
 
 			for (let i = 0; i < waiting.length; i += 1) {
 				const subscriber = waiting[i]
-				if (!subscriber.closed) {
-					this.#serveSegment(subscriber, value) // async
-				} else {
+				if (subscriber.closed) {
 					// Remove from future iterations
 					waiting.splice(i, 1)
 					i -= 1
+
+					continue
 				}
+
+				// Serve the segment, catching any errors and closing the subscription.
+				this.#serveSegment(subscriber, value).catch(async (e) => {
+					const err = asError(e)
+					await subscriber.close(1n, `failed to serve segment: ${err.message}`)
+				})
 			}
 		}
 	}
 
 	async #serveSegment(subscriber: SubscribeRecv, segment: ContainerSegment) {
-		try {
-			const stream = await subscriber.data({
-				group: BigInt(segment.sequence),
-				sequence: 0n,
-				send_order: 0n, // TODO
-			})
+		const stream = await subscriber.data({
+			group: BigInt(segment.sequence),
+			sequence: 0n,
+			send_order: 0n, // TODO
+		})
 
-			await segment.fragments.pipeTo(stream)
-		} catch (e) {
-			subscriber.close(1n, `failed to serve stream: ${e}`)
-		}
+		await segment.fragments.pipeTo(stream)
 	}
 
 	async #run() {
@@ -89,7 +93,8 @@ export class Broadcaster {
 
 				await subscriber.ack()
 			} catch (e) {
-				await subscriber.close(1n, `failed to process subscribe: ${e}`)
+				const err = asError(e)
+				await subscriber.close(1n, `failed to process subscribe: ${err.message}`)
 			}
 		}
 	}

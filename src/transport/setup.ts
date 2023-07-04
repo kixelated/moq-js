@@ -104,7 +104,7 @@ export class Encoder {
 		}
 
 		await this.role(c.role)
-		await this.w.string(c.path || "")
+		await this.w.string(c.path ?? "")
 	}
 
 	async server(s: Server) {
@@ -119,10 +119,8 @@ export class Encoder {
 			v = 0
 		} else if (r == "subscriber") {
 			v = 1
-		} else if (r == "both") {
-			v = 2
 		} else {
-			throw new Error(`invalid role: ${r}`)
+			v = 2
 		}
 
 		return this.w.vint52(v)

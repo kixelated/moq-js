@@ -5,11 +5,16 @@ module.exports = {
 		"plugin:@typescript-eslint/recommended",
 		"plugin:@typescript-eslint/recommended-requiring-type-checking",
 		"plugin:@typescript-eslint/strict",
-		"prettier",
+		//"prettier",
 	],
 	parser: "@typescript-eslint/parser",
-	plugins: ["@typescript-eslint", "prettier"],
+	plugins: ["@typescript-eslint" /*"prettier"*/],
 	root: true,
+	env: {
+		browser: true,
+		es2020: true,
+		worker: true,
+	},
 	ignorePatterns: ["dist", "node_modules", "tailwind.config.js", ".eslintrc.cjs"],
 	rules: {
 		"@typescript-eslint/no-non-null-assertion": "off",
@@ -23,15 +28,15 @@ module.exports = {
 				caughtErrorsIgnorePattern: "^_",
 			},
 		],
-		"prettier/prettier": 2, // Means error
+		//"prettier/prettier": 2, // Means error
 	},
 
 	parserOptions: {
 		project: true,
-		//tsconfigRootDir: "./src",
-		//project: ["./src/playback/tsconfig.json"],
+		tsconfigRootDir: __dirname,
 		ecmaFeatures: {
 			jsx: true,
 		},
+		//sourceType: "module",
 	},
 }

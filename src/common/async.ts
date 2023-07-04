@@ -1,7 +1,7 @@
 export class Deferred<T> {
 	promise: Promise<T>
 	resolve!: (value: T | PromiseLike<T>) => void
-	reject!: (reason: any | PromiseLike<any>) => void
+	reject!: (reason: Error | PromiseLike<any>) => void
 	pending = true
 
 	constructor() {
@@ -26,7 +26,7 @@ export class Notify {
 		this.#next = new Deferred<void>()
 	}
 
-	close(e: any) {
+	close(e: Error) {
 		this.#next.reject(e)
 	}
 

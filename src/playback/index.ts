@@ -27,7 +27,6 @@ export class Player {
 
 	constructor(conn: Connection) {
 		this.#port = new Message.Port(this.#onMessage.bind(this)) // TODO await an async method instead
-
 		this.#conn = conn
 	}
 
@@ -49,7 +48,7 @@ export class Player {
 		this.#context = new Audio.Context(config.audio)
 	}
 
-	async #onMessage(msg: Message.FromWorker) {
+	#onMessage(msg: Message.FromWorker) {
 		if (msg.timeline) {
 			this.#onTimeline(msg.timeline)
 		}
@@ -65,9 +64,28 @@ export class Player {
 		// TODO
 	}
 
-	// TODO support arguments
-	play() {
+	// TODO support more arguments
+	async play(broadcast: Broadcast) {
 		this.#port.sendPlay({ minBuffer: 0.5 }) // TODO
+
+		// Call play on each track individually
+		await Promise.all(broadcast.info.tracks.map((info) => this.#playTrack(broadcast, info.id.toString())))
+	}
+
+	async #playTrack(broadcast: Broadcast, name: string) {
+		const sub = await broadcast.announce.subscribe(name)
+		try {
+			for (;;) {
+				const [header, stream] = await sub.data()
+				this.#port.sendSegment({
+					init: broadcast.init,
+					header,
+					stream,
+				})
+			}
+		} finally {
+			await sub.close()
+		}
 	}
 
 	seek(timestamp: number) {
@@ -98,50 +116,19 @@ export class Player {
 			}
 
 			const { info, raw } = await decodeInit(stream)
-			return new Broadcast(this, announce, info, raw)
+			return { announce, info, init: raw }
 		} catch (e) {
 			// Optional: Tell the other side we failed and won't use this broadcast
-			announce.close()
+			await announce.close()
 		} finally {
 			// Close the subscription after we're done.
-			subscribe.close()
+			await subscribe.close()
 		}
 	}
 }
 
-export class Broadcast {
-	#player: Player
-	#announce: AnnounceRecv
-
-	readonly info: MP4.Info
-	#raw: Uint8Array
-
-	constructor(player: Player, announce: AnnounceRecv, info: MP4.Info, raw: Uint8Array) {
-		this.#player = player
-		this.#announce = announce
-		this.info = info
-		this.#raw = raw
-	}
-
-	get name() {
-		return this.#announce.namespace
-	}
-
-	async play() {
-		const subs = []
-
-		for (const track of this.info.tracks) {
-			const sub = await this.#announce.subscribe(track.id.toString())
-			subs.push(sub)
-		}
-
-		for (const sub of subs) {
-			await sub.ack
-		}
-
-		for (const sub of subs) {
-			// Blocks until the end of the subscription
-			await sub.error
-		}
-	}
+export interface Broadcast {
+	announce: AnnounceRecv
+	info: MP4.Info
+	init: Uint8Array
 }

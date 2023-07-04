@@ -48,21 +48,6 @@ export class Announce {
 		}
 	}
 
-	close(err: any) {
-		for (const announce of this.#send.values()) {
-			announce.close(err)
-		}
-
-		for (const announce of this.#recv.values()) {
-			announce.close(err)
-		}
-
-		this.#send.clear()
-		this.#recv.clear()
-
-		this.#recvNotify.close(err)
-	}
-
 	async onAnnounce(msg: Control.Announce) {
 		if (this.#recv.has(msg.namespace)) {
 			throw new Error(`duplicate announce for namespace: ${msg.namespace}`)
@@ -76,7 +61,7 @@ export class Announce {
 		this.#recvNotify.broadcast()
 	}
 
-	async onOk(msg: Control.AnnounceOk) {
+	onOk(msg: Control.AnnounceOk) {
 		const announce = this.#send.get(msg.namespace)
 		if (!announce) {
 			throw new Error(`announce error for unknown announce: ${msg.namespace}`)
@@ -85,7 +70,7 @@ export class Announce {
 		announce.onOk()
 	}
 
-	async onError(msg: Control.AnnounceError) {
+	onError(msg: Control.AnnounceError) {
 		const announce = this.#send.get(msg.namespace)
 		if (!announce) {
 			throw new Error(`announce error for unknown announce: ${msg.namespace}`)
@@ -101,7 +86,7 @@ export class Announce {
 			throw new Error(`subscribe for unknown announce: ${msg.namespace}`)
 		}
 
-		this.#subscribe.onSubscribe(msg, announce)
+		await this.#subscribe.onSubscribe(msg, announce)
 	}
 }
 

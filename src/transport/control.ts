@@ -105,8 +105,6 @@ export class Decoder {
 				return this.announce_ok()
 			case Type.AnnounceError:
 				return this.announce_error()
-			default:
-				throw new Error(`unknown message type: ${t}`)
 		}
 	}
 

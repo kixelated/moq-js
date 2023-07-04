@@ -1,3 +1,10 @@
+// TODO fix when ESLint supports WebTransport
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import { Reader, Writer } from "./stream"
 export { Reader, Writer }
 
@@ -22,13 +29,13 @@ export class Transport {
 		this.quic = quic
 	}
 
-	async send(header: Header): Promise<WritableStream> {
-		const stream = await this.quic.createUnidirectionalStream()
+	async send(header: Header): Promise<WritableStream<Uint8Array>> {
+		const stream: WritableStream<Uint8Array> = await this.quic.createUnidirectionalStream()
 		await this.#encode(stream, header)
 		return stream
 	}
 
-	async recv(): Promise<{ header: Header; stream: ReadableStream } | undefined> {
+	async recv(): Promise<{ header: Header; stream: ReadableStream<Uint8Array> } | undefined> {
 		const streams = this.quic.incomingUnidirectionalStreams.getReader()
 
 		const { value, done } = await streams.read()
@@ -40,7 +47,7 @@ export class Transport {
 		return { header, stream: value }
 	}
 
-	async #decode(s: ReadableStream): Promise<Header> {
+	async #decode(s: ReadableStream<Uint8Array>): Promise<Header> {
 		const r = new Reader(s)
 
 		const type = await r.vint52()
@@ -59,7 +66,7 @@ export class Transport {
 		}
 	}
 
-	async #encode(s: WritableStream, h: Header) {
+	async #encode(s: WritableStream<Uint8Array>, h: Header) {
 		const w = new Writer(s)
 		await w.vint52(0)
 		await w.vint62(h.track)
