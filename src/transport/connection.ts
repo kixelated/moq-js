@@ -1,5 +1,5 @@
 import * as Control from "./control"
-import * as Object from "./object"
+import { Objects } from "./object"
 
 import { Announce } from "./announce"
 import { Subscribe } from "./subscribe"
@@ -11,7 +11,7 @@ export class Connection {
 	#control: Control.Stream
 
 	// Use to receive/send objects.
-	#objects: Object.Transport
+	#objects: Objects
 
 	// Module for announcing tracks.
 	readonly announce: Announce
@@ -19,7 +19,7 @@ export class Connection {
 	// Module for subscribing to tracks
 	readonly subscribe: Subscribe
 
-	constructor(quic: WebTransport, control: Control.Stream, objects: Object.Transport) {
+	constructor(quic: WebTransport, control: Control.Stream, objects: Objects) {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		this.#quic = quic
 		this.#control = control
@@ -35,13 +35,23 @@ export class Connection {
 	}
 
 	async run() {
-		// Wait for the connection to be established.
-		const control = this.#control
+		return Promise.all([this.#runControl(), this.#runObjects()])
+	}
 
+	async #runControl() {
 		// Receive messages until the connection is closed.
 		for (;;) {
-			const msg = await control.recv()
+			const msg = await this.#control.recv()
 			await this.#receive(msg)
+		}
+	}
+
+	async #runObjects() {
+		for (;;) {
+			const obj = await this.#objects.recv()
+			if (!obj) break
+
+			await this.subscribe.onData(obj.header, obj.stream)
 		}
 	}
 

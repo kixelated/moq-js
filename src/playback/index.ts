@@ -7,6 +7,7 @@ import { RingShared } from "../common/ring"
 import * as MP4 from "../common/mp4"
 import { AnnounceRecv } from "../transport/announce"
 import { decodeInit } from "./decoder"
+import { asError } from "../common/error"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
@@ -76,7 +77,7 @@ export class Player {
 		const sub = await broadcast.announce.subscribe(name)
 		try {
 			for (;;) {
-				const [header, stream] = await sub.data()
+				const { header, stream } = await sub.data()
 				this.#port.sendSegment({
 					init: broadcast.init,
 					header,
@@ -103,37 +104,33 @@ export class Player {
 
 	// Returns the next available broadcast.
 	async broadcast() {
-		console.log("waiting")
-		for (;;) {
-			const announce = await this.#conn.announce.recv()
-			console.log("got announce", announce)
-			await announce.ok()
+		const announce = await this.#conn.announce.recv()
+		await announce.ok()
 
-			console.log("sent ok", announce)
+		// TODO do this in parallel
+		const subscribe = await announce.subscribe("catalog")
+		try {
+			const { header, stream } = await subscribe.data()
 
-			// TODO do this in parallel
-			const subscribe = await announce.subscribe("catalog")
-			console.log("subscribing to catalog", subscribe)
-			try {
-				const [header, stream] = await subscribe.data()
-				console.log("got the first piece", header)
-
-				if (header.sequence !== 0n) {
-					throw new Error("TODO delta updates not supported")
-				}
-
-				const { info, raw } = await decodeInit(stream)
-				console.log("decoded init", info, raw)
-				return { announce, info, init: raw }
-			} catch (e) {
-				// JK loop again and try the next announce
-				// Optional: Tell the other side we failed and won't use this broadcast
-				await announce.close()
-				console.log("jk try the next ", e)
-			} finally {
-				// Close the subscription after we're done.
-				await subscribe.close()
+			if (header.sequence !== 0n) {
+				throw new Error("TODO delta updates not supported")
 			}
+
+			const { info, raw } = await decodeInit(stream)
+
+			await subscribe.close() // we done
+
+			return { announce, info, init: raw }
+		} catch (e) {
+			const err = asError(e)
+
+			// Close the subscription after we're done.
+			await subscribe.close(1n, err.message)
+
+			// Optional: Tell the other side we failed and won't use this broadcast
+			await announce.close()
+
+			throw err
 		}
 	}
 }

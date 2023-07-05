@@ -7,7 +7,7 @@
 import * as Stream from "./stream"
 import * as Setup from "./setup"
 import * as Control from "./control"
-import * as Object from "./object"
+import { Objects } from "./object"
 import { Connection } from "./connection"
 
 export interface Config {
@@ -52,7 +52,7 @@ export async function connect(config: Config) {
 	const _server = await setup.recv.server()
 
 	const control = new Control.Stream(reader, writer)
-	const objects = new Object.Transport(quic)
+	const objects = new Objects(quic)
 
 	return new Connection(quic, control, objects)
 }

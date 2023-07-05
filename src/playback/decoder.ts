@@ -38,11 +38,15 @@ export async function decodeInit(stream: ReadableStream<Uint8Array>) {
 		mp4.flush()
 
 		// Append the entire init segment into a single buffer.
-		// i hate javascript
-		const temp = new Uint8Array(raw.byteLength)
-		temp.set(raw, 0)
-		temp.set(copy, raw.length)
-		raw = temp
+		if (raw.byteLength == 0) {
+			raw = copy
+		} else {
+			// i hate javascript
+			const temp = new Uint8Array(raw.byteLength)
+			temp.set(raw, 0)
+			temp.set(copy, raw.length)
+			raw = temp
+		}
 
 		if (info) {
 			return { info, raw }

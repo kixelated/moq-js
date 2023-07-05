@@ -1,10 +1,3 @@
-// TODO fix when ESLint supports WebTransport
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { Reader, Writer } from "./stream"
 export { Reader, Writer }
 
@@ -22,32 +15,37 @@ export interface Header {
 	// followed by payload
 }
 
-export class Transport {
+export class Objects {
 	private quic: WebTransport
 
 	constructor(quic: WebTransport) {
 		this.quic = quic
 	}
 
-	async send(header: Header): Promise<WritableStream<Uint8Array>> {
-		const stream: WritableStream<Uint8Array> = await this.quic.createUnidirectionalStream()
+	async send(header: Header) {
+		const stream: WritableStream<Uint8Array> =
+			(await this.quic.createUnidirectionalStream()) as WritableStream<Uint8Array>
 		await this.#encode(stream, header)
 		return stream
 	}
 
-	async recv(): Promise<{ header: Header; stream: ReadableStream<Uint8Array> } | undefined> {
-		const streams = this.quic.incomingUnidirectionalStreams.getReader()
+	async recv() {
+		// TODO not sure why the WebTransport API isn't typed correctly
+		const streams = this.quic.incomingUnidirectionalStreams.getReader() as ReadableStreamDefaultReader<
+			ReadableStream<Uint8Array>
+		>
 
 		const { value, done } = await streams.read()
 		streams.releaseLock()
 
 		if (done) return
+		const stream = value
 
-		const header = await this.#decode(value)
-		return { header, stream: value }
+		const header = await this.#decode(stream)
+		return { header, stream }
 	}
 
-	async #decode(s: ReadableStream<Uint8Array>): Promise<Header> {
+	async #decode(s: ReadableStream<Uint8Array>) {
 		const r = new Reader(s)
 
 		const type = await r.vint52()

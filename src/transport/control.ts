@@ -65,17 +65,42 @@ export class Stream {
 	private decoder: Decoder
 	private encoder: Encoder
 
+	#mutex = Promise.resolve()
+
 	constructor(r: Reader, w: Writer) {
 		this.decoder = new Decoder(r)
 		this.encoder = new Encoder(w)
 	}
 
+	// Will error if two messages are read at once.
 	async recv(): Promise<Message> {
 		return this.decoder.message()
 	}
 
 	async send(msg: Message) {
-		return this.encoder.message(msg)
+		const unlock = await this.#lock()
+		try {
+			await this.encoder.message(msg)
+		} finally {
+			unlock()
+		}
+	}
+
+	async #lock() {
+		// Make a new promise that we can resolve later.
+		let done: () => void
+		const p = new Promise<void>((resolve) => {
+			done = () => resolve()
+		})
+
+		// Wait until the previous lock is done, then resolve our our lock.
+		const lock = this.#mutex.then(() => done)
+
+		// Save our lock as the next lock.
+		this.#mutex = p
+
+		// Return the lock.
+		return lock
 	}
 }
 

@@ -9,10 +9,11 @@ export function Main(props: { player: Player }) {
 	let canvas: HTMLCanvasElement
 
 	onMount(() => {
-		props.player.render(canvas)
+		const player = props.player
 
+		player.render(canvas)
 		onCleanup(() => {
-			props.player.close()
+			player.close()
 		})
 	})
 
@@ -38,8 +39,6 @@ export function Setup(props: { connection: Connection | undefined; setPlayer: (v
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
 
 	createEffect(async () => {
-		console.log("pending be", pending())
-
 		const player = pending()
 		if (!player) return
 

@@ -1,5 +1,5 @@
 import * as Control from "./control"
-import * as Object from "./object"
+import { Header, Objects } from "./object"
 import { Notify, Deferred } from "../common/async"
 import { AnnounceSend, AnnounceRecv } from "./announce"
 
@@ -8,7 +8,7 @@ export class Subscribe {
 	#control: Control.Stream
 
 	// Use to send objects.
-	#objects: Object.Transport
+	#objects: Objects
 
 	// Our subscribed tracks.
 	#send = new Map<bigint, SubscribeSend>()
@@ -19,7 +19,7 @@ export class Subscribe {
 	#recvQueue = new Array<SubscribeRecv>()
 	#recvNotify = new Notify()
 
-	constructor(control: Control.Stream, objects: Object.Transport) {
+	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
 		this.#objects = objects
 	}
@@ -66,12 +66,12 @@ export class Subscribe {
 		await this.#control.send({ type: Control.Type.SubscribeOk, id: msg.id })
 	}
 
-	async onData(msg: Object.Header, stream: ReadableStream<Uint8Array>) {
-		const subscribe = this.#send.get(msg.track)
+	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
+		const subscribe = this.#send.get(header.track)
 		if (!subscribe) {
-			throw new Error(`data for for unknown track: ${msg.track}`)
+			throw new Error(`data for for unknown track: ${header.track}`)
 		} else {
-			await subscribe.onData(msg, stream)
+			await subscribe.onData(header, stream)
 		}
 	}
 
@@ -96,7 +96,7 @@ export class Subscribe {
 
 export class SubscribeRecv {
 	#control: Control.Stream
-	#objects: Object.Transport
+	#objects: Objects
 	#id: bigint
 
 	readonly announce: AnnounceSend
@@ -108,7 +108,7 @@ export class SubscribeRecv {
 	// Active is resolved when the subscribe is cancelled.
 	#active = new Deferred()
 
-	constructor(control: Control.Stream, objects: Object.Transport, id: bigint, announce: AnnounceSend, name: string) {
+	constructor(control: Control.Stream, objects: Objects, id: bigint, announce: AnnounceSend, name: string) {
 		this.#control = control // so we can send messages
 		this.#objects = objects // so we can send objects
 		this.#id = id
@@ -136,7 +136,8 @@ export class SubscribeRecv {
 	// Close the subscription with an error.
 	async close(code = 0n, reason = "") {
 		if (!this.#active.pending) {
-			throw new Error("error already sent")
+			// Already closed
+			return
 		}
 
 		const err = new Error(`SUBSCRIBE_ERROR (${code})` + reason ? `: ${reason}` : "")
@@ -152,7 +153,7 @@ export class SubscribeRecv {
 
 	// Create a writable data stream
 	async data(header: { group: bigint; sequence: bigint; send_order: bigint }) {
-		return this.#objects.send({ track: this.#id, ...header })
+		return await this.#objects.send({ track: this.#id, ...header })
 	}
 }
 
@@ -170,7 +171,7 @@ export class SubscribeSend {
 	#active = new Deferred()
 
 	// A queue of received streams for this subscription.
-	#data = new Array<[Object.Header, ReadableStream<Uint8Array>]>()
+	#data = new Array<{ header: Header; stream: ReadableStream<Uint8Array> }>()
 	#dataNotify = new Notify()
 
 	constructor(control: Control.Stream, id: bigint, announce: AnnounceRecv, name: string) {
@@ -199,46 +200,69 @@ export class SubscribeSend {
 	}
 
 	async close(code = 0n, reason = "") {
+		if (this.closed) {
+			// Already closed
+			return
+		}
+
 		// TODO implement unsubscribe
 		// await this.#inner.sendReset(code, reason)
 
-		const err = new Error(`local error (${code})` + reason ? `: ${reason}` : "")
+		if (reason !== "") {
+			reason = `: ${reason}`
+		}
+
+		// We closed the subscription, so don't error
+		this.#active.resolve(undefined)
+
+		const err = new Error(`local error (${code})${reason}`)
 		await this.#close(err)
 	}
 
 	onOk() {
-		if (!this.#ok.pending) {
-			throw new Error("or or error already received")
+		if (this.closed) {
+			// Already closed
+			return
 		}
 
 		this.#ok.resolve(undefined)
 	}
 
 	async onError(code: bigint, reason: string) {
-		if (!this.#active.pending) {
-			throw new Error("error already received")
+		if (this.closed) {
+			// Already closed
+			return
 		}
 
-		const err = new Error(`remote error (${code})` + reason ? `: ${reason}` : "")
+		if (reason !== "") {
+			reason = `: ${reason}`
+		}
+
+		const err = new Error(`remote error (${code})${reason}`)
 		await this.#close(err)
 	}
 
-	async onData(msg: Object.Header, stream: ReadableStream<Uint8Array>) {
+	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
 		if (this.closed) {
+			// Cancel the stream immediately because we're closed
 			await stream.cancel()
 		} else {
-			console.log("broadcasting")
-			this.#data.push([msg, stream])
+			this.#data.push({ header, stream })
 			this.#dataNotify.broadcast()
 		}
 	}
 
 	async #close(err: Error) {
+		if (this.closed) {
+			// Already closed
+			return
+		}
+
 		this.#ok.reject(err)
 		this.#active.reject(err)
 		this.#dataNotify.close(err)
 
-		for (const [_, stream] of this.#data) {
+		for (const { stream } of this.#data) {
 			await stream.cancel()
 		}
 
@@ -246,7 +270,7 @@ export class SubscribeSend {
 	}
 
 	// Receive the next a readable data stream
-	async data(): Promise<[Object.Header, ReadableStream<Uint8Array>]> {
+	async data() {
 		for (;;) {
 			const data = this.#data.shift()
 			if (data) return data
