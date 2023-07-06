@@ -1,5 +1,5 @@
 import * as Control from "./control"
-import { Notify, Deferred } from "../common/async"
+import { Queue, Deferred } from "../common/async"
 import { Subscribe } from "./subscribe"
 
 // Handles all incoming and outgoing announce messages for a connection.
@@ -12,8 +12,7 @@ export class Announce {
 
 	// Their announced tracks.
 	#recv = new Map<string, AnnounceRecv>()
-	#recvQueue = new Array<AnnounceRecv>()
-	#recvNotify = new Notify()
+	#recvQueue = new Queue<AnnounceRecv>()
 
 	constructor(control: Control.Stream, subscribe: Subscribe) {
 		this.#control = control
@@ -39,13 +38,7 @@ export class Announce {
 
 	// Receive a track namespace.
 	async recv() {
-		for (;;) {
-			const next = this.#recvQueue.shift()
-			if (next) return next
-
-			// Wait for the next value
-			await this.#recvNotify.wait()
-		}
+		return this.#recvQueue.shift()
 	}
 
 	async onAnnounce(msg: Control.Announce) {
@@ -58,7 +51,6 @@ export class Announce {
 		const announce = new AnnounceRecv(this.#control, this.#subscribe, msg.namespace)
 		this.#recv.set(msg.namespace, announce)
 		this.#recvQueue.push(announce)
-		this.#recvNotify.broadcast()
 	}
 
 	onOk(msg: Control.AnnounceOk) {
@@ -158,8 +150,10 @@ export class AnnounceRecv {
 			throw new Error("err already sent")
 		}
 
+		console.log("ok sent")
 		this.okSent = true
 
+		console.log("await")
 		// Send the control message.
 		await this.#control.send({ type: Control.Type.AnnounceOk, namespace: this.namespace })
 	}

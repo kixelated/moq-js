@@ -1,7 +1,6 @@
 import { Connection } from "../transport/connection"
 import { Player, Range, Broadcast, Timeline } from "../playback"
 import * as MP4 from "../common/mp4"
-import { asError } from "../common/error"
 
 import { createSignal, createMemo, onMount, For, Show, createEffect, onCleanup } from "solid-js"
 
@@ -26,8 +25,6 @@ export function Main(props: { player: Player }) {
 }
 
 export function Setup(props: { connection: Connection | undefined; setPlayer: (v: Player | undefined) => void }) {
-	const [error, setError] = createSignal<Error | undefined>()
-
 	// Create a player that we'll use to list all of the broadcasts
 	const pending = createMemo(() => {
 		if (props.connection) {
@@ -59,9 +56,6 @@ export function Setup(props: { connection: Connection | undefined; setPlayer: (v
 
 		try {
 			await player.play(selected)
-		} catch (e) {
-			const err = asError(e)
-			setError(err)
 		} finally {
 			props.setPlayer(undefined)
 		}
@@ -70,9 +64,6 @@ export function Setup(props: { connection: Connection | undefined; setPlayer: (v
 	return (
 		<>
 			<p class="mb-6 text-center font-mono text-xl">Watch</p>
-			<Show when={error()}>
-				<p>{error()?.message}</p>
-			</Show>
 			<ul>
 				<For each={broadcasts()} fallback={"No live broadcasts"}>
 					{(broadcast) => {

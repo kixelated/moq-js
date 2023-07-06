@@ -2,7 +2,7 @@ import * as Audio from "./audio"
 import * as Message from "./message"
 
 import { Connection } from "../transport/connection"
-import { Notify } from "../common/async"
+import { Watch } from "../common/async"
 import { RingShared } from "../common/ring"
 import * as MP4 from "../common/mp4"
 import { AnnounceRecv } from "../transport/announce"
@@ -20,11 +20,8 @@ export class Player {
 	// The audio context, which must be created on the main thread.
 	#context?: Audio.Context
 
-	// The most recent timeline message received from the worker.
-	#timeline?: Message.Timeline
-
-	// A list of consumers waiting for the next timeline message.
-	#timelineNotify = new Notify()
+	// A periodically updated timeline
+	#timeline = new Watch<Timeline | undefined>(undefined)
 
 	constructor(conn: Connection) {
 		this.#port = new Message.Port(this.#onMessage.bind(this)) // TODO await an async method instead
@@ -51,14 +48,8 @@ export class Player {
 
 	#onMessage(msg: Message.FromWorker) {
 		if (msg.timeline) {
-			this.#onTimeline(msg.timeline)
+			this.#timeline.update(msg.timeline)
 		}
-	}
-
-	#onTimeline(timeline: Message.Timeline) {
-		// Save the latest timeline timeline
-		this.#timeline = timeline
-		this.#timelineNotify.broadcast()
 	}
 
 	close() {
@@ -77,11 +68,13 @@ export class Player {
 		const sub = await broadcast.announce.subscribe(name)
 		try {
 			for (;;) {
-				const { header, stream } = await sub.data()
+				const segment = await sub.data()
+				if (!segment) break
+
 				this.#port.sendSegment({
 					init: broadcast.init,
-					header,
-					stream,
+					header: segment.header,
+					stream: segment.stream,
 				})
 			}
 		} finally {
@@ -94,23 +87,32 @@ export class Player {
 	}
 
 	async *timeline() {
+		const timeline = this.#timeline.current()
+		if (timeline) yield timeline
+
 		for (;;) {
-			if (this.#timeline) {
-				yield this.#timeline
-			}
-			await this.#timelineNotify.wait()
+			const timeline = await this.#timeline.next()
+			if (!timeline) break
+
+			yield timeline
 		}
 	}
 
 	// Returns the next available broadcast.
 	async broadcast() {
 		const announce = await this.#conn.announce.recv()
+		if (!announce) throw new Error("connection closed")
+
+		console.log("sending OK", announce)
 		await announce.ok()
 
 		// TODO do this in parallel
 		const subscribe = await announce.subscribe("catalog")
 		try {
-			const { header, stream } = await subscribe.data()
+			const segment = await subscribe.data()
+			if (!segment) throw new Error("no catalog data")
+
+			const { header, stream } = segment
 
 			if (header.sequence !== 0n) {
 				throw new Error("TODO delta updates not supported")

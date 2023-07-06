@@ -8,6 +8,7 @@
 		"serve": "parcel serve --https --cert cert/localhost.crt --key cert/localhost.key  --port 4444 --open",
 		"build": "parcel build",
 		"lint": "eslint .",
+		"test": "tsc -b src",
 		"fmt": "prettier --write .",
 		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1",
 		"clean": "rm -r ./.parcel-cache/ ./dist/"

@@ -20,7 +20,6 @@ export class Connection {
 	readonly subscribe: Subscribe
 
 	constructor(quic: WebTransport, control: Control.Stream, objects: Objects) {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		this.#quic = quic
 		this.#control = control
 		this.#objects = objects

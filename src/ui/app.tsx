@@ -4,17 +4,18 @@ import { asError } from "../common/error"
 
 import { createSignal, Show, createSelector, createEffect, onCleanup, createMemo } from "solid-js"
 
-import * as Playback from "./playback"
-import * as Broadcast from "./broadcast"
+import * as Watch from "./watch"
+import * as Publish from "./publish"
+
 import { Player } from "../playback"
-import { Broadcaster } from "../broadcast"
+import { Broadcast } from "../contribute"
 
 export function App(props: { url: string }) {
 	const [connection, setConnection] = createSignal<Connection | undefined>()
 
 	const [player, setPlayer] = createSignal<Player | undefined>()
-	const [broadcaster, setBroadcaster] = createSignal<Broadcaster | undefined>()
-	const setup = createMemo(() => !player() && !broadcaster())
+	const [broadcast, setBroadcast] = createSignal<Broadcast | undefined>()
+	const setup = createMemo(() => !player() && !broadcast())
 
 	return (
 		<div class="flex flex-col overflow-hidden rounded-lg bg-black shadow-xl ring-1 ring-gray-900/5">
@@ -25,16 +26,16 @@ export function App(props: { url: string }) {
 				classList={{ "h-[500]": !!player(), "h-0": !player() }}
 			>
 				<Show when={player()}>
-					<Playback.Main player={player()!} />
+					<Watch.Main player={player()!} />
 				</Show>
 			</div>
 
 			<div
 				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!broadcaster(), "h-0": !broadcaster() }}
+				classList={{ "h-[500]": !!broadcast(), "h-0": !broadcast() }}
 			>
-				<Show when={broadcaster()}>
-					<Broadcast.Main broadcaster={broadcaster()!} />
+				<Show when={broadcast()}>
+					<Publish.Main broadcast={broadcast()!} />
 				</Show>
 			</div>
 
@@ -43,11 +44,11 @@ export function App(props: { url: string }) {
 				classList={{ "h-96": setup(), "h-0": setup() }}
 			>
 				<div class="basis-1/2 p-6">
-					<Playback.Setup connection={connection()} setPlayer={setPlayer} />
+					<Watch.Setup connection={connection()} setPlayer={setPlayer} />
 				</div>
 				<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
 				<div class="basis-1/2 p-6">
-					<Broadcast.Setup connection={connection()} setBroadcaster={setBroadcaster} />
+					<Publish.Setup connection={connection()} setBroadcast={setBroadcast} />
 				</div>
 			</div>
 		</div>

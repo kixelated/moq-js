@@ -17,8 +17,8 @@ jobs:
             - name: build
               run: yarn build
 
-            - name: check
-              run: yarn tsc -b src
+            - name: test
+              run: yarn test
 
             - name: lint
               run: yarn lint

@@ -1,50 +1,47 @@
-import { Broadcaster } from "../broadcast"
+import { Broadcast } from "../contribute"
+import { Encoder } from "../contribute/encoder"
 import { Connection } from "../transport/connection"
 
-import { createEffect, createSignal, For, Show } from "solid-js"
+import { createEffect, createSignal, For } from "solid-js"
 import { createStore } from "solid-js/store"
-import { asError } from "../common/error"
 
-export function Main(_props: { broadcaster: Broadcaster }) {
+export function Main(_props: { broadcast: Broadcast }) {
 	return <></>
 }
 
-export function Setup(props: {
-	connection: Connection | undefined
-	setBroadcaster: (v: Broadcaster | undefined) => void
-}) {
-	const [error, setError] = createSignal<Error | undefined>(undefined)
+export function Setup(props: { connection: Connection | undefined; setBroadcast: (v: Broadcast | undefined) => void }) {
 	const [state, setState] = createStore({
 		name: "",
-		codec: "av1",
+		codec: "",
 		height: 720,
 		fps: 30,
 		bitrate: 2000,
 	})
 
 	const [constraints, setConstraints] = createSignal()
-	const [media, setMedia] = createSignal()
+	const [media, setMedia] = createSignal<MediaStream | undefined>()
 
 	createEffect(async () => {
 		if (!constraints()) {
 			return
 		}
 
-		try {
-			const stream = await window.navigator.mediaDevices.getUserMedia(constraints()!)
-			setMedia(stream)
-		} catch (e) {
-			const err = asError(e)
-			setError(err)
-		}
+		const stream = await window.navigator.mediaDevices.getUserMedia(constraints()!)
+		setMedia(stream)
 	})
 
-	const options = {
-		codec: ["av1"],
+	const [supported, setSupported] = createStore({
+		codecs: new Array<string>(),
 		height: [480, 720, 1080, 1440],
 		fps: [15, 30, 60],
 		bitrate: { min: 500, max: 4000 },
-	}
+	})
+
+	createEffect(async () => {
+		const supported = await Encoder.supported()
+		setSupported(supported)
+		setState({ codec: supported.codecs.at(0) })
+	})
 
 	const submit = (e: Event) => {
 		e.preventDefault()
@@ -59,25 +56,25 @@ export function Setup(props: {
 		})
 	}
 
-	createEffect(() => {
+	createEffect(async () => {
 		const m = media()
 		const c = props.connection
 
 		if (!m || !c) {
-			props.setBroadcaster(undefined)
+			props.setBroadcast(undefined)
 			return
 		}
 
-		const broadcaster = new Broadcaster({
-			connection: c,
+		const broadcast = new Broadcast({
+			conn: c,
+			media: m,
 			name: state.name,
 			video: { codec: state.codec, bitrate: state.bitrate },
-			media: m,
 		})
 
-		props.setBroadcaster(broadcaster)
+		props.setBroadcast(broadcast)
 
-		// TODO await broadcaster.serve()
+		await broadcast.running
 	})
 
 	return (
@@ -107,7 +104,7 @@ export function Setup(props: {
 					class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 					onInput={(e) => setState({ codec: e.target.value })}
 				>
-					<For each={options.codec}>
+					<For each={supported.codecs}>
 						{(codec) => {
 							return (
 								<option value={codec} selected={codec === state.codec}>
@@ -125,7 +122,7 @@ export function Setup(props: {
 					class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 					onInput={(e) => setState({ height: parseInt(e.target.value) })}
 				>
-					<For each={options.height}>
+					<For each={supported.height}>
 						{(res) => {
 							return (
 								<option value={res} selected={res === state.height}>
@@ -143,7 +140,7 @@ export function Setup(props: {
 					class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 					onInput={(e) => setState({ fps: parseInt(e.target.value) })}
 				>
-					<For each={options.fps}>
+					<For each={supported.fps}>
 						{(fps) => {
 							return (
 								<option value={fps} selected={fps === state.fps}>
@@ -159,8 +156,8 @@ export function Setup(props: {
 				<input
 					type="range"
 					name="bitrate"
-					min={options.bitrate.min}
-					max={options.bitrate.max}
+					min={supported.bitrate.min}
+					max={supported.bitrate.max}
 					step="100"
 					value={state.bitrate}
 					onInput={(e) => setState({ bitrate: parseInt(e.target.value) })}
@@ -173,9 +170,6 @@ export function Setup(props: {
 				>
 					Go Live
 				</button>
-				<Show when={error()}>
-					<p class="col-span-3 text-red-500">{error()?.message}</p>
-				</Show>
 			</form>
 		</>
 	)

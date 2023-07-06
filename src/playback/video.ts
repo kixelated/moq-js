@@ -84,8 +84,6 @@ export class Renderer {
 			// Check if there was a seek, and we need to flush any decode queue.
 			const continuity = this.timeline.continuity()
 			if (this.continuity && continuity !== this.continuity) {
-				console.log("clearing decoder queue", continuity)
-
 				// Flush the decoder queue.
 				if (this.decoder) {
 					this.decoder.close()

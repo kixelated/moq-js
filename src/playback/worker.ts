@@ -19,7 +19,6 @@ class Worker {
 		const msg = e.data as Message.ToWorker
 
 		if (msg.config) {
-			console.log("got config", msg.config)
 			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline)
 			this.#video = new Video.Renderer(msg.config.video, this.#timeline)
 		} else if (msg.segment) {

@@ -1,6 +1,6 @@
 import * as Control from "./control"
 import { Header, Objects } from "./object"
-import { Notify, Deferred } from "../common/async"
+import { Queue, Deferred } from "../common/async"
 import { AnnounceSend, AnnounceRecv } from "./announce"
 
 export class Subscribe {
@@ -16,8 +16,7 @@ export class Subscribe {
 
 	// Their subscribed tracks.
 	#recv = new Map<bigint, SubscribeRecv>()
-	#recvQueue = new Array<SubscribeRecv>()
-	#recvNotify = new Notify()
+	#recvQueue = new Queue<SubscribeRecv>()
 
 	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
@@ -44,13 +43,7 @@ export class Subscribe {
 
 	// Receive the next new subscription
 	async recv() {
-		for (;;) {
-			const next = this.#recvQueue.shift()
-			if (next) return next
-
-			// Wait for any changes
-			await this.#recvNotify.wait()
-		}
+		return this.#recvQueue.shift()
 	}
 
 	async onSubscribe(msg: Control.Subscribe, announce: AnnounceSend) {
@@ -61,7 +54,6 @@ export class Subscribe {
 		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg.id, announce, msg.name)
 		this.#recv.set(msg.id, subscribe)
 		this.#recvQueue.push(subscribe)
-		this.#recvNotify.broadcast()
 
 		await this.#control.send({ type: Control.Type.SubscribeOk, id: msg.id })
 	}
@@ -171,8 +163,7 @@ export class SubscribeSend {
 	#active = new Deferred()
 
 	// A queue of received streams for this subscription.
-	#data = new Array<{ header: Header; stream: ReadableStream<Uint8Array> }>()
-	#dataNotify = new Notify()
+	#data = new Queue<{ header: Header; stream: ReadableStream<Uint8Array> }>()
 
 	constructor(control: Control.Stream, id: bigint, announce: AnnounceRecv, name: string) {
 		this.#control = control // so we can send messages
@@ -248,7 +239,6 @@ export class SubscribeSend {
 			await stream.cancel()
 		} else {
 			this.#data.push({ header, stream })
-			this.#dataNotify.broadcast()
 		}
 	}
 
@@ -260,22 +250,17 @@ export class SubscribeSend {
 
 		this.#ok.reject(err)
 		this.#active.reject(err)
-		this.#dataNotify.close(err)
 
-		for (const { stream } of this.#data) {
+		const streams = this.#data.current()
+		for (const { stream } of streams) {
 			await stream.cancel()
 		}
 
-		this.#data = []
+		this.#data.close()
 	}
 
 	// Receive the next a readable data stream
 	async data() {
-		for (;;) {
-			const data = this.#data.shift()
-			if (data) return data
-
-			await this.#dataNotify.wait()
-		}
+		return this.#data.shift()
 	}
 }
