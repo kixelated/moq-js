@@ -8,7 +8,7 @@ export interface BroadcastConfig {
 	conn: Connection
 	media: MediaStream
 
-	name?: string // name of the broadcast
+	name: string // name of the broadcast
 
 	// TODO support multiple audio/video tracks
 	audio?: BroadcastConfigTrack
@@ -64,11 +64,9 @@ export class Broadcast {
 	}
 
 	async #runAnnounce(config: BroadcastConfig) {
-		const name = `anon.quic.video/${config.name ?? crypto.randomUUID()}`
-
 		// Announce the namespace and wait for an explicit OK.
-		const announce = await this.#conn.announce.send(name)
-		await announce.ok
+		const announce = await this.#conn.announce.send(config.name)
+		await announce.ok()
 
 		try {
 			for (;;) {
@@ -89,10 +87,10 @@ export class Broadcast {
 
 	async #serveSubscribe(subscriber: SubscribeRecv) {
 		try {
-			if (subscriber.name === "catalog") {
-				return this.#serveCatalog(subscriber)
+			if (subscriber.name === "0") {
+				await this.#serveCatalog(subscriber)
 			} else {
-				return this.#serveTrack(subscriber)
+				await this.#serveTrack(subscriber)
 			}
 		} catch (e) {
 			const err = asError(e)
@@ -105,24 +103,25 @@ export class Broadcast {
 	async #serveCatalog(subscriber: SubscribeRecv) {
 		await subscriber.ack()
 
-		for await (const catalog of this.#container.catalog()) {
-			const stream = await subscriber.data({
-				group: 0n,
-				sequence: catalog.sequence,
-				send_order: -1n, // Send before any media data.
-			})
+		const catalog = await this.#container.catalog()
+		if (!catalog) throw new Error("no catalog produced")
 
-			const writer = stream.getWriter()
+		const stream = await subscriber.data({
+			group: 0n,
+			sequence: catalog.sequence,
+			send_order: 0n, // Highest priority
+		})
 
-			try {
-				await writer.write(catalog.init)
-			} catch (e) {
-				const err = asError(e)
-				await writer.abort(err.message)
-				throw err
-			} finally {
-				await writer.close()
-			}
+		const writer = stream.getWriter()
+
+		try {
+			await writer.write(catalog.init)
+		} catch (e) {
+			const err = asError(e)
+			await writer.abort(err.message)
+			throw err
+		} finally {
+			await writer.close()
 		}
 	}
 
@@ -133,7 +132,8 @@ export class Broadcast {
 
 		for await (const segment of track.segments()) {
 			this.#serveSegment(subscriber, segment).catch((e) => {
-				console.warn(`failed to serve segment ${segment.sequence}`, e)
+				const err = asError(e)
+				console.warn(`failed to serve segment ${segment.sequence}`, err)
 			})
 		}
 	}

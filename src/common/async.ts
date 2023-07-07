@@ -18,35 +18,40 @@ export class Deferred<T> {
 	}
 }
 
+export type WatchNext<T> = [T, Promise<WatchNext<T>> | undefined]
+
 export class Watch<T> {
-	#current: T
-	#next = new Deferred<T | undefined>()
+	#current: WatchNext<T>
+	#next = new Deferred<WatchNext<T>>()
 
 	constructor(init: T) {
-		this.#current = init
+		this.#next = new Deferred<WatchNext<T>>()
+		this.#current = [init, this.#next.promise]
 	}
 
-	current(): T {
+	value(): WatchNext<T> {
 		return this.#current
 	}
 
-	async next(): Promise<T | undefined> {
-		return this.#next.promise
-	}
-
 	update(v: T | ((v: T) => T)) {
-		// If we're given a function, call it with the current value
-		if (v instanceof Function) {
-			v = v(this.#current)
+		if (!this.#next.pending) {
+			throw new Error("already closed")
 		}
 
-		this.#current = v
+		// If we're given a function, call it with the current value
+		if (v instanceof Function) {
+			v = v(this.#current[0])
+		}
+
+		const next = new Deferred<WatchNext<T>>()
+		this.#current = [v, next.promise]
 		this.#next.resolve(this.#current)
-		this.#next = new Deferred()
+		this.#next = next
 	}
 
 	close() {
-		this.#next.resolve(undefined)
+		this.#current[1] = undefined
+		this.#next.resolve(this.#current)
 	}
 }
 
@@ -61,24 +66,18 @@ export class Queue<T> {
 	}
 
 	async shift(): Promise<T | undefined> {
-		const q = this.#watch.current()
-		if (q.length > 0) {
-			return q.shift()
+		for (;;) {
+			const [current, next] = this.#watch.value()
+			if (current.length > 0) return current.shift()
+			if (!next) return
+
+			await next
 		}
-
-		const r = await this.#watch.next()
-		if (!r) return undefined
-
-		return r.shift()
 	}
 
-	// Returns the entire queue on each update.
-	async next(): Promise<T[] | undefined> {
-		return this.#watch.next()
-	}
-
-	current(): T[] {
-		return this.#watch.current()
+	// Returns the entire queue state on each update.
+	value() {
+		return this.#watch.value()
 	}
 
 	close() {
@@ -89,8 +88,9 @@ export class Queue<T> {
 export class Notify {
 	#watch = new Watch<void>(undefined)
 
-	async next(): Promise<void> {
-		return this.#watch.next()
+	async next() {
+		const [_, next] = this.#watch.value()
+		return next
 	}
 
 	wake() {
@@ -108,19 +108,16 @@ export class List<T> {
 	#skip = 0
 
 	async *get() {
-		const queue = this.#queue.current()
-		for (const v of queue) yield v
-
-		let index = queue.length
-
+		let index = 0
 		for (;;) {
 			index = Math.max(0, index - this.#skip)
 
-			const queue = await this.#queue.next()
-			if (!queue) return
+			const [current, next] = this.#queue.value()
+			for (const v of current.slice(index)) yield v
+			if (!next) return
 
-			for (const v of queue.slice(index)) yield v
-			index = this.#skip + queue.length
+			index = this.#skip + current.length
+			await next
 		}
 	}
 

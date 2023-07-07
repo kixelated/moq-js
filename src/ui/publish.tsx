@@ -65,10 +65,13 @@ export function Setup(props: { connection: Connection | undefined; setBroadcast:
 			return
 		}
 
+		let name = state.name == "" ? crypto.randomUUID() : state.name
+		name = `anon.quic.video/${name}`
+
 		const broadcast = new Broadcast({
 			conn: c,
 			media: m,
-			name: state.name,
+			name: name,
 			video: { codec: state.codec, bitrate: state.bitrate },
 		})
 

@@ -15,14 +15,17 @@ class Worker {
 	#audio?: Audio.Renderer
 	#video?: Video.Renderer
 
-	async on(e: MessageEvent) {
+	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
 
 		if (msg.config) {
 			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline)
 			this.#video = new Video.Renderer(msg.config.video, this.#timeline)
 		} else if (msg.segment) {
-			await this.onSegment(msg.segment)
+			this.onSegment(msg.segment).catch((e) => {
+				const err = asError(e)
+				send({ fail: { err } })
+			})
 		} else if (msg.play) {
 			this.#timeline.play(msg.play.minBuffer)
 		} else if (msg.seek) {
@@ -63,10 +66,12 @@ class Worker {
 // Pass all events to the worker
 const worker = new Worker()
 self.addEventListener("message", (msg) => {
-	worker.on(msg).catch((e) => {
+	try {
+		worker.on(msg)
+	} catch (e) {
 		const err = asError(e)
 		send({ fail: { err } })
-	})
+	}
 })
 
 // Validates this is an expected message

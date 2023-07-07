@@ -23,17 +23,14 @@ export class Objects {
 	}
 
 	async send(header: Header) {
-		const stream: WritableStream<Uint8Array> =
-			(await this.quic.createUnidirectionalStream()) as WritableStream<Uint8Array>
+		console.log("sending object", header)
+		const stream = await this.quic.createUnidirectionalStream()
 		await this.#encode(stream, header)
 		return stream
 	}
 
 	async recv() {
-		// TODO not sure why the WebTransport API isn't typed correctly
-		const streams = this.quic.incomingUnidirectionalStreams.getReader() as ReadableStreamDefaultReader<
-			ReadableStream<Uint8Array>
-		>
+		const streams = this.quic.incomingUnidirectionalStreams.getReader()
 
 		const { value, done } = await streams.read()
 		streams.releaseLock()
@@ -42,6 +39,8 @@ export class Objects {
 		const stream = value
 
 		const header = await this.#decode(stream)
+
+		console.log("received object", header)
 		return { header, stream }
 	}
 

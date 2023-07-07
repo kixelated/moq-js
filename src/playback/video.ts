@@ -123,6 +123,7 @@ export class Renderer {
 	}
 
 	private makeDecoder(frame: Frame): VideoDecoder {
+		console.log("make decoder:", frame)
 		// Reuse the decoder if it's not a sync frame
 		if (this.decoder && !frame.sample.is_sync) return this.decoder
 

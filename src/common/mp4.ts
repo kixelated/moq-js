@@ -11,6 +11,7 @@ export type {
 	Sample,
 	TrackOptions,
 	SampleOptions,
+	Trak,
 } from "mp4box"
 
 import { MP4Track, MP4AudioTrack, MP4VideoTrack } from "mp4box"

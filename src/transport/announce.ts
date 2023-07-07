@@ -1,5 +1,5 @@
 import * as Control from "./control"
-import { Queue, Deferred } from "../common/async"
+import { Queue, Watch } from "../common/async"
 import { Subscribe } from "./subscribe"
 
 // Handles all incoming and outgoing announce messages for a connection.
@@ -20,7 +20,7 @@ export class Announce {
 	}
 
 	// Announce a track namespace.
-	async send(namespace: string) {
+	async send(namespace: string): Promise<AnnounceSend> {
 		if (this.#send.has(namespace)) {
 			throw new Error(`already announced: ${namespace}`)
 		}
@@ -37,7 +37,7 @@ export class Announce {
 	}
 
 	// Receive a track namespace.
-	async recv() {
+	async recv(): Promise<AnnounceRecv | undefined> {
 		return this.#recvQueue.shift()
 	}
 
@@ -56,7 +56,7 @@ export class Announce {
 	onOk(msg: Control.AnnounceOk) {
 		const announce = this.#send.get(msg.namespace)
 		if (!announce) {
-			throw new Error(`announce error for unknown announce: ${msg.namespace}`)
+			throw new Error(`announce OK for unknown announce: ${msg.namespace}`)
 		}
 
 		announce.onOk()
@@ -87,20 +87,33 @@ export class AnnounceSend {
 
 	readonly namespace: string
 
-	#ok = new Deferred()
-	#active = new Deferred()
+	// The current state, updated by control messages.
+	#state = new Watch<"init" | "ack" | Error>("init")
 
 	constructor(control: Control.Stream, namespace: string) {
 		this.#control = control
 		this.namespace = namespace
 	}
 
-	get ok() {
-		return this.#ok.promise
+	async ok() {
+		for (;;) {
+			const [state, next] = this.#state.value()
+			if (state === "ack") return
+			if (state instanceof Error) throw state
+			if (!next) throw new Error("closed")
+
+			await next
+		}
 	}
 
-	get error() {
-		return this.#active.promise
+	async active() {
+		for (;;) {
+			const [state, next] = this.#state.value()
+			if (state instanceof Error) throw state
+			if (!next) return
+
+			await next
+		}
 	}
 
 	async close(_code = 0n, _reason = "") {
@@ -108,22 +121,21 @@ export class AnnounceSend {
 		// await this.#inner.sendReset(code, reason)
 	}
 
-	onOk() {
-		if (!this.#ok.pending) {
-			throw new Error("or or error already received")
-		}
+	closed() {
+		const [state, next] = this.#state.value()
+		return state instanceof Error || next == undefined
+	}
 
-		this.#ok.resolve(undefined)
+	onOk() {
+		if (this.closed()) return
+		this.#state.update("ack")
 	}
 
 	onError(code: bigint, reason: string) {
-		if (!this.#active.pending) {
-			throw new Error("error already received")
-		}
+		if (this.closed()) return
 
 		const err = new Error(`ANNOUNCE_ERROR (${code})` + reason ? `: ${reason}` : "")
-		this.#ok.reject(err)
-		this.#active.reject(err)
+		this.#state.update(err)
 	}
 }
 
@@ -133,8 +145,8 @@ export class AnnounceRecv {
 
 	readonly namespace: string
 
-	okSent = false
-	errSent = false
+	// The current state of the announce
+	#state: "init" | "ack" | "closed" = "init"
 
 	constructor(control: Control.Stream, subscribe: Subscribe, namespace: string) {
 		this.#control = control // so we can send messages
@@ -144,28 +156,18 @@ export class AnnounceRecv {
 
 	// Acknowledge the subscription as valid.
 	async ok() {
-		if (this.okSent) {
-			throw new Error("ok already sent")
-		} else if (this.errSent) {
-			throw new Error("err already sent")
-		}
+		if (this.#state !== "init") return
+		this.#state = "ack"
 
-		console.log("ok sent")
-		this.okSent = true
-
-		console.log("await")
 		// Send the control message.
-		await this.#control.send({ type: Control.Type.AnnounceOk, namespace: this.namespace })
+		return this.#control.send({ type: Control.Type.AnnounceOk, namespace: this.namespace })
 	}
 
 	async close(code = 0n, reason = "") {
-		if (this.errSent) {
-			throw new Error("error already sent")
-		}
+		if (this.#state === "closed") return
+		this.#state = "closed"
 
-		this.errSent = true
-
-		await this.#control.send({ type: Control.Type.AnnounceError, namespace: this.namespace, code, reason })
+		return this.#control.send({ type: Control.Type.AnnounceError, namespace: this.namespace, code, reason })
 	}
 
 	// Helper to subscribe to the received announced namespace.

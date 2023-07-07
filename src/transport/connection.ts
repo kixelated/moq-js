@@ -55,7 +55,6 @@ export class Connection {
 	}
 
 	async #receive(msg: Control.Message) {
-		console.log("received", msg)
 		switch (msg.type) {
 			case Control.Type.Announce:
 				return this.announce.onAnnounce(msg)

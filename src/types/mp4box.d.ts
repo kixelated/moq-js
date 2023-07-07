@@ -104,6 +104,7 @@ declare module "mp4box" {
 	const LITTLE_ENDIAN: boolean
 
 	export class DataStream {
+		// WARNING, the default is little endian, which is not what MP4 uses.
 		constructor(buffer?: ArrayBuffer, byteOffset?: number, littleEndian?: boolean)
 		getPosition(): number
 
@@ -176,10 +177,6 @@ declare module "mp4box" {
 		adjustUint32(pos: number, v: number): void
 	}
 
-	export class Box {
-		write(stream: DataStream): void
-	}
-
 	export interface TrackOptions {
 		id?: number
 		type?: string
@@ -249,12 +246,63 @@ declare module "mp4box" {
 		createSingleSampleMoof(sample: Sample): Box
 
 		// helpers
-		getTrackById(id: number): Box | undefined
+		getTrackById(id: number): Trak | undefined
 		getTrexById(id: number): Box | undefined
 
 		// boxes that are added to the root
 		ftyp?: Box
 		moov?: Box
+
+		static writeInitializationSegment(
+			ftyp: Box,
+			moov: Box,
+			total_duration: number,
+			sample_duration: number
+		): ArrayBuffer
+	}
+
+	export class Box {
+		write(stream: DataStream): void
+		computeSize(): void
+		size: number
+	}
+
+	// Non-exhaustive and I'm too lazy to split into separate interfaces
+	export interface Trak extends Box {
+		samples: Sample[]
+		samples_duration: number
+		samples_size: number
+
+		tkhd: {
+			track_id: number
+			alternate_group: number
+			creation_time: number
+			duration: number
+			flags: number
+			height: number
+			matrix: number[]
+			volume: number
+			width: number
+		}
+
+		mdia: {
+			mdhd: {
+				creation_time: number
+				duration: number
+				timescale: number
+				flags: number
+				language: string
+				modification_time: number
+			}
+
+			minf: {
+				stbl: {
+					stsd: {
+						entries: any[]
+					}
+				}
+			}
+		}
 	}
 
 	export {}

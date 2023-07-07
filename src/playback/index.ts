@@ -87,14 +87,12 @@ export class Player {
 	}
 
 	async *timeline() {
-		const timeline = this.#timeline.current()
-		if (timeline) yield timeline
-
 		for (;;) {
-			const timeline = await this.#timeline.next()
-			if (!timeline) break
+			const [timeline, next] = this.#timeline.value()
+			if (timeline) yield timeline
+			if (!next) break
 
-			yield timeline
+			await next
 		}
 	}
 
@@ -103,11 +101,10 @@ export class Player {
 		const announce = await this.#conn.announce.recv()
 		if (!announce) throw new Error("connection closed")
 
-		console.log("sending OK", announce)
 		await announce.ok()
 
 		// TODO do this in parallel
-		const subscribe = await announce.subscribe("catalog")
+		const subscribe = await announce.subscribe("0")
 		try {
 			const segment = await subscribe.data()
 			if (!segment) throw new Error("no catalog data")

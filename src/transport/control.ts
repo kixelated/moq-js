@@ -74,7 +74,7 @@ export class Stream {
 
 	// Will error if two messages are read at once.
 	async recv(): Promise<Message> {
-		const msg = this.decoder.message()
+		const msg = await this.decoder.message()
 		console.log("received message", msg)
 		return msg
 	}

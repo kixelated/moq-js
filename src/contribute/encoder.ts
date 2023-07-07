@@ -1,4 +1,5 @@
 import { Deferred } from "../common/async"
+import * as MP4 from "../common/mp4"
 
 export interface EncoderConfig {
 	codec: string
@@ -16,17 +17,15 @@ export class Encoder {
 	#keyframeCounter = 0 // insert a keyframe every 2s at least
 
 	// inputs
-	#input: MediaStreamTrackProcessor<VideoFrame>
+	#input: ReadableStreamDefaultReader<VideoFrame>
 
 	// outputs
-	#init = new Deferred<VideoDecoderConfig>()
+	#init = new Deferred<MP4.TrackOptions>()
 	#frames: ReadableStream<EncodedVideoChunk>
 
 	constructor(input: MediaStreamVideoTrack, config: EncoderConfig) {
-		this.#input = new MediaStreamTrackProcessor({ track: input })
+		this.#input = new MediaStreamTrackProcessor({ track: input }).readable.getReader()
 		const settings = input.getSettings()
-
-		console.log(config.codec)
 
 		this.#config = {
 			codec: config.codec,
@@ -74,7 +73,7 @@ export class Encoder {
 		return { codecs }
 	}
 
-	async init(): Promise<VideoDecoderConfig> {
+	async init(): Promise<MP4.TrackOptions> {
 		return this.#init.promise
 	}
 
@@ -102,7 +101,7 @@ export class Encoder {
 	}
 
 	async #pull(controller: ReadableStreamDefaultController<EncodedVideoChunk>) {
-		const raw = await this.#input.readable.getReader().read()
+		const raw = await this.#input.read()
 		if (raw.done) {
 			this.#encoder.close()
 			controller.close()
@@ -135,14 +134,25 @@ export class Encoder {
 		metadata?: EncodedVideoChunkMetadata
 	) {
 		if (metadata?.decoderConfig && this.#init.pending) {
-			this.#init.resolve(metadata.decoderConfig)
+			const config = metadata.decoderConfig
+
+			console.log(metadata)
+
+			// TODO remove MP4 specific stuff
+			this.#init.resolve({
+				type: config.codec.substring(0, 4),
+				width: config.codedWidth,
+				height: config.codedHeight,
+				timescale: 1000,
+				layer: metadata.temporalLayerId,
+				description: config.description,
+				description_boxes: [new MP4.Box()],
+			})
 		}
 
 		if (frame.type === "key") {
 			this.#keyframeCounter = 0
 		}
-
-		console.log("encoded frame", frame.type, frame.timestamp, metadata?.decoderConfig)
 
 		controller.enqueue(frame)
 	}
