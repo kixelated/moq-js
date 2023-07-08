@@ -29,7 +29,6 @@ export class Connection {
 	}
 
 	close(code = 0, reason = "") {
-		// eslint-disable-next-line
 		this.#quic.close({ closeCode: code, reason })
 	}
 

@@ -3,7 +3,7 @@ import { Timeline } from "./timeline"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
-import { decodeSegment } from "./decoder"
+import { decodeSegment } from "./container"
 import * as Message from "./message"
 import { asError } from "../common/error"
 

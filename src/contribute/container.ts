@@ -29,9 +29,7 @@ export class Container {
 	}
 
 	add(track: MP4.TrackOptions): ContainerTrack {
-		console.log("add", track)
 		const id = this.#mp4.addTrack(track)
-		console.log(id)
 		const trak = this.#mp4.getTrackById(id)
 		if (!trak) throw new Error("failed to get newly created track")
 
@@ -61,63 +59,55 @@ export class ContainerTrack {
 	#segments = new List<ContainerSegment>()
 	#segmentSequence = 0n
 
-	// The total number of samples we've produced.
-	#samples = 0
-
 	constructor(mp4: MP4.ISOFile, trak: MP4.Trak) {
 		this.#mp4 = mp4
 		this.#trak = trak
 	}
 
 	add(frame: EncodedVideoChunk) {
-		const stream = new MP4.Stream()
-		stream.endianness = false // BigEndian TODO typed
-
-		// TODO avoid this extra copy by writing to the mdat directly
-		const buffer = new Uint8Array(frame.byteLength)
-		frame.copyTo(buffer)
-
-		const moof = this.#mp4.createSingleSampleMoof({
-			number: this.#samples++,
-			track_id: this.#trak.tkhd.track_id,
-			timescale: this.#trak.mdia.mdhd.timescale,
-			description_index: 0,
-			description: this.#trak.mdia.minf.stbl.stsd.entries[0],
-			data: buffer,
-			size: buffer.byteLength,
-			duration: frame.duration ?? 0,
-			cts: frame.timestamp,
-			dts: frame.timestamp,
-			is_sync: frame.type == "key",
-			is_leading: 0,
-			depends_on: 0,
-			is_depended_on: 0,
-			has_redundancy: 0,
-			degration_priority: 0,
-			offset: 0,
-			subsamples: undefined,
-		})
-
-		console.log(frame.timestamp, this.#trak.mdia.mdhd.timescale)
-
-		moof.write(stream)
-		stream.writeUint32(buffer.byteLength + 8)
-		stream.writeString("mdat")
-		stream.writeUint8Array(buffer)
-
+		// Check if we should close the current segment
 		if (this.#segment && frame.type == "key") {
 			this.#segmentSequence += 1n
 			this.#segment.end()
 			this.#segment = undefined
 		}
 
+		// Check if we need to create a new segment
 		if (!this.#segment) {
 			this.#segment = new ContainerSegment(this.#segmentSequence)
 			this.#segments.push(this.#segment)
 		}
 
-		const data = new Uint8Array(stream.buffer)
-		this.#segment.push(data)
+		// TODO avoid this extra copy by writing to the mdat directly
+		// ...and changing mp4box.js to take an offset instead of ArrayBuffer
+		const buffer = new Uint8Array(frame.byteLength)
+		frame.copyTo(buffer)
+
+		// Add the sample to the container
+		this.#mp4.addSample(this.#trak.tkhd.track_id, buffer, {
+			duration: 0,
+			dts: frame.timestamp,
+			cts: frame.timestamp,
+			is_sync: frame.type == "key",
+		})
+
+		const stream = new MP4.Stream()
+		stream.endianness = MP4.Stream.BIG_ENDIAN
+
+		// Moof and mdat atoms are written in pairs.
+		for (;;) {
+			const moof = this.#mp4.moofs.shift()
+			const mdat = this.#mp4.mdats.shift()
+
+			if (!moof && !mdat) break
+			if (!moof) throw new Error("moof missing")
+			if (!mdat) throw new Error("mdat missing")
+
+			moof.write(stream)
+			mdat.write(stream)
+		}
+
+		this.#segment.push(new Uint8Array(stream.buffer))
 	}
 
 	segments() {

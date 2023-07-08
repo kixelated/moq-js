@@ -1,5 +1,5 @@
 import { Connection } from "../transport/connection"
-import { Encoder } from "./encoder"
+import { Encoder, EncoderConfig } from "./encoder"
 import { Container, ContainerSegment } from "./container"
 import { SubscribeRecv } from "../transport/subscribe"
 import { asError } from "../common/error"
@@ -7,12 +7,8 @@ import { asError } from "../common/error"
 export interface BroadcastConfig {
 	conn: Connection
 	media: MediaStream
-
 	name: string // name of the broadcast
-
-	// TODO support multiple audio/video tracks
-	audio?: BroadcastConfigTrack
-	video: BroadcastConfigTrack
+	encoder: EncoderConfig
 }
 
 export interface BroadcastConfigTrack {
@@ -23,23 +19,36 @@ export interface BroadcastConfigTrack {
 export class Broadcast {
 	#conn: Connection
 	#container: Container
+	#media: MediaStream
+	#encoder: EncoderConfig // TODO make an encoder object
+	#name: string
 
 	running: Promise<void>
 
 	constructor(config: BroadcastConfig) {
 		this.#conn = config.conn
+		this.#media = config.media
+		this.#name = config.name
+		this.#encoder = config.encoder
+
 		this.#container = new Container()
 
-		const runAnnounce = this.#runAnnounce(config)
-		const runMedia = this.#runMedia(config)
-
-		this.running = Promise.all([runAnnounce, runMedia]).then(() => {})
+		this.running = this.#run() // async
 	}
 
-	async #runMedia(config: BroadcastConfig) {
+	preview(video: HTMLVideoElement) {
+		video.srcObject = this.#media
+	}
+
+	async #run() {
+		await Promise.all([this.#runAnnounce(), this.#runMedia()])
+	}
+
+	async #runMedia() {
 		const promises = []
-		for (const track of config.media.getVideoTracks()) {
-			promises.push(this.#runEncode(track as MediaStreamVideoTrack, config.video))
+		for (const track of this.#media.getVideoTracks()) {
+			const encode = this.#runEncode(track as MediaStreamVideoTrack, this.#encoder)
+			promises.push(encode)
 		}
 
 		// TODO listen for "addtrack"
@@ -63,9 +72,9 @@ export class Broadcast {
 		track.end()
 	}
 
-	async #runAnnounce(config: BroadcastConfig) {
+	async #runAnnounce() {
 		// Announce the namespace and wait for an explicit OK.
-		const announce = await this.#conn.announce.send(config.name)
+		const announce = await this.#conn.announce.send(this.#name)
 		await announce.ok()
 
 		try {
@@ -116,12 +125,11 @@ export class Broadcast {
 
 		try {
 			await writer.write(catalog.init)
+			await writer.close()
 		} catch (e) {
 			const err = asError(e)
 			await writer.abort(err.message)
 			throw err
-		} finally {
-			await writer.close()
 		}
 	}
 
@@ -150,11 +158,11 @@ export class Broadcast {
 			for await (const fragment of segment.fragments()) {
 				await writer.write(fragment)
 			}
+			await writer.close()
 		} catch (e) {
 			const err = asError(e)
 			await writer.abort(err.message)
-		} finally {
-			await writer.close()
+			throw err
 		}
 	}
 }

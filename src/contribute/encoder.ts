@@ -1,6 +1,12 @@
 import { Deferred } from "../common/async"
 import * as MP4 from "../common/mp4"
 
+export const EncodecCodecs = [
+	"avc1", // H.264
+	"hev1", // HEVC (aka h.265)
+	// "av01", // AV1
+]
+
 export interface EncoderConfig {
 	codec: string
 	bitrate: number
@@ -14,7 +20,11 @@ export class Encoder {
 	#encoder!: VideoEncoder
 	#config: VideoEncoderConfig
 
-	#keyframeCounter = 0 // insert a keyframe every 2s at least
+	// true if we should insert a keyframe, undefined when the encoder should decide
+	#keyframeNext: true | undefined = true
+
+	// Count the number of frames without a keyframe.
+	#keyframeCounter = 0
 
 	// inputs
 	#input: ReadableStreamDefaultReader<VideoFrame>
@@ -44,33 +54,22 @@ export class Encoder {
 		})
 	}
 
-	static async supported(): Promise<EncoderSupported> {
-		const codecs = new Array<string>()
+	static async isSupported(config: VideoEncoderConfig) {
+		// Check if we support a specific codec family
+		const short = config.codec.substring(0, 4)
+		if (!EncodecCodecs.includes(short)) return false
 
-		// TODO figure out the best codecs
-		const available = ["av01.0.04M.08", "avc1.64001E"]
-		const accelerations: HardwarePreference[] = ["prefer-hardware", "prefer-software"]
+		// Default to hardware encoding
+		config.hardwareAcceleration ??= "prefer-hardware"
 
-		// Check hardware acceleration first, but fall back to software if it's not available.
-		for (const acceleration of accelerations) {
-			for (const codec of available) {
-				const { supported } = await VideoEncoder.isConfigSupported({
-					codec,
-					hardwareAcceleration: acceleration,
-					width: 1280,
-					height: 720,
-					bitrate: 2_000_000,
-					bitrateMode: "constant",
-					framerate: 30,
-				})
+		// Default to CBR
+		config.bitrateMode ??= "constant"
 
-				if (supported && !codecs.includes(codec)) {
-					codecs.push(codec)
-				}
-			}
-		}
+		// Default to realtime encoding
+		config.latencyMode ??= "realtime"
 
-		return { codecs }
+		const res = await VideoEncoder.isConfigSupported(config)
+		return !!res.supported
 	}
 
 	async init(): Promise<MP4.TrackOptions> {
@@ -111,15 +110,9 @@ export class Encoder {
 		const frame = raw.value
 		const encoder = this.#encoder
 
-		let insertKeyframe = false
-		if (this.#keyframeCounter + encoder.encodeQueueSize >= 2 * this.#config.framerate!) {
-			insertKeyframe = true
-			this.#keyframeCounter = 0
-		} else {
-			this.#keyframeCounter += 1
-		}
-
-		encoder.encode(frame, { keyFrame: insertKeyframe })
+		// Set keyFrame to undefined when we're not sure so the encoder can decide.
+		encoder.encode(frame, { keyFrame: this.#keyframeNext })
+		this.#keyframeNext = undefined
 
 		frame.close()
 	}
@@ -133,25 +126,34 @@ export class Encoder {
 		frame: EncodedVideoChunk,
 		metadata?: EncodedVideoChunkMetadata
 	) {
-		if (metadata?.decoderConfig && this.#init.pending) {
-			const config = metadata.decoderConfig
+		const config = metadata?.decoderConfig
+		if (config && this.#init.pending) {
+			const codec = config.codec.substring(0, 4)
 
-			console.log(metadata)
-
-			// TODO remove MP4 specific stuff
-			this.#init.resolve({
-				type: config.codec.substring(0, 4),
+			const options: MP4.TrackOptions = {
+				type: codec,
 				width: config.codedWidth,
 				height: config.codedHeight,
 				timescale: 1000,
 				layer: metadata.temporalLayerId,
-				description: config.description,
-				description_boxes: [new MP4.Box()],
-			})
+			}
+
+			if (codec === "avc1") {
+				options.avcDecoderConfigRecord = config.description
+			} else if (codec === "hev1") {
+				options.hevcDecoderConfigRecord = config.description
+			}
+
+			this.#init.resolve(options)
 		}
 
 		if (frame.type === "key") {
 			this.#keyframeCounter = 0
+		} else {
+			this.#keyframeCounter += 1
+			if (this.#keyframeCounter + this.#encoder.encodeQueueSize >= 2 * this.#config.framerate!) {
+				this.#keyframeNext = true
+			}
 		}
 
 		controller.enqueue(frame)

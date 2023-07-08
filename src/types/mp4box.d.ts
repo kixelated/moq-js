@@ -79,7 +79,12 @@ declare module "mp4box" {
 		track_id: number
 		timescale: number
 		description_index: number
-		description: any
+		description: {
+			avcC?: Box // h.264
+			hvcC?: Box // hevc
+			vpcC?: Box // vp9
+			av1C?: Box // av1
+		}
 		data: ArrayBuffer
 		size: number
 		alreadyRead?: number
@@ -100,12 +105,13 @@ declare module "mp4box" {
 		nbSamples: number
 	}
 
-	const BIG_ENDIAN: boolean
-	const LITTLE_ENDIAN: boolean
+	type BIG_ENDIAN = true
+	type LITTLE_ENDIAN = false
+	type Endianness = LITTLE_ENDIAN | BIG_ENDIAN
 
 	export class DataStream {
 		// WARNING, the default is little endian, which is not what MP4 uses.
-		constructor(buffer?: ArrayBuffer, byteOffset?: number, littleEndian?: boolean)
+		constructor(buffer?: ArrayBuffer, byteOffset?: number, endianness?: Endianness)
 		getPosition(): number
 
 		get byteLength(): number
@@ -120,25 +126,25 @@ declare module "mp4box" {
 		isEof(): boolean
 
 		mapUint8Array(length: number): Uint8Array
-		readInt32Array(length: number, littleEndian: boolean): Int32Array
-		readInt16Array(length: number, littleEndian: boolean): Int16Array
+		readInt32Array(length: number, endianness?: Endianness): Int32Array
+		readInt16Array(length: number, endianness?: Endianness): Int16Array
 		readInt8Array(length: number): Int8Array
-		readUint32Array(length: number, littleEndian: boolean): Uint32Array
-		readUint16Array(length: number, littleEndian: boolean): Uint16Array
+		readUint32Array(length: number, endianness?: Endianness): Uint32Array
+		readUint16Array(length: number, endianness?: Endianness): Uint16Array
 		readUint8Array(length: number): Uint8Array
-		readFloat64Array(length: number, littleEndian: boolean): Float64Array
-		readFloat32Array(length: number, littleEndian: boolean): Float32Array
+		readFloat64Array(length: number, endianness?: Endianness): Float64Array
+		readFloat32Array(length: number, endianness?: Endianness): Float32Array
 
-		readInt32(littleEndian: boolean): number
-		readInt16(littleEndian: boolean): number
+		readInt32(endianness?: Endianness): number
+		readInt16(endianness?: Endianness): number
 		readInt8(): number
-		readUint32(littleEndian: boolean): number
-		readUint16(littleEndian: boolean): number
+		readUint32(endianness?: Endianness): number
+		readUint16(endianness?: Endianness): number
 		readUint8(): number
-		readFloat32(littleEndian: boolean): number
-		readFloat64(littleEndian: boolean): number
+		readFloat32(endianness?: Endianness): number
+		readFloat64(endianness?: Endianness): number
 
-		endianness: boolean
+		endianness: Endianness
 
 		memcpy(
 			dst: ArrayBufferLike,
@@ -153,28 +159,31 @@ declare module "mp4box" {
 		save(filename: string): void
 		shift(offset: number): void
 
-		writeInt32Array(arr: Int32Array, littleEndian?: boolean): void
-		writeInt16Array(arr: Int16Array, littleEndian?: boolean): void
+		writeInt32Array(arr: Int32Array, endianness?: Endianness): void
+		writeInt16Array(arr: Int16Array, endianness?: Endianness): void
 		writeInt8Array(arr: Int8Array): void
-		writeUint32Array(arr: Uint32Array, littleEndian?: boolean): void
-		writeUint16Array(arr: Uint16Array, littleEndian?: boolean): void
+		writeUint32Array(arr: Uint32Array, endianness?: Endianness): void
+		writeUint16Array(arr: Uint16Array, endianness?: Endianness): void
 		writeUint8Array(arr: Uint8Array): void
-		writeFloat64Array(arr: Float64Array, littleEndian?: boolean): void
-		writeFloat32Array(arr: Float32Array, littleEndian?: boolean): void
-		writeInt32(v: number, littleEndian?: boolean): void
-		writeInt16(v: number, littleEndian?: boolean): void
+		writeFloat64Array(arr: Float64Array, endianness?: Endianness): void
+		writeFloat32Array(arr: Float32Array, endianness?: Endianness): void
+		writeInt32(v: number, endianness?: Endianness): void
+		writeInt16(v: number, endianness?: Endianness): void
 		writeInt8(v: number): void
-		writeUint32(v: number, littleEndian?: boolean): void
-		writeUint16(v: number, littleEndian?: boolean): void
+		writeUint32(v: number, endianness?: Endianness): void
+		writeUint16(v: number, endianness?: Endianness): void
 		writeUint8(v: number): void
-		writeFloat32(v: number, littleEndian?: boolean): void
-		writeFloat64(v: number, littleEndian?: boolean): void
-		writeUCS2String(s: string, endianness?: boolean, length?: number): void
+		writeFloat32(v: number, endianness?: Endianness): void
+		writeFloat64(v: number, endianness?: Endianness): void
+		writeUCS2String(s: string, endianness?: Endianness, length?: number): void
 		writeString(s: string, encoding?: string, length?: number): void
 		writeCString(s: string, length?: number): void
 		writeUint64(v: number): void
 		writeUint24(v: number): void
 		adjustUint32(pos: number, v: number): void
+
+		static LITTLE_ENDIAN: LITTLE_ENDIAN
+		static BIG_ENDIAN: BIG_ENDIAN
 	}
 
 	export interface TrackOptions {
@@ -191,6 +200,7 @@ declare module "mp4box" {
 
 		// video
 		avcDecoderConfigRecord?: any
+		hevcDecoderConfigRecord?: any
 
 		// audio
 		balance?: number
@@ -250,6 +260,10 @@ declare module "mp4box" {
 		getTrexById(id: number): Box | undefined
 
 		// boxes that are added to the root
+		boxes: Box[]
+		mdats: Box[]
+		moofs: Box[]
+
 		ftyp?: Box
 		moov?: Box
 
@@ -262,9 +276,10 @@ declare module "mp4box" {
 	}
 
 	export class Box {
+		size: number
+
 		write(stream: DataStream): void
 		computeSize(): void
-		size: number
 	}
 
 	// Non-exhaustive and I'm too lazy to split into separate interfaces

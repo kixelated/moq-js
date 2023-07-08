@@ -112,32 +112,31 @@ export class Renderer {
 
 			// Create or reuse the decoder.
 			const decoder = this.makeDecoder(frame)
-			decoder.decode(
-				new EncodedVideoChunk({
-					type: frame.sample.is_sync ? "key" : "delta",
-					data: frame.sample.data,
-					timestamp: wall,
-				})
-			)
+
+			const chunk = new EncodedVideoChunk({
+				type: frame.sample.is_sync ? "key" : "delta",
+				data: frame.sample.data,
+				timestamp: wall,
+			})
+
+			decoder.decode(chunk)
 		}
 	}
 
 	private makeDecoder(frame: Frame): VideoDecoder {
-		console.log("make decoder:", frame)
+		const { sample, track } = frame
+
 		// Reuse the decoder if it's not a sync frame
-		if (this.decoder && !frame.sample.is_sync) return this.decoder
+		if (this.decoder && !sample.is_sync) return this.decoder
 
-		// Configure the decoder using the AVC box for H.264
-		// TODO it should be easy to support other codecs, just need to know the right boxes.
-		// TODO make a type for each codec
-		// eslint-disable-next-line
-		const avcc = frame.sample.description.avcC
-		if (!avcc) throw new Error("TODO only h264 is supported")
+		const desc = sample.description
+		const box = desc.avcC ?? desc.hvcC ?? desc.vpcC ?? desc.av1C
+		if (!box) throw new Error(`unsupported codec: ${track.codec}`)
 
-		// eslint-disable-next-line
-		const description = new MP4.Stream(new Uint8Array(avcc.size), 0, false)
-		// eslint-disable-next-line
-		avcc.write(description)
+		const buffer = new MP4.Stream()
+		buffer.endianness = MP4.Stream.BIG_ENDIAN
+		box.write(buffer)
+		const description = new Uint8Array(buffer.buffer, 8) // Remove the box header.
 
 		const decoder = new VideoDecoder({
 			output: this.render.bind(this),
@@ -147,14 +146,13 @@ export class Renderer {
 		// Try queuing up more work when the decoder is ready.
 		decoder.addEventListener("dequeue", this.tryDecode.bind(this))
 
-		const track = frame.track
 		if (!MP4.isVideoTrack(track)) throw new Error("expected video track")
 
 		decoder.configure({
 			codec: track.codec,
 			codedHeight: track.video.height,
 			codedWidth: track.video.width,
-			description: description.buffer.slice(8),
+			description,
 			// optimizeForLatency: true
 		})
 

@@ -81,21 +81,13 @@ export class Timeline {
 	#tryPlay() {
 		if (this.#target === undefined) return
 
-		// Return the first and last sample in both component queues.
-		const combined = this.span()
-		const audio = this.audio.span()
 		const video = this.video.span()
 
-		// Set our timestamp to be relative to the max value we have buffered.
-		const min = combined ?? audio ?? video
-		if (!min) return
-
 		// NOTE: This could be in an unbuffered range.
-		// Make sure both components are buffered enough before actually playing.
-		if (!combined || combined.end - combined.start < this.#target) return
+		if (!video || video.end - video.start < this.#target) return
 
 		// Set the timestamp to be relative to the end.
-		const timestamp = min.end - this.#target
+		const timestamp = video.end - this.#target
 		this.seek(timestamp)
 
 		this.#target = undefined // we did it
@@ -159,10 +151,14 @@ export class Component {
 
 	next(): Frame | undefined {
 		// Not playing yet
-		if (this.#index === undefined) return
+		if (this.#index === undefined) {
+			return
+		}
 
 		// Nothing in the queue
-		if (this.#index >= this.#queue.length) return
+		if (this.#index >= this.#queue.length) {
+			return
+		}
 
 		// Get the next frame to render.
 		const frame = this.#queue[this.#index]

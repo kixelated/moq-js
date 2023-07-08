@@ -6,7 +6,7 @@ import { Watch } from "../common/async"
 import { RingShared } from "../common/ring"
 import * as MP4 from "../common/mp4"
 import { AnnounceRecv } from "../transport/announce"
-import { decodeInit } from "./decoder"
+import { decodeInit } from "./container"
 import { asError } from "../common/error"
 
 export type Range = Message.Range
@@ -57,6 +57,7 @@ export class Player {
 	}
 
 	// TODO support more arguments
+	// TODO this API is gross
 	async play(broadcast: Broadcast) {
 		this.#port.sendPlay({ minBuffer: 0.5 }) // TODO
 

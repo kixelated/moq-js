@@ -8,29 +8,29 @@ export class Reader {
 		this.#scratch = new Uint8Array(8)
 	}
 
-	async readAll(dst?: Uint8Array): Promise<Uint8Array> {
+	async readAll(): Promise<Uint8Array> {
 		const reader = this.#reader.getReader({ mode: "byob" })
 
-		let buf = dst ?? new Uint8Array(1024)
+		let buf = new Uint8Array(new ArrayBuffer(1024), 0, 0)
 
-		let offset = 0
 		for (;;) {
-			if (offset >= buf.byteLength) {
-				const temp = new Uint8Array(buf.byteLength * 2)
-				temp.set(buf)
-				buf = temp
+			if (buf.byteLength == buf.buffer.byteLength) {
+				const tmp = new Uint8Array(new ArrayBuffer(2 * buf.buffer.byteLength), buf.byteLength)
+				tmp.set(buf)
+				buf = tmp
 			}
 
-			const { value, done } = await reader.read(buf.slice(offset))
+			const scratch = new Uint8Array(buf.buffer, buf.byteLength, buf.buffer.byteLength - buf.byteLength)
+
+			const { value, done } = await reader.read(scratch)
 			if (done) break
 
-			offset += value.byteLength
-			buf = new Uint8Array(value.buffer, value.byteOffset)
+			buf = new Uint8Array(value.buffer, 0, value.byteOffset + value.byteLength)
 		}
 
 		reader.releaseLock()
 
-		return new Uint8Array(buf.buffer, buf.byteOffset, offset)
+		return buf
 	}
 
 	async readFull(dst: Uint8Array): Promise<Uint8Array> {
