@@ -1,19 +1,28 @@
 import { Connection } from "../transport/connection"
-import { Player, Range, Broadcast, Timeline } from "../playback"
+import { Player, Range, Timeline } from "../playback/player"
+import { Broadcast, Catalog } from "../playback/catalog"
+import { asError } from "../common/error"
+
 import * as MP4 from "../common/mp4"
 
-import { createSignal, createMemo, onMount, For, Show, createEffect, onCleanup } from "solid-js"
+import { createSignal, createMemo, onMount, Switch, Match, For, Show, createEffect } from "solid-js"
 
-export function Main(props: { player: Player }) {
+export function Main(props: { player: Player; setError(e: Error): void; setPlayer(): void }) {
 	let canvas: HTMLCanvasElement
 
 	onMount(() => {
-		const player = props.player
+		props.player.render(canvas)
+		props.player.play()
+	})
 
-		player.render(canvas)
-		onCleanup(() => {
-			player.close()
-		})
+	createEffect(async () => {
+		try {
+			await props.player.run()
+		} catch (e) {
+			props.setError(asError(e))
+		} finally {
+			props.setPlayer()
+		}
 	})
 
 	return (
@@ -24,71 +33,66 @@ export function Main(props: { player: Player }) {
 	)
 }
 
-export function Setup(props: { connection: Connection | undefined; setPlayer: (v: Player | undefined) => void }) {
-	// Create a player that we'll use to list all of the broadcasts
-	const pending = createMemo(() => {
-		if (props.connection) {
-			return new Player(props.connection)
-		}
-	})
+export function Setup(props: { connection: Connection; setPlayer(v: Player): void; setError(e: Error): void }) {
+	// Create a catalog that we'll use to list all of the broadcasts
+	const catalog = new Catalog(props.connection)
 
 	const [broadcast, setBroadcast] = createSignal<Broadcast | undefined>()
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
 
 	createEffect(async () => {
-		const player = pending()
-		if (!player) return
+		try {
+			for (;;) {
+				const broadcast = await catalog.broadcast()
+				if (!broadcast) break
 
-		for (;;) {
-			const broadcast = await player.broadcast()
-			setBroadcasts((prev) => prev.concat(broadcast))
+				setBroadcasts((prev) => prev.concat(broadcast))
+			}
+		} catch (e) {
+			props.setError(asError(e))
 		}
 	})
 
-	createEffect(async () => {
-		const player = pending()
-		if (!player) return
-
+	createEffect(() => {
 		const selected = broadcast()
 		if (!selected) return
 
+		const player = new Player(props.connection, selected)
 		props.setPlayer(player)
-
-		try {
-			await player.play(selected)
-		} finally {
-			props.setPlayer(undefined)
-		}
 	})
 
 	return (
-		<>
-			<p class="mb-6 text-center font-mono text-xl">Watch</p>
-			<ul>
-				<For each={broadcasts()} fallback={"No live broadcasts"}>
-					{(broadcast) => {
-						const select = () => {
-							setBroadcast(broadcast)
-						}
-						return (
-							<li class="mt-4">
-								<Available broadcast={broadcast} select={select} />
-							</li>
-						)
-					}}
-				</For>
-			</ul>
-		</>
+		<ul>
+			<For each={broadcasts()} fallback={"No live broadcasts"}>
+				{(broadcast) => {
+					const select = () => {
+						setBroadcast(broadcast)
+					}
+					return (
+						<li class="mt-4">
+							<Available broadcast={broadcast} select={select} />
+						</li>
+					)
+				}}
+			</For>
+		</ul>
 	)
 }
 
 function Available(props: { broadcast: Broadcast; select: () => void }) {
-	const watch = (e: MouseEvent) => {
-		e.preventDefault()
-		props.select()
-	}
+	const name = props.broadcast.name.replace(/\//, " / ")
 
-	const name = props.broadcast.announce.namespace.replace(/\//, " / ")
+	const [tracks, setTracks] = createSignal<MP4.Track[]>([])
+	const [error, setError] = createSignal<Error | undefined>()
+
+	createEffect(async () => {
+		try {
+			const info = await props.broadcast.info()
+			setTracks(info.tracks)
+		} catch (e) {
+			setError(asError(e))
+		}
+	})
 
 	// A function because Match doesn't work with Typescript type guards
 	const trackInfo = (track: MP4.Track) => {
@@ -112,15 +116,30 @@ function Available(props: { broadcast: Broadcast; select: () => void }) {
 		}
 	}
 
+	const watch = (e: MouseEvent) => {
+		e.preventDefault()
+		props.select()
+	}
+
 	return (
 		<>
 			<a onClick={watch}>{name}</a>
 			<div class="ml-4 text-xs italic text-gray-700">
-				<For each={props.broadcast.info.tracks}>
-					{(track) => {
-						return <div>{trackInfo(track)}</div>
-					}}
-				</For>
+				<Switch>
+					<Match when={error()}>
+						<p class="text-red-500">{error()!.message}</p>
+					</Match>
+					<Match when={tracks()}>
+						<For each={tracks()}>
+							{(track) => {
+								return <div>{trackInfo(track)}</div>
+							}}
+						</For>
+					</Match>
+					<Match when={true}>
+						<p>loading...</p>
+					</Match>
+				</Switch>
 			</div>
 		</>
 	)

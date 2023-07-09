@@ -1,4 +1,4 @@
-import { Broadcast } from "../contribute"
+import { Broadcast } from "../contribute/broadcast"
 import { Encoder } from "../contribute/encoder"
 import { Connection } from "../transport/connection"
 import { asError } from "../common/error"
@@ -236,124 +236,120 @@ export function Setup(props: {
 	const isState = createSelector(state)
 
 	return (
-		<>
-			<p class="mb-6 text-center font-mono text-xl">Broadcast</p>
-
-			<form class="grid grid-cols-3 items-center gap-x-4 gap-y-2 text-sm text-gray-900">
-				<label for="name" class="col-start-1 block font-medium">
-					Name
-				</label>
-				<div class="form-input col-span-2 w-full rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600">
-					<span>anon.quic.video/</span>
-					<input
-						type="text"
-						name="name"
-						placeholder="random"
-						class="block border-0 bg-transparent p-1 pl-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0"
-						value={name()}
-						onInput={(e) => setName(e.target.value)}
-					/>
-				</div>
-				<label for="codec" class="col-start-1 font-medium leading-6">
-					Codec
-				</label>
-				<select
-					name="codec"
-					class="col-span-1 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-					onInput={(e) => setCodec({ name: e.target.value })}
-				>
-					<For each={[...supportedCodecNames()]}>
-						{(supported) => {
-							return (
-								<option value={supported} selected={supported === codec.name}>
-									{supported}
-								</option>
-							)
-						}}
-					</For>
-				</select>
-				<select
-					name="profile"
-					class="col-span-1 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-					onInput={(e) => setCodec({ profile: e.target.value })}
-				>
-					<For each={[...supportedCodecProfiles()]}>
-						{(supported) => {
-							return (
-								<option value={supported} selected={supported === codec.profile}>
-									{supported}
-								</option>
-							)
-						}}
-					</For>
-				</select>
-				<label for="resolution" class="col-start-1 font-medium leading-6">
-					Resolution
-				</label>
-				<select
-					name="resolution"
-					class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-					onInput={(e) => setConstraints({ height: parseInt(e.target.value) })}
-				>
-					<For each={CONSTRAINTS.height}>
-						{(res) => {
-							return (
-								<option value={res} selected={res === constraints.height}>
-									{res}p
-								</option>
-							)
-						}}
-					</For>
-				</select>
-				<label for="fps" class="col-start-1 font-medium">
-					FPS
-				</label>
-				<select
-					name="fps"
-					class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-					onInput={(e) => setConstraints({ fps: parseInt(e.target.value) })}
-				>
-					<For each={CONSTRAINTS.fps}>
-						{(fps) => {
-							return (
-								<option value={fps} selected={fps === constraints.fps}>
-									{fps}
-								</option>
-							)
-						}}
-					</For>
-				</select>
-				<label for="bitrate" class="col-start-1 font-medium">
-					Bitrate
-				</label>
+		<form class="grid grid-cols-3 items-center gap-x-4 gap-y-2 text-sm text-gray-900">
+			<label for="name" class="col-start-1 block font-medium">
+				Name
+			</label>
+			<div class="form-input col-span-2 w-full rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600">
+				<span>anon.quic.video/</span>
 				<input
-					type="range"
-					name="bitrate"
-					min={CONSTRAINTS.bitrate.min}
-					max={CONSTRAINTS.bitrate.max}
-					step="1000"
-					value={constraints.bitrate}
-					onInput={(e) => setConstraints({ bitrate: parseInt(e.target.value) })}
+					type="text"
+					name="name"
+					placeholder="random"
+					class="block border-0 bg-transparent p-1 pl-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0"
+					value={name()}
+					onInput={(e) => setName(e.target.value)}
 				/>
-				<span class="text-left text-xs">{Math.floor(constraints.bitrate / 1000)} Kb/s</span>
-				<button
-					class="transition-color col-span-2 col-start-2 mt-3 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm duration-1000 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-					classList={{
-						"bg-indigo-600": isState("ready") || isState("connecting"),
-						"hover:bg-indigo-500": isState("ready"),
-						"focus-visible:outline-indigo-600": isState("ready"),
-						"bg-cyan-600": isState("loading"),
+			</div>
+			<label for="codec" class="col-start-1 font-medium leading-6">
+				Codec
+			</label>
+			<select
+				name="codec"
+				class="col-span-1 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+				onInput={(e) => setCodec({ name: e.target.value })}
+			>
+				<For each={[...supportedCodecNames()]}>
+					{(supported) => {
+						return (
+							<option value={supported} selected={supported === codec.name}>
+								{supported}
+							</option>
+						)
 					}}
-					type="submit"
-					onClick={start}
-				>
-					<Switch>
-						<Match when={isState("ready")}>Go Live</Match>
-						<Match when={isState("loading")}>Loading</Match>
-						<Match when={isState("connecting")}>Connecting</Match>
-					</Switch>
-				</button>
-			</form>
-		</>
+				</For>
+			</select>
+			<select
+				name="profile"
+				class="col-span-1 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+				onInput={(e) => setCodec({ profile: e.target.value })}
+			>
+				<For each={[...supportedCodecProfiles()]}>
+					{(supported) => {
+						return (
+							<option value={supported} selected={supported === codec.profile}>
+								{supported}
+							</option>
+						)
+					}}
+				</For>
+			</select>
+			<label for="resolution" class="col-start-1 font-medium leading-6">
+				Resolution
+			</label>
+			<select
+				name="resolution"
+				class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+				onInput={(e) => setConstraints({ height: parseInt(e.target.value) })}
+			>
+				<For each={CONSTRAINTS.height}>
+					{(res) => {
+						return (
+							<option value={res} selected={res === constraints.height}>
+								{res}p
+							</option>
+						)
+					}}
+				</For>
+			</select>
+			<label for="fps" class="col-start-1 font-medium">
+				FPS
+			</label>
+			<select
+				name="fps"
+				class="col-span-2 rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+				onInput={(e) => setConstraints({ fps: parseInt(e.target.value) })}
+			>
+				<For each={CONSTRAINTS.fps}>
+					{(fps) => {
+						return (
+							<option value={fps} selected={fps === constraints.fps}>
+								{fps}
+							</option>
+						)
+					}}
+				</For>
+			</select>
+			<label for="bitrate" class="col-start-1 font-medium">
+				Bitrate
+			</label>
+			<input
+				type="range"
+				name="bitrate"
+				min={CONSTRAINTS.bitrate.min}
+				max={CONSTRAINTS.bitrate.max}
+				step="1000"
+				value={constraints.bitrate}
+				onInput={(e) => setConstraints({ bitrate: parseInt(e.target.value) })}
+			/>
+			<span class="text-left text-xs">{Math.floor(constraints.bitrate / 1000)} Kb/s</span>
+			<button
+				class="transition-color col-span-2 col-start-2 mt-3 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm duration-1000 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+				classList={{
+					"bg-indigo-600": isState("ready") || isState("connecting"),
+					"hover:bg-indigo-500": isState("ready"),
+					"focus-visible:outline-indigo-600": isState("ready"),
+					"bg-cyan-600": isState("loading"),
+				}}
+				type="submit"
+				onClick={start}
+			>
+				<Switch>
+					<Match when={isState("ready")}>Go Live</Match>
+					<Match when={isState("loading")}>Loading</Match>
+					<Match when={isState("connecting")}>Connecting</Match>
+				</Switch>
+			</button>
+		</form>
 	)
 }

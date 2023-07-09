@@ -6,8 +6,8 @@ import { createSignal, createEffect, Show, createMemo } from "solid-js"
 import * as Watch from "./watch"
 import * as Publish from "./publish"
 
-import { Player } from "../playback"
-import { Broadcast } from "../contribute"
+import { Player } from "../playback/player"
+import { Broadcast } from "../contribute/broadcast"
 import { Connection } from "../transport/connection"
 
 export function App(props: { url: string }) {
@@ -52,7 +52,7 @@ export function App(props: { url: string }) {
 				classList={{ "h-[500]": !!player(), "h-0": !player() }}
 			>
 				<Show when={player()}>
-					<Watch.Main player={player()!} />
+					<Watch.Main player={player()!} setError={setError} setPlayer={setPlayer} />
 				</Show>
 			</div>
 
@@ -70,10 +70,14 @@ export function App(props: { url: string }) {
 				classList={{ "h-96": setup(), "h-0": setup() }}
 			>
 				<div class="basis-1/2 p-6">
-					<Watch.Setup connection={connection()} setPlayer={setPlayer} />
+					<p class="mb-6 text-center font-mono text-xl">Watch</p>
+					<Show when={connection()} fallback="Connecting...">
+						<Watch.Setup connection={connection()!} setPlayer={setPlayer} setError={setError} />
+					</Show>
 				</div>
 				<div class="basis-0 border-l-2 border-dotted border-black/20"></div>
 				<div class="basis-1/2 p-6">
+					<p class="mb-6 text-center font-mono text-xl">Publish</p>
 					<Publish.Setup connection={connection()} setBroadcast={setBroadcast} setError={setError} />
 				</div>
 			</div>
