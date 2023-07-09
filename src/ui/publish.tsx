@@ -1,10 +1,10 @@
 import { Broadcast } from "../contribute"
 import { Encoder } from "../contribute/encoder"
 import { Connection } from "../transport/connection"
+import { asError } from "../common/error"
 
 import {
 	createEffect,
-	createSelector,
 	Switch,
 	Match,
 	createMemo,
@@ -12,6 +12,7 @@ import {
 	For,
 	createResource,
 	onMount,
+	createSelector,
 } from "solid-js"
 import { createStore } from "solid-js/store"
 
@@ -75,17 +76,31 @@ interface Codec {
 	value: string
 }
 
-export function Main(props: { broadcast: Broadcast }) {
+export function Main(props: { broadcast: Broadcast; setBroadcast(): void; setError(e: Error): void }) {
 	let preview: HTMLVideoElement
 
 	onMount(() => {
 		props.broadcast.preview(preview)
 	})
 
+	createEffect(async () => {
+		try {
+			await props.broadcast.run()
+		} catch (e) {
+			props.setError(asError(e))
+		} finally {
+			props.setBroadcast()
+		}
+	})
+
 	return <video ref={preview!} autoplay muted></video>
 }
 
-export function Setup(props: { connection: Connection | undefined; setBroadcast: (v: Broadcast | undefined) => void }) {
+export function Setup(props: {
+	connection: Connection | undefined
+	setBroadcast(v: Broadcast | undefined): void
+	setError(e: Error): void
+}) {
 	const [name, setName] = createSignal("")
 	const [codec, setCodec] = createStore<Codec>({ name: "", profile: "", value: "" })
 
@@ -99,7 +114,7 @@ export function Setup(props: { connection: Connection | undefined; setBroadcast:
 		bitrate: 2_000_000,
 	})
 
-	// Fetch the list of
+	// Fetch the list of supported codecs.
 	const [supportedCodecs] = createResource(
 		() => ({ ...constraints }), // weird syntax is required so it reruns on update
 		async (constraints) => {
@@ -169,70 +184,53 @@ export function Setup(props: { connection: Connection | undefined; setBroadcast:
 		return [...unique]
 	})
 
-	const [mediaLoading, setMediaLoading] = createSignal()
+	const [loading, setLoading] = createSignal(false)
 
-	const submit = (e: Event) => {
-		e.preventDefault()
-		setMediaLoading(true)
-	}
+	const [broadcast] = createResource(loading, async () => {
+		const media = await window.navigator.mediaDevices.getUserMedia({
+			audio: false, // TODO
+			video: {
+				aspectRatio: { ideal: 16 / 9 },
+				width: { ideal: constraints.width, max: constraints.width },
+				height: { ideal: constraints.height, max: constraints.height },
+				frameRate: { ideal: constraints.fps, max: constraints.fps },
+			},
+		})
 
-	const [media] = createResource(mediaLoading, async () => {
-		try {
-			return await window.navigator.mediaDevices.getUserMedia({
-				audio: false, // TODO
-				video: {
-					aspectRatio: { ideal: 16 / 9 },
-					width: { ideal: constraints.width, max: constraints.width },
-					height: { ideal: constraints.height, max: constraints.height },
-					frameRate: { ideal: constraints.fps, max: constraints.fps },
-				},
-			})
-		} finally {
-			setMediaLoading(false)
-		}
-	})
-
-	const broadcastOptions = createMemo(() => {
 		const conn = props.connection
-		const medi = media()
-
-		if (!conn || !medi) return
+		if (!conn) throw new Error("disconnected")
 
 		let full = name() != "" ? name() : crypto.randomUUID()
 		full = `anon.quic.video/${full}`
 
-		return {
+		return new Broadcast({
 			conn,
-			media: medi,
+			media,
 			name: full,
 			encoder: { codec: codec.value, bitrate: constraints.bitrate },
-		}
+		})
 	})
 
-	const [broadcast, { mutate: clearBroadcast }] = createResource(
-		broadcastOptions,
-		(options) => new Broadcast(options)
-	)
-
-	createEffect(async () => {
-		const active = broadcast()
-		props.setBroadcast(active)
-
-		if (!active) return
-
-		// Run the broadcast, closing it when we're done.
+	createEffect(() => {
 		try {
-			await active.run()
+			const b = broadcast()
+			props.setBroadcast(b)
+		} catch (e) {
+			props.setError(asError(e))
 		} finally {
-			clearBroadcast()
+			setLoading(false)
 		}
 	})
+
+	const start = (e: Event) => {
+		e.preventDefault()
+		setLoading(true)
+	}
 
 	const state = createMemo(() => {
-		if (media.error || broadcast.error) return "error"
-		if (broadcast.latest) return "ready"
+		if (!props.connection) return "connecting"
 		if (broadcast.loading) return "loading"
-		return "waiting"
+		return "ready"
 	})
 
 	const isState = createSelector(state)
@@ -341,20 +339,18 @@ export function Setup(props: { connection: Connection | undefined; setBroadcast:
 				<button
 					class="transition-color col-span-2 col-start-2 mt-3 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm duration-1000 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
 					classList={{
-						"bg-indigo-600": isState("waiting"),
-						"hover:bg-indigo-500": isState("waiting"),
-						"focus-visible:outline-indigo-600": isState("waiting"),
-						"bg-lime-600": isState("loading"),
-						"bg-green-600": isState("ready"),
-						"bg-red-600": isState("error"),
+						"bg-indigo-600": isState("ready") || isState("connecting"),
+						"hover:bg-indigo-500": isState("ready"),
+						"focus-visible:outline-indigo-600": isState("ready"),
+						"bg-cyan-600": isState("loading"),
 					}}
 					type="submit"
-					onClick={submit}
+					onClick={start}
 				>
-					<Switch fallback="Go Live">
-						<Match when={isState("error")}>Error</Match>
+					<Switch>
+						<Match when={isState("ready")}>Go Live</Match>
 						<Match when={isState("loading")}>Loading</Match>
-						<Match when={isState("ready")}>Live!</Match>
+						<Match when={isState("connecting")}>Connecting</Match>
 					</Switch>
 				</button>
 			</form>

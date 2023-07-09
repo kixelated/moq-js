@@ -16,11 +16,10 @@ export function Main(props: { player: Player }) {
 		})
 	})
 
-	// TODO <Buffer player={props.player} />
-
 	return (
 		<>
 			<canvas ref={canvas!} width="854" height="480" class="aspect-video bg-black"></canvas>
+			<Buffer player={props.player} />
 		</>
 	)
 }

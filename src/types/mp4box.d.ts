@@ -92,13 +92,13 @@ declare module "mp4box" {
 		cts: number
 		dts: number
 		is_sync: boolean
-		is_leading: number
-		depends_on: number
-		is_depended_on: number
-		has_redundancy: number
-		degration_priority: number
-		offset: number
-		subsamples: any
+		is_leading?: number
+		depends_on?: number
+		is_depended_on?: number
+		has_redundancy?: number
+		degradation_priority?: number
+		offset?: number
+		subsamples?: any
 	}
 
 	export interface ExtractionOptions {

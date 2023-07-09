@@ -31,7 +31,7 @@ export class Encoder {
 
 	// outputs
 	#init = new Deferred<MP4.TrackOptions>()
-	#frames: ReadableStream<EncodedVideoChunk>
+	frames: ReadableStream<EncodedVideoChunk>
 
 	constructor(input: MediaStreamVideoTrack, config: EncoderConfig) {
 		this.#input = new MediaStreamTrackProcessor({ track: input }).readable.getReader()
@@ -47,7 +47,7 @@ export class Encoder {
 			latencyMode: "realtime", // TODO configurable
 		}
 
-		this.#frames = new ReadableStream({
+		this.frames = new ReadableStream({
 			start: this.#start.bind(this),
 			pull: this.#pull.bind(this),
 			cancel: this.#cancel.bind(this),
@@ -74,16 +74,6 @@ export class Encoder {
 
 	async init(): Promise<MP4.TrackOptions> {
 		return this.#init.promise
-	}
-
-	async frame() {
-		const reader = this.#frames.getReader()
-		try {
-			const { value } = await reader.read()
-			return value
-		} finally {
-			reader.releaseLock()
-		}
 	}
 
 	#start(controller: ReadableStreamDefaultController<EncodedVideoChunk>) {
@@ -134,7 +124,7 @@ export class Encoder {
 				type: codec,
 				width: config.codedWidth,
 				height: config.codedHeight,
-				timescale: 1000,
+				timescale: 1_000_000,
 				layer: metadata.temporalLayerId,
 			}
 

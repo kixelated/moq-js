@@ -1,5 +1,5 @@
 import * as MP4 from "../common/mp4"
-import { List, Watch } from "../common/async"
+import { Watch } from "../common/async"
 
 export interface Catalog {
 	sequence: bigint
@@ -8,9 +8,6 @@ export interface Catalog {
 
 export class Container {
 	#mp4: MP4.ISOFile
-
-	#tracks = new Array<ContainerTrack>()
-
 	#catalog = new Watch<Catalog | undefined>(undefined)
 
 	constructor() {
@@ -33,8 +30,7 @@ export class Container {
 		const trak = this.#mp4.getTrackById(id)
 		if (!trak) throw new Error("failed to get newly created track")
 
-		const container = new ContainerTrack(this.#mp4, trak)
-		this.#tracks.push(container)
+		const container = new ContainerTrack(this.#mp4, id)
 
 		const buffer = MP4.ISOFile.writeInitializationSegment(this.#mp4.ftyp!, this.#mp4.moov!, 0, 0)
 		const init = new Uint8Array(buffer)
@@ -45,47 +41,64 @@ export class Container {
 
 		return container
 	}
+}
 
-	track(id: number): ContainerTrack | undefined {
-		return this.#tracks.at(id - 1) // MP4 is 1 indexed
-	}
+export interface Fragment {
+	segment: number // incremented on each keyframe
+	data: Uint8Array
 }
 
 export class ContainerTrack {
+	readonly id: number
+
 	#mp4: MP4.ISOFile
-	#trak: MP4.Trak
+	//#trak: MP4.Trak
+	//#samples = 0
 
-	#segment?: ContainerSegment
-	#segments = new List<ContainerSegment>()
-	#segmentSequence = 0n
+	#segment = 0
 
-	constructor(mp4: MP4.ISOFile, trak: MP4.Trak) {
+	frames: TransformStream<EncodedVideoChunk, Fragment>
+	#frame?: EncodedVideoChunk // 1 frame buffer
+
+	constructor(mp4: MP4.ISOFile, id: number) {
 		this.#mp4 = mp4
+		this.id = id
+
+		/*
+		const trak = mp4.getTrackById(id)
+		if (!trak) throw new Error(`no track with id ${id}`)
 		this.#trak = trak
+		*/
+
+		this.frames = new TransformStream({
+			transform: this.#transform.bind(this),
+			flush: this.#close.bind(this),
+		})
 	}
 
-	add(frame: EncodedVideoChunk) {
-		// Check if we should close the current segment
-		if (this.#segment && frame.type == "key") {
-			this.#segmentSequence += 1n
-			this.#segment.end()
-			this.#segment = undefined
+	#transform(frame: EncodedVideoChunk, controller: TransformStreamDefaultController<Fragment>) {
+		// Check if we should create a new segment
+		if (this.#segment > 0 && frame.type == "key") {
+			this.#segment += 1
 		}
 
-		// Check if we need to create a new segment
-		if (!this.#segment) {
-			this.#segment = new ContainerSegment(this.#segmentSequence)
-			this.#segments.push(this.#segment)
+		// We need a one frame buffer to compute the duration
+		if (this.#frame) {
+			this.#flush(this.#frame, frame.timestamp - this.#frame.timestamp, controller)
 		}
 
+		this.#frame = frame
+	}
+
+	#flush(frame: EncodedVideoChunk, duration: number, controller: TransformStreamDefaultController<Fragment>) {
 		// TODO avoid this extra copy by writing to the mdat directly
-		// ...and changing mp4box.js to take an offset instead of ArrayBuffer
+		// ...which means changing mp4box.js to take an offset instead of ArrayBuffer
 		const buffer = new Uint8Array(frame.byteLength)
 		frame.copyTo(buffer)
 
 		// Add the sample to the container
-		this.#mp4.addSample(this.#trak.tkhd.track_id, buffer, {
-			duration: 0,
+		this.#mp4.addSample(this.id, buffer, {
+			duration,
 			dts: frame.timestamp,
 			cts: frame.timestamp,
 			is_sync: frame.type == "key",
@@ -95,6 +108,7 @@ export class ContainerTrack {
 		stream.endianness = MP4.Stream.BIG_ENDIAN
 
 		// Moof and mdat atoms are written in pairs.
+		// TODO remove the moof/mdat from the Box to reclaim memory once everything works
 		for (;;) {
 			const moof = this.#mp4.moofs.shift()
 			const mdat = this.#mp4.mdats.shift()
@@ -107,35 +121,44 @@ export class ContainerTrack {
 			mdat.write(stream)
 		}
 
-		this.#segment.push(new Uint8Array(stream.buffer))
+		const data = new Uint8Array(stream.buffer)
+		controller.enqueue({ segment: this.#segment, data })
+
+		/*
+		const sample: MP4.Sample = {
+			number: this.#samples++,
+			track_id: this.#trak.tkhd.track_id,
+			timescale: this.#trak.mdia.mdhd.timescale,
+			description_index: 0,
+			description: this.#trak.mdia.minf.stbl.stsd.entries[0],
+			data: buffer,
+			size: buffer.byteLength,
+			duration: 0,
+			cts: frame.timestamp,
+			dts: frame.timestamp,
+			is_sync: frame.type == "key",
+		}
+
+		const moof = this.#mp4.createSingleSampleMoof(sample)
+
+		// TODO needed?
+		moof.computeSize()
+		moof.trafs[0].truns[0].data_offset = moof.size + 8 //8 is mdat header
+
+		const stream = new MP4.Stream()
+		stream.endianness = MP4.Stream.BIG_ENDIAN
+		moof.write(stream)
+
+		stream.writeUint32(8 + buffer.byteLength)
+		stream.writeString("mdat")
+		stream.writeUint8Array(buffer)
+		*/
 	}
 
-	segments() {
-		return this.#segments.get()
-	}
-
-	end() {
-		this.#segments.close()
-	}
-}
-
-export class ContainerSegment {
-	#fragments = new List<Uint8Array>()
-	readonly sequence: bigint
-
-	constructor(sequence: bigint) {
-		this.sequence = sequence
-	}
-
-	push(data: Uint8Array) {
-		this.#fragments.push(data)
-	}
-
-	fragments() {
-		return this.#fragments.get()
-	}
-
-	end() {
-		this.#fragments.close()
+	#close(controller: TransformStreamDefaultController<Fragment>) {
+		if (this.#frame) {
+			// TODO guess the duration
+			this.#flush(this.#frame, 0, controller)
+		}
 	}
 }

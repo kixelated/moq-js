@@ -55,6 +55,7 @@ export class Watch<T> {
 	}
 }
 
+// TODO replace with ReadableStream
 export class Queue<T> {
 	#watch = new Watch<T[]>([])
 
@@ -102,6 +103,7 @@ export class Notify {
 	}
 }
 
+/* NOTE: Replaced by ReadableStream
 // A list of values that can be iterated over asynchronously
 export class List<T> {
 	#queue = new Queue<T>()
@@ -134,3 +136,4 @@ export class List<T> {
 		this.#queue.close()
 	}
 }
+*/

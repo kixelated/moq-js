@@ -1,8 +1,9 @@
 import { Connection } from "../transport/connection"
 import { Encoder, EncoderConfig } from "./encoder"
-import { Container, ContainerSegment } from "./container"
+import { Container, ContainerTrack } from "./container"
 import { SubscribeRecv } from "../transport/subscribe"
 import { asError } from "../common/error"
+import { Segment, Segmenter } from "./segment"
 
 export interface BroadcastConfig {
 	conn: Connection
@@ -18,12 +19,12 @@ export interface BroadcastConfigTrack {
 
 export class Broadcast {
 	#conn: Connection
-	#container: Container
 	#media: MediaStream
 	#encoder: EncoderConfig // TODO make an encoder object
 	#name: string
 
-	running: Promise<void>
+	#container: Container
+	#containerTracks = new Map<number, ContainerTrack>()
 
 	constructor(config: BroadcastConfig) {
 		this.#conn = config.conn
@@ -32,16 +33,16 @@ export class Broadcast {
 		this.#encoder = config.encoder
 
 		this.#container = new Container()
-
-		this.running = this.#run() // async
 	}
 
+	// Run the broadcast.
+	async run() {
+		await Promise.all([this.#runAnnounce(), this.#runMedia()])
+	}
+
+	// Attach the captured video stream to the given video element.
 	preview(video: HTMLVideoElement) {
 		video.srcObject = this.#media
-	}
-
-	async #run() {
-		await Promise.all([this.#runAnnounce(), this.#runMedia()])
 	}
 
 	async #runMedia() {
@@ -61,15 +62,10 @@ export class Broadcast {
 
 		const init = await encoder.init()
 		const track = this.#container.add(init)
+		this.#containerTracks.set(track.id, track)
 
-		for (;;) {
-			const frame = await encoder.frame()
-			if (!frame) break
-
-			track.add(frame)
-		}
-
-		track.end()
+		// We don't use pipeThrough because we're not the ones who plan to read the data.
+		await encoder.frames.pipeTo(track.frames.writable)
 	}
 
 	async #runAnnounce() {
@@ -135,34 +131,30 @@ export class Broadcast {
 
 	async #serveTrack(subscriber: SubscribeRecv) {
 		const id = parseInt(subscriber.name)
-		const track = this.#container.track(id)
+		const track = this.#containerTracks.get(id)
 		if (!track) throw new Error(`no track with id ${id}`)
 
-		for await (const segment of track.segments()) {
+		// TODO support multiple subscriptions for the same track
+		const segments = track.frames.readable.pipeThrough(Segmenter()).getReader()
+
+		for (;;) {
+			const { value: segment, done } = await segments.read()
+			if (done) break
+
 			this.#serveSegment(subscriber, segment).catch((e) => {
 				const err = asError(e)
-				console.warn(`failed to serve segment ${segment.sequence}`, err)
+				console.warn("failed to serve segment", err)
 			})
 		}
 	}
 
-	async #serveSegment(subscriber: SubscribeRecv, segment: ContainerSegment) {
+	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
 		const stream = await subscriber.data({
-			group: BigInt(segment.sequence),
+			group: BigInt(segment.id),
 			sequence: 0n,
 			send_order: 0n, // TODO
 		})
 
-		const writer = stream.getWriter()
-		try {
-			for await (const fragment of segment.fragments()) {
-				await writer.write(fragment)
-			}
-			await writer.close()
-		} catch (e) {
-			const err = asError(e)
-			await writer.abort(err.message)
-			throw err
-		}
+		await segment.fragments.pipeTo(stream)
 	}
 }
