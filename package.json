@@ -2,7 +2,7 @@
 	"name": "moq",
 	"version": "0.0.1",
 	"description": "Media over QUIC library",
-	"license": "(MIT or Apache-2.0)",
+	"license": "(MIT OR Apache-2.0)",
 	"source": "src/ui/index.html",
 	"scripts": {
 		"serve": "parcel serve --https --cert cert/localhost.crt --key cert/localhost.key  --port 4444 --open",
