@@ -1,4 +1,4 @@
-import { Reader, Writer } from "../stream"
+import { Reader, Writer } from "./stream"
 
 export type Message = Subscriber | Publisher
 export type Subscriber = Subscribe | AnnounceOk | AnnounceError
@@ -65,17 +65,45 @@ export class Stream {
 	private decoder: Decoder
 	private encoder: Encoder
 
+	#mutex = Promise.resolve()
+
 	constructor(r: Reader, w: Writer) {
 		this.decoder = new Decoder(r)
 		this.encoder = new Encoder(w)
 	}
 
+	// Will error if two messages are read at once.
 	async recv(): Promise<Message> {
-		return this.decoder.message()
+		const msg = await this.decoder.message()
+		console.log("received message", msg)
+		return msg
 	}
 
 	async send(msg: Message) {
-		return this.encoder.message(msg)
+		const unlock = await this.#lock()
+		try {
+			console.log("sending message", msg)
+			await this.encoder.message(msg)
+		} finally {
+			unlock()
+		}
+	}
+
+	async #lock() {
+		// Make a new promise that we can resolve later.
+		let done: () => void
+		const p = new Promise<void>((resolve) => {
+			done = () => resolve()
+		})
+
+		// Wait until the previous lock is done, then resolve our our lock.
+		const lock = this.#mutex.then(() => done)
+
+		// Save our lock as the next lock.
+		this.#mutex = p
+
+		// Return the lock.
+		return lock
 	}
 }
 
@@ -105,8 +133,6 @@ export class Decoder {
 				return this.announce_ok()
 			case Type.AnnounceError:
 				return this.announce_error()
-			default:
-				throw new Error(`unknown message type: ${t}`)
 		}
 	}
 
@@ -174,7 +200,7 @@ export class Encoder {
 	}
 
 	async message(m: Message) {
-		this.w.vint52(m.type)
+		await this.w.vint52(m.type)
 
 		switch (m.type) {
 			case Type.Subscribe:
@@ -200,7 +226,7 @@ export class Encoder {
 
 	async subscribe_ok(s: SubscribeOk) {
 		await this.w.vint62(s.id)
-		await this.w.vint62(s.expires || 0n)
+		await this.w.vint62(s.expires ?? 0n)
 	}
 
 	async subscribe_error(s: SubscribeError) {

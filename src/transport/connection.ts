@@ -1,105 +1,72 @@
-import * as Stream from "../stream"
-import * as Setup from "./setup"
 import * as Control from "./control"
-import * as Data from "./data"
+import { Objects } from "./object"
 
-export interface Config {
-	url: string
-
-	// Parameters used to create the MoQ session
-	role: Setup.Role
-
-	// If set, the server fingerprint will be fetched from this URL.
-	// This is required to use self-signed certificates with Chrome (May 2023)
-	fingerprint?: string
-}
+import { Announce } from "./announce"
+import { Subscribe } from "./subscribe"
 
 export class Connection {
-	quic: Promise<WebTransport>
+	#quic: WebTransport
 
 	// Use to receive/send control messages.
-	control: Promise<Control.Stream>
+	#control: Control.Stream
 
-	// Use to receive/send data streams.
-	data: Promise<Data.Transport>
+	// Use to receive/send objects.
+	#objects: Objects
 
-	constructor(config: Config) {
-		this.quic = this.#connect(config)
+	// Module for announcing tracks.
+	readonly announce: Announce
 
-		// Create a bidirection stream to control the connection
-		this.control = this.#setup({
-			versions: [Setup.Version.DRAFT_00],
-			role: config.role,
-		})
+	// Module for subscribing to tracks
+	readonly subscribe: Subscribe
 
-		// Create unidirectional streams to send media.
-		this.data = this.quic.then((quic) => {
-			return new Data.Transport(quic)
-		})
+	constructor(quic: WebTransport, control: Control.Stream, objects: Objects) {
+		this.#quic = quic
+		this.#control = control
+		this.#objects = objects
+
+		this.subscribe = new Subscribe(this.#control, this.#objects)
+		this.announce = new Announce(this.#control, this.subscribe)
 	}
 
-	async close() {
-		;(await this.quic).close()
+	close(code = 0, reason = "") {
+		this.#quic.close({ closeCode: code, reason })
 	}
 
-	async #fingerprint(url: string): Promise<WebTransportHash> {
-		// TODO remove this fingerprint when Chrome WebTransport accepts the system CA
-		const response = await fetch(url)
-		const hexString = await response.text()
+	async run() {
+		return Promise.all([this.#runControl(), this.#runObjects()])
+	}
 
-		const hexBytes = new Uint8Array(hexString.length / 2)
-		for (let i = 0; i < hexBytes.length; i += 1) {
-			hexBytes[i] = parseInt(hexString.slice(2 * i, 2 * i + 2), 16)
-		}
-
-		return {
-			algorithm: "sha-256",
-			value: hexBytes,
+	async #runControl() {
+		// Receive messages until the connection is closed.
+		for (;;) {
+			const msg = await this.#control.recv()
+			await this.#receive(msg)
 		}
 	}
 
-	// Helper function to make creating a promise easier
-	async #connect(config: Config): Promise<WebTransport> {
-		const options: WebTransportOptions = {}
+	async #runObjects() {
+		for (;;) {
+			const obj = await this.#objects.recv()
+			if (!obj) break
 
-		if (config.fingerprint) {
-			try {
-				const fingerprint = await this.#fingerprint(config.fingerprint)
-				options.serverCertificateHashes = [fingerprint]
-			} catch (e) {
-				console.warn("failed to fetch fingerprint: ", e)
-			}
+			await this.subscribe.onData(obj.header, obj.stream)
 		}
-
-		const quic = new WebTransport(config.url, options)
-		console.log("awaiting connection")
-		await quic.ready
-		console.log("connection ready")
-
-		return quic
 	}
 
-	async #setup(client: Setup.Client): Promise<Control.Stream> {
-		const quic = await this.quic
-		console.log("creating bidi")
-		const stream = await quic.createBidirectionalStream()
-
-		const writer = new Stream.Writer(stream.writable)
-		const reader = new Stream.Reader(stream.readable)
-
-		const setup = new Setup.Stream(reader, writer)
-
-		console.log("sending client setup", client)
-
-		// Send the setup message.
-		await setup.send.client(client)
-
-		// Receive the setup message.
-		// TODO verify the SETUP response.
-		const _server = await setup.recv.server()
-
-		console.log("recv server setup", _server)
-
-		return new Control.Stream(reader, writer)
+	async #receive(msg: Control.Message) {
+		switch (msg.type) {
+			case Control.Type.Announce:
+				return this.announce.onAnnounce(msg)
+			case Control.Type.AnnounceOk:
+				return this.announce.onOk(msg)
+			case Control.Type.AnnounceError:
+				return this.announce.onError(msg)
+			case Control.Type.Subscribe:
+				return this.announce.onSubscribe(msg)
+			case Control.Type.SubscribeOk:
+				return this.subscribe.onOk(msg)
+			case Control.Type.SubscribeError:
+				return this.subscribe.onError(msg)
+		}
 	}
 }

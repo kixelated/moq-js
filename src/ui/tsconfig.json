@@ -1,0 +1,22 @@
+{
+	"extends": "../tsconfig.json",
+	"include": [
+		"."
+	],
+	"compilerOptions": {
+		"types": [
+			"mp4box",
+			"web"
+		],
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
+	},
+	"references": [
+		{
+			"path": "../playback"
+		},
+		{
+			"path": "../contribute"
+		},
+	],
+}
