@@ -43,7 +43,6 @@ export class Player {
 			for (;;) {
 				const segment = await sub.data()
 				if (!segment) break
-				console.log("got segment", segment)
 
 				this.#port.sendSegment({
 					init,
