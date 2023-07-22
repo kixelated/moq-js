@@ -14,12 +14,14 @@ export function App(props: { url: string }) {
 	const [error, setError] = createSignal<Error | undefined>()
 	const [connection, setConnection] = createSignal<Connection | undefined>()
 
+	const fingerprint = process.env.NODE_ENV !== "production" ? props.url + "/fingerprint" : undefined
+
 	createEffect(async () => {
 		try {
 			const conn = await connect({
 				url: props.url,
 				role: "both",
-				fingerprint: props.url + "/fingerprint",
+				fingerprint,
 			})
 
 			setConnection(conn)
@@ -47,10 +49,7 @@ export function App(props: { url: string }) {
 					{error()?.name}: {error()?.message}
 				</div>
 			</Show>
-			<div
-				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!player(), "h-0": !player() }}
-			>
+			<div class="flex flex-col overflow-hidden transition-size duration-1000" classList={{ "h-0": !player() }}>
 				<Show when={player()}>
 					<Watch.Main player={player()!} setError={setError} setPlayer={setPlayer} />
 				</Show>

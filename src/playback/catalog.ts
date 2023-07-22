@@ -58,9 +58,6 @@ export class Broadcast {
 			// Close the subscription after we're done.
 			await subscribe.close(1n, err.message)
 
-			// Optional: Tell the other side we failed and won't use this broadcast
-			await this.#announce.close()
-
 			throw err
 		}
 	}

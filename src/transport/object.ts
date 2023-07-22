@@ -23,7 +23,6 @@ export class Objects {
 	}
 
 	async send(header: Header) {
-		//console.log("sending object", header)
 		const stream = await this.quic.createUnidirectionalStream()
 		await this.#encode(stream, header)
 		return stream
@@ -40,7 +39,6 @@ export class Objects {
 
 		const header = await this.#decode(stream)
 
-		//console.log("received object", header)
 		return { header, stream }
 	}
 

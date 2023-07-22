@@ -65,7 +65,9 @@ export class Announce {
 	onError(msg: Control.AnnounceError) {
 		const announce = this.#send.get(msg.namespace)
 		if (!announce) {
-			throw new Error(`announce error for unknown announce: ${msg.namespace}`)
+			// TODO debug this
+			console.warn(`announce error for unknown announce: ${msg.namespace}`)
+			return
 		}
 
 		announce.onError(msg.code, msg.reason)

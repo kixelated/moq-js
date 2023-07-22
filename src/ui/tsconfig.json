@@ -6,7 +6,8 @@
 	"compilerOptions": {
 		"types": [
 			"mp4box",
-			"web"
+			"web",
+			"parcel-bundler"
 		],
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",

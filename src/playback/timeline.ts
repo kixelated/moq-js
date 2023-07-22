@@ -220,16 +220,23 @@ interface Timed {
 	timestamp: number
 }
 
-export function findTimestamp(queue: Timed[], timestamp: number): number {
-	// Do binary search
-	let low = 0
-	let high = queue.length
+// Find the elemnt with the closest timestamp.
+export function findTimestamp<T extends Timed>(arr: T[], timestamp: number): number {
+	let left = 0
+	let right = arr.length - 1
 
-	while (low < high) {
-		const mid = (low + high) >>> 1
-		if (queue[mid].timestamp < timestamp) low = mid + 1
-		else high = mid
+	while (left <= right) {
+		const mid = Math.floor((left + right) / 2)
+		const value = arr[mid].timestamp
+
+		if (value === timestamp) {
+			return mid
+		} else if (value < timestamp) {
+			left = mid + 1
+		} else {
+			right = mid - 1
+		}
 	}
 
-	return low
+	return left
 }

@@ -101,7 +101,8 @@ export class Broadcast {
 			const err = asError(e)
 			await subscriber.close(1n, `failed to process subscribe: ${err.message}`)
 		} finally {
-			await subscriber.close()
+			// TODO we can't close subscribers because there's no support for clean termination
+			// await subscriber.close()
 		}
 	}
 
@@ -126,6 +127,8 @@ export class Broadcast {
 			const err = asError(e)
 			await writer.abort(err.message)
 			throw err
+		} finally {
+			writer.releaseLock()
 		}
 	}
 

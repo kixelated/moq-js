@@ -65,7 +65,7 @@ const CODECS: Codec[] = [
 	{ name: "h.264", profile: "baseline", value: "avc1.420032" },
 
 	// AVC Baseline Level 5.2
-	{ name: "h.264", profile: "main", value: "avc1.420034" },
+	{ name: "h.264", profile: "baseline", value: "avc1.420034" },
 ]
 
 const CODEC_UNDEF = { name: "", profile: "", value: "" }
@@ -166,23 +166,27 @@ export function Setup(props: {
 		}
 	})
 
+	const ShowName = () => {
+		return <div>My name: {name()}</div>
+	}
+
 	// Return supported codec names in preference order.
-	const supportedCodecNames = createMemo(() => {
+	const supportedCodecNames = () => {
 		const unique = new Set<string>()
 		for (const codec of supportedCodecs()) {
 			if (!unique.has(codec.name)) unique.add(codec.name)
 		}
 		return [...unique]
-	})
+	}
 
 	// Returns supported codec profiles in preference order.
-	const supportedCodecProfiles = createMemo(() => {
+	const supportedCodecProfiles = () => {
 		const unique = new Set<string>()
 		for (const supported of supportedCodecs()) {
 			if (supported.name == codec.name && !unique.has(supported.profile)) unique.add(supported.profile)
 		}
 		return [...unique]
-	})
+	}
 
 	const [loading, setLoading] = createSignal(false)
 
@@ -237,20 +241,7 @@ export function Setup(props: {
 
 	return (
 		<form class="grid grid-cols-3 items-center gap-x-4 gap-y-2 text-sm text-gray-900">
-			<label for="name" class="col-start-1 block font-medium">
-				Name
-			</label>
-			<div class="form-input col-span-2 w-full rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600">
-				<span>anon.quic.video/</span>
-				<input
-					type="text"
-					name="name"
-					placeholder="random"
-					class="block border-0 bg-transparent p-1 pl-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0"
-					value={name()}
-					onInput={(e) => setName(e.target.value)}
-				/>
-			</div>
+			<NameInput name={name()} setName={setName} />
 			<label for="codec" class="col-start-1 font-medium leading-6">
 				Codec
 			</label>
@@ -351,5 +342,26 @@ export function Setup(props: {
 				</Switch>
 			</button>
 		</form>
+	)
+}
+
+function NameInput(props: { name: string; setName(name: string): void }) {
+	return (
+		<>
+			<label for="name" class="col-start-1 block font-medium">
+				Name
+			</label>
+			<div class="form-input col-span-2 w-full rounded-md border-0 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600">
+				<span>anon.quic.video/</span>
+				<input
+					type="text"
+					name="name"
+					placeholder="random"
+					class="block border-0 bg-transparent p-1 pl-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0"
+					value={props.name}
+					onInput={(e) => props.setName(e.target.value)}
+				/>
+			</div>
+		</>
 	)
 }

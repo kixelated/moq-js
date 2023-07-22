@@ -41,7 +41,8 @@ export class Reader {
 		while (offset < dst.byteLength) {
 			const { value, done } = await reader.read(dst.slice(offset))
 			if (done) {
-				throw new Error("short buffer")
+				console.warn(value)
+				throw new Error(`short buffer: ${offset} < ${dst.byteLength}`)
 			}
 
 			offset += value.byteLength
