@@ -1,6 +1,6 @@
 import * as Message from "./message"
 import { Ring } from "../common/ring"
-import { Timeline } from "./timeline"
+import { Component } from "./timeline"
 
 // NOTE: This must be on the main thread
 export class Context {
@@ -53,13 +53,13 @@ export class Context {
 // This is run in a worker.
 export class Renderer {
 	ring?: Ring
-	timeline: Timeline
+	timeline: Component
 
 	queue: AudioData[]
 	interval?: number
 	last?: number // the timestamp of the last rendered frame, in microseconds
 
-	constructor(config: Message.ConfigAudio, timeline: Timeline) {
+	constructor(config: Message.ConfigAudio, timeline: Component) {
 		this.timeline = timeline
 		this.queue = []
 	}

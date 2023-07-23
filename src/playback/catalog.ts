@@ -1,13 +1,8 @@
-import * as Message from "./message"
-
 import { Connection } from "../transport/connection"
 import * as MP4 from "../common/mp4"
 import { AnnounceRecv } from "../transport/announce"
 import { decodeInit } from "./container"
 import { asError } from "../common/error"
-
-export type Range = Message.Range
-export type Timeline = Message.Timeline
 
 export class Catalog {
 	#conn: Connection

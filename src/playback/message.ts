@@ -19,6 +19,7 @@ export interface ConfigVideo {
 
 export interface Segment {
 	init: Uint8Array
+	component: "audio" | "video"
 	header: Header
 	stream: ReadableStream<Uint8Array>
 }

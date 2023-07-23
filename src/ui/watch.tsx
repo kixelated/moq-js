@@ -1,11 +1,11 @@
 import { Connection } from "../transport/connection"
-import { Player, Range, Timeline } from "../playback/player"
+import { Player } from "../playback/player"
 import { Broadcast, Catalog } from "../playback/catalog"
 import { asError } from "../common/error"
 
 import * as MP4 from "../common/mp4"
 
-import { createSignal, createMemo, onMount, Switch, Match, For, Show, createEffect } from "solid-js"
+import { createSignal, onMount, Switch, Match, For, Show, createEffect } from "solid-js"
 
 export function Main(props: { player: Player; setError(e: Error): void; setPlayer(): void }) {
 	let canvas: HTMLCanvasElement
@@ -28,7 +28,6 @@ export function Main(props: { player: Player; setError(e: Error): void; setPlaye
 	return (
 		<>
 			<canvas ref={canvas!} width="854" height="480" class="aspect-video bg-black"></canvas>
-			<Buffer player={props.player} />
 		</>
 	)
 }
@@ -145,6 +144,7 @@ function Available(props: { broadcast: Broadcast; select: () => void }) {
 	)
 }
 
+/*
 function Buffer(props: { player: Player }) {
 	const [timeline, setTimeline] = createSignal<Timeline>({ audio: { buffer: [] }, video: { buffer: [] } })
 
@@ -263,3 +263,4 @@ function Buffer(props: { player: Player }) {
 		</div>
 	)
 }
+*/

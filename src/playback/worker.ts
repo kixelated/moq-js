@@ -19,47 +19,28 @@ class Worker {
 		const msg = e.data as Message.ToWorker
 
 		if (msg.config) {
-			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline)
-			this.#video = new Video.Renderer(msg.config.video, this.#timeline)
+			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline.audio)
+			this.#video = new Video.Renderer(msg.config.video, this.#timeline.video)
 		} else if (msg.segment) {
 			this.onSegment(msg.segment).catch((e) => {
 				const err = asError(e)
 				send({ fail: { err } })
 			})
-		} else if (msg.play) {
-			this.#timeline.play(msg.play.minBuffer)
-		} else if (msg.seek) {
-			this.#timeline.seek(msg.seek.timestamp)
 		} else {
 			throw new Error(`unknown message: + ${JSON.stringify(msg)}`)
 		}
 	}
 
 	async onSegment(msg: Message.Segment) {
-		const decode = decodeSegment(msg.init, msg.stream)
-		for await (const frame of decode) {
-			this.#timeline.push(frame)
-			this.#sendTimeline()
-		}
-	}
+		const frames = msg.stream.pipeThrough(decodeSegment(msg.init))
+		const timeline = msg.component === "audio" ? this.#timeline.audio : this.#timeline.video
 
-	// TODO limit the frequency?
-	#sendTimeline() {
-		const audio = this.#timeline.audio.ranges()
-		const video = this.#timeline.video.ranges()
-
-		const timeline: Message.Timeline = {
-			audio: { buffer: audio },
-			video: { buffer: video },
-		}
-
-		const ref = this.#timeline.sync(0)
-		if (ref) {
-			const now = performance.now() / 1000
-			timeline.timestamp = now - ref
-		}
-
-		send({ timeline })
+		const segments = timeline.segments.getWriter()
+		await segments.write({
+			sequence: msg.header.sequence,
+			frames,
+		})
+		segments.releaseLock()
 	}
 }
 
