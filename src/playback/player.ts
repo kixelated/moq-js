@@ -31,7 +31,6 @@ export class Player {
 	async run() {
 		const info = await this.#broadcast.info()
 		const init = await this.#broadcast.init()
-
 		const tracks = info.tracks.map((track) => this.#runTrack(init, track))
 
 		await Promise.all(tracks)
@@ -44,8 +43,13 @@ export class Player {
 				const segment = await sub.data()
 				if (!segment) break
 
+				if (segment.header.sequence !== 0n) {
+					throw new Error("TODO multiple objects per segment not supported")
+				}
+
 				this.#port.sendSegment({
 					init,
+					component: MP4.isAudioTrack(track) ? "audio" : "video",
 					header: segment.header,
 					stream: segment.stream,
 				})

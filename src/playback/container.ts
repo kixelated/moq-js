@@ -1,6 +1,5 @@
-import { Frame } from "./timeline"
-
 import * as MP4 from "../common/mp4"
+import { Frame } from "./timeline"
 
 export async function decodeInit(stream: ReadableStream<Uint8Array>) {
 	const mp4 = MP4.New()
@@ -56,14 +55,18 @@ export async function decodeInit(stream: ReadableStream<Uint8Array>) {
 	}
 }
 
-export async function* decodeSegment(init: Uint8Array, stream: ReadableStream<Uint8Array>) {
+// Returns a transformer that converts MP4 samples into frames.
+export function decodeSegment(init: Uint8Array): TransformStream<Uint8Array, Frame> {
 	const mp4 = MP4.New()
 
 	mp4.onError = (err) => {
 		throw new Error(err)
 	}
 
-	mp4.onReady = (info: MP4.Info) => {
+	let info: MP4.Info | undefined
+	mp4.onReady = (i: MP4.Info) => {
+		info = i
+
 		// Extract all of the tracks, because we don't know if it's audio or video.
 		for (const track of info.tracks) {
 			mp4.setExtractionOptions(track.id, track, { nbSamples: 1 })
@@ -85,45 +88,41 @@ export async function* decodeSegment(init: Uint8Array, stream: ReadableStream<Ui
 	mp4.appendBuffer(raw)
 	mp4.flush()
 
-	const frames = new Array<Frame>()
+	if (!info) {
+		throw new Error("no info")
+	}
+
 	let offset = init.byteLength
 
-	mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
-		for (const sample of samples) {
-			frames.push({
-				track,
-				sample,
-				timestamp: sample.dts / track.timescale, // TODO don't convert to seconds for better accuracy
-			})
-		}
-	}
+	return new TransformStream({
+		start(controller) {
+			mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
+				for (const sample of samples) {
+					controller.enqueue({
+						track,
+						sample,
+						timestamp: sample.dts / track.timescale, // TODO don't convert to seconds for better accuracy
+					})
+				}
+			}
 
-	mp4.start()
+			mp4.start()
+		},
+		transform(chunk, _controller) {
+			const copy = new Uint8Array(chunk)
 
-	const reader = stream.getReader()
+			// For some reason we need to modify the underlying ArrayBuffer with offset
+			const buffer = copy.buffer as MP4.ArrayBuffer
+			buffer.fileStart = offset
 
-	for (;;) {
-		const { value, done } = await reader.read()
-		if (done) break
+			// Parse the data
+			mp4.appendBuffer(buffer)
+			mp4.flush()
 
-		const copy = new Uint8Array(value)
-
-		// For some reason we need to modify the underlying ArrayBuffer with offset
-		const buffer = copy.buffer as MP4.ArrayBuffer
-		buffer.fileStart = offset
-
-		// Parse the data
-		mp4.appendBuffer(buffer)
-		mp4.flush()
-
-		// Yield any frames that were parsed.
-		for (;;) {
-			const frame = frames.shift()
-			if (!frame) break
-
-			yield frame
-		}
-
-		offset += buffer.byteLength
-	}
+			offset += buffer.byteLength
+		},
+		flush(_controller) {
+			mp4.flush()
+		},
+	})
 }

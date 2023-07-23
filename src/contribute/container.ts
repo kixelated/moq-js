@@ -64,12 +64,6 @@ export class ContainerTrack {
 		this.#mp4 = mp4
 		this.id = id
 
-		/*
-		const trak = mp4.getTrackById(id)
-		if (!trak) throw new Error(`no track with id ${id}`)
-		this.#trak = trak
-		*/
-
 		this.frames = new TransformStream({
 			transform: this.#transform.bind(this),
 			flush: this.#close.bind(this),
@@ -123,36 +117,6 @@ export class ContainerTrack {
 
 		const data = new Uint8Array(stream.buffer)
 		controller.enqueue({ segment: this.#segment, data })
-
-		/*
-		const sample: MP4.Sample = {
-			number: this.#samples++,
-			track_id: this.#trak.tkhd.track_id,
-			timescale: this.#trak.mdia.mdhd.timescale,
-			description_index: 0,
-			description: this.#trak.mdia.minf.stbl.stsd.entries[0],
-			data: buffer,
-			size: buffer.byteLength,
-			duration: 0,
-			cts: frame.timestamp,
-			dts: frame.timestamp,
-			is_sync: frame.type == "key",
-		}
-
-		const moof = this.#mp4.createSingleSampleMoof(sample)
-
-		// TODO needed?
-		moof.computeSize()
-		moof.trafs[0].truns[0].data_offset = moof.size + 8 //8 is mdat header
-
-		const stream = new MP4.Stream()
-		stream.endianness = MP4.Stream.BIG_ENDIAN
-		moof.write(stream)
-
-		stream.writeUint32(8 + buffer.byteLength)
-		stream.writeString("mdat")
-		stream.writeUint8Array(buffer)
-		*/
 	}
 
 	#close(controller: TransformStreamDefaultController<Fragment>) {

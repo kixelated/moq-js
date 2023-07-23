@@ -93,7 +93,7 @@ export function Main(props: { broadcast: Broadcast; setBroadcast(): void; setErr
 		}
 	})
 
-	return <video ref={preview!} autoplay muted></video>
+	return <video ref={preview!} width="854" height="480" autoplay muted></video>
 }
 
 export function Setup(props: {
@@ -165,10 +165,6 @@ export function Setup(props: {
 			setCodec(CODEC_UNDEF)
 		}
 	})
-
-	const ShowName = () => {
-		return <div>My name: {name()}</div>
-	}
 
 	// Return supported codec names in preference order.
 	const supportedCodecNames = () => {
