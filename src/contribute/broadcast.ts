@@ -1,15 +1,20 @@
 import { Connection } from "../transport/connection"
-import { Encoder, EncoderConfig } from "./encoder"
-import { Container, ContainerTrack } from "./container"
 import { SubscribeRecv } from "../transport/subscribe"
 import { asError } from "../common/error"
-import { Segment, Segmenter } from "./segment"
+import { Segment } from "./segment"
+import { Track } from "./track"
+import { Catalog, TrackMp4 } from "../common/catalog"
+
+import * as Audio from "./audio"
+import * as Video from "./video"
 
 export interface BroadcastConfig {
 	conn: Connection
 	media: MediaStream
 	name: string // name of the broadcast
-	encoder: EncoderConfig
+
+	audio: Audio.EncoderConfig
+	video: Video.EncoderConfig
 }
 
 export interface BroadcastConfigTrack {
@@ -20,24 +25,44 @@ export interface BroadcastConfigTrack {
 export class Broadcast {
 	#conn: Connection
 	#media: MediaStream
-	#encoder: EncoderConfig // TODO make an encoder object
-	#name: string
+	#catalog: Catalog
+	#config: BroadcastConfig
 
-	#container: Container
-	#containerTracks = new Map<number, ContainerTrack>()
+	#tracks = new Map<string, Track>()
 
 	constructor(config: BroadcastConfig) {
 		this.#conn = config.conn
 		this.#media = config.media
-		this.#name = config.name
-		this.#encoder = config.encoder
+		this.#config = config
 
-		this.#container = new Container()
+		this.#catalog = new Catalog()
+
+		for (const media of this.#media.getTracks()) {
+			const track = new Track(media, config)
+			this.#tracks.set(track.name, track)
+
+			const catalog: TrackMp4 = {
+				container: "mp4",
+				kind: media.kind,
+				namespace: config.name,
+				codec: track.config.codec,
+				init: `${track.name}.mp4`,
+				data: `${track.name}.m4s`,
+			}
+
+			this.#catalog.tracks.push(catalog)
+		}
 	}
 
 	// Run the broadcast.
 	async run() {
-		await Promise.all([this.#runAnnounce(), this.#runMedia()])
+		await Promise.all([this.#runAnnounce(), this.#runTracks()])
+	}
+
+	async #runTracks() {
+		// For each track, call the run method.
+		const tracks = [...this.#tracks.values()]
+		await Promise.all(tracks.map((track) => track.run()))
 	}
 
 	// Attach the captured video stream to the given video element.
@@ -45,32 +70,9 @@ export class Broadcast {
 		video.srcObject = this.#media
 	}
 
-	async #runMedia() {
-		const promises = []
-		for (const track of this.#media.getVideoTracks()) {
-			const encode = this.#runEncode(track as MediaStreamVideoTrack, this.#encoder)
-			promises.push(encode)
-		}
-
-		// TODO listen for "addtrack"
-
-		await Promise.all(promises)
-	}
-
-	async #runEncode(media: MediaStreamVideoTrack, config: BroadcastConfigTrack) {
-		const encoder = new Encoder(media, config)
-
-		const init = await encoder.init()
-		const track = this.#container.add(init)
-		this.#containerTracks.set(track.id, track)
-
-		// We don't use pipeThrough because we're not the ones who plan to read the data.
-		await encoder.frames.pipeTo(track.frames.writable)
-	}
-
 	async #runAnnounce() {
 		// Announce the namespace and wait for an explicit OK.
-		const announce = await this.#conn.announce.send(this.#name)
+		const announce = await this.#conn.announce.send(this.#config.name)
 		await announce.ok()
 
 		try {
@@ -92,10 +94,15 @@ export class Broadcast {
 
 	async #serveSubscribe(subscriber: SubscribeRecv) {
 		try {
-			if (subscriber.name === "0") {
-				await this.#serveCatalog(subscriber)
+			const [base, ext] = splitExt(subscriber.name)
+			if (ext === "catalog") {
+				await this.#serveCatalog(subscriber, base)
+			} else if (ext === "mp4") {
+				await this.#serveInit(subscriber, base)
+			} else if (ext === "m4s") {
+				await this.#serveTrack(subscriber, base)
 			} else {
-				await this.#serveTrack(subscriber)
+				throw new Error(`unknown subscription: ${subscriber.name}`)
 			}
 		} catch (e) {
 			const err = asError(e)
@@ -106,22 +113,25 @@ export class Broadcast {
 		}
 	}
 
-	async #serveCatalog(subscriber: SubscribeRecv) {
-		await subscriber.ack()
+	async #serveCatalog(subscriber: SubscribeRecv, name: string) {
+		// We only support ".catalog"
+		if (name !== "") throw new Error(`unknown catalog: ${name}`)
 
-		const catalog = await this.#container.catalog()
-		if (!catalog) throw new Error("no catalog produced")
+		const bytes = this.#catalog.encode()
+
+		// Send a SUBSCRIBE_OK
+		await subscriber.ack()
 
 		const stream = await subscriber.data({
 			group: 0n,
-			sequence: catalog.sequence,
+			sequence: 0n,
 			send_order: 0n, // Highest priority
 		})
 
 		const writer = stream.getWriter()
 
 		try {
-			await writer.write(catalog.init)
+			await writer.write(bytes)
 			await writer.close()
 		} catch (e) {
 			const err = asError(e)
@@ -132,18 +142,55 @@ export class Broadcast {
 		}
 	}
 
-	async #serveTrack(subscriber: SubscribeRecv) {
-		const id = parseInt(subscriber.name)
-		const track = this.#containerTracks.get(id)
-		if (!track) throw new Error(`no track with id ${id}`)
+	async #serveInit(subscriber: SubscribeRecv, name: string) {
+		const track = this.#tracks.get(name)
+		if (!track) throw new Error(`no track with name ${subscriber.name}`)
 
-		// TODO support multiple subscriptions for the same track
-		const segments = track.frames.readable.pipeThrough(Segmenter()).getReader()
+		// Send a SUBSCRIBE_OK
+		await subscriber.ack()
+
+		const inits = track.init().getReader()
+
+		for (;;) {
+			const { value: init, done } = await inits.read()
+			if (done) break
+
+			this.#serveInitUpdate(subscriber, init).catch((e) => {
+				// Log any errors that occur.
+				const err = asError(e)
+				console.warn("failed to serve segment", err)
+			})
+		}
+	}
+
+	async #serveInitUpdate(subscriber: SubscribeRecv, init: Uint8Array) {
+		// Create a new stream for each segment.
+		const stream = await subscriber.data({
+			group: 0n,
+			sequence: 0n,
+			send_order: 0n, // TODO
+		})
+
+		// Write the init segment to the stream.
+		const writer = stream.getWriter()
+		await writer.write(init)
+		await writer.close()
+	}
+
+	async #serveTrack(subscriber: SubscribeRecv, name: string) {
+		const track = this.#tracks.get(name)
+		if (!track) throw new Error(`no track with name ${subscriber.name}`)
+
+		// Send a SUBSCRIBE_OK
+		await subscriber.ack()
+
+		const segments = track.segments().getReader()
 
 		for (;;) {
 			const { value: segment, done } = await segments.read()
 			if (done) break
 
+			// Serve the segment and log any errors that occur.
 			this.#serveSegment(subscriber, segment).catch((e) => {
 				const err = asError(e)
 				console.warn("failed to serve segment", err)
@@ -152,12 +199,20 @@ export class Broadcast {
 	}
 
 	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
+		// Create a new stream for each segment.
 		const stream = await subscriber.data({
 			group: BigInt(segment.id),
 			sequence: 0n,
 			send_order: 0n, // TODO
 		})
 
-		await segment.fragments.pipeTo(stream)
+		// Pipe the segment to the stream.
+		await segment.chunks().pipeTo(stream)
 	}
+}
+
+function splitExt(s: string): [string, string] {
+	const i = s.lastIndexOf(".")
+	if (i < 0) throw new Error(`no extension found`)
+	return [s.substring(0, i), s.substring(i + 1)]
 }

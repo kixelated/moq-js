@@ -7,11 +7,7 @@ export class Renderer {
 	#timeline: Component
 
 	#decoder?: VideoDecoder
-	#continuity?: number // the continuity of the last decoded frame
-	#rendered?: number // the timestamp of the last rendered frame
-
 	#queue: TransformStream<Frame, VideoFrame>
-	#render?: number
 
 	constructor(config: Message.ConfigVideo, timeline: Component) {
 		this.#canvas = config.canvas
@@ -30,11 +26,9 @@ export class Renderer {
 			const { value: frame, done } = await reader.read()
 			if (done) break
 
-			this.#render = self.requestAnimationFrame(() => {
+			self.requestAnimationFrame(() => {
 				const ctx = this.#canvas.getContext("2d")
 				ctx!.drawImage(frame, 0, 0, this.#canvas.width, this.#canvas.height) // TODO aspect ratio
-
-				this.#rendered = frame.timestamp
 				frame.close()
 			})
 		}

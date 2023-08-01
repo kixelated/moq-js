@@ -117,5 +117,6 @@ export class Component {
 
 // Return if a type is a segment or frame
 function isSegment(value: Segment | Frame): value is Segment {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	return (value as Segment).frames !== undefined
 }

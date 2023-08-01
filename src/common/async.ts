@@ -91,7 +91,7 @@ export class Notify {
 
 	async next() {
 		const [_, next] = this.#watch.value()
-		return next
+		await next
 	}
 
 	wake() {

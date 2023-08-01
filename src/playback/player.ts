@@ -1,11 +1,11 @@
 import * as Audio from "./audio"
 import * as Message from "./message"
-import { Broadcast } from "./catalog"
+import { Broadcast } from "./announced"
 
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
 import { RingShared } from "../common/ring"
-import * as MP4 from "../common/mp4"
+import { isTrackMp4, TrackMp4 } from "../common/catalog"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
@@ -29,15 +29,53 @@ export class Player {
 	}
 
 	async run() {
-		const info = await this.#broadcast.info()
-		const init = await this.#broadcast.init()
-		const tracks = info.tracks.map((track) => this.#runTrack(init, track))
+		const catalog = await this.#broadcast.catalog
 
-		await Promise.all(tracks)
+		const inits = new Set<string>()
+		const tracks = new Array<TrackMp4>()
+
+		for (const track of catalog.tracks) {
+			if (!isTrackMp4(track)) {
+				throw new Error(`expected CMAF track`)
+			}
+
+			inits.add(track.init)
+			tracks.push(track)
+		}
+
+		// Call #runInit on each unique init track
+		// TODO do this in parallel with #runTrack to remove a round trip
+		await Promise.all(Array.from(inits).map((init) => this.#runInit(init)))
+
+		// Call #runTrack on each track
+		await Promise.all(tracks.map((track) => this.#runTrack(track)))
 	}
 
-	async #runTrack(init: Uint8Array, track: MP4.Track) {
-		const sub = await this.#broadcast.subscribe(track.id)
+	async #runInit(name: string) {
+		const sub = await this.#broadcast.subscribe(name)
+		try {
+			const init = await sub.data()
+			if (!init) throw new Error("no init data")
+
+			if (init.header.sequence !== 0n) {
+				throw new Error("TODO multiple objects per init not supported")
+			}
+
+			this.#port.sendInit({
+				name: name,
+				stream: init.stream,
+			})
+		} finally {
+			await sub.close()
+		}
+	}
+
+	async #runTrack(track: TrackMp4) {
+		if (track.kind !== "audio" && track.kind !== "video") {
+			throw new Error(`unknown track kind: ${track.kind}`)
+		}
+
+		const sub = await this.#broadcast.subscribe(track.data)
 		try {
 			for (;;) {
 				const segment = await sub.data()
@@ -48,8 +86,8 @@ export class Player {
 				}
 
 				this.#port.sendSegment({
-					init,
-					component: MP4.isAudioTrack(track) ? "audio" : "video",
+					init: track.init,
+					kind: track.kind,
 					header: segment.header,
 					stream: segment.stream,
 				})
@@ -66,7 +104,7 @@ export class Player {
 			audio: {
 				channels: 2,
 				sampleRate: 44100,
-				ring: new RingShared(2, 44100),
+				ring: new RingShared(2, 4410), // 100ms
 			},
 			video: {
 				canvas: canvas.transferControlToOffscreen(),

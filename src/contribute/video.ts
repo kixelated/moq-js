@@ -1,7 +1,4 @@
-import { Deferred } from "../common/async"
-import * as MP4 from "../common/mp4"
-
-export const EncodecCodecs = [
+export const EncoderCodecs = [
 	"avc1", // H.264
 	"hev1", // HEVC (aka h.265)
 	// "av01", // AV1
@@ -18,7 +15,8 @@ export interface EncoderSupported {
 
 export class Encoder {
 	#encoder!: VideoEncoder
-	#config: VideoEncoderConfig
+	#encoderConfig: VideoEncoderConfig
+	#decoderConfig?: VideoDecoderConfig
 
 	// true if we should insert a keyframe, undefined when the encoder should decide
 	#keyframeNext: true | undefined = true
@@ -26,18 +24,16 @@ export class Encoder {
 	// Count the number of frames without a keyframe.
 	#keyframeCounter = 0
 
-	// inputs
-	#input: ReadableStreamDefaultReader<VideoFrame>
+	// Converts raw rames to encoded frames.
+	#encode: TransformStream<VideoFrame, VideoDecoderConfig | EncodedVideoChunk>
 
-	// outputs
-	#init = new Deferred<MP4.TrackOptions>()
-	frames: ReadableStream<EncodedVideoChunk>
+	// Output
+	frames: ReadableStream<VideoDecoderConfig | EncodedVideoChunk>
 
 	constructor(input: MediaStreamVideoTrack, config: EncoderConfig) {
-		this.#input = new MediaStreamTrackProcessor({ track: input }).readable.getReader()
 		const settings = input.getSettings()
 
-		this.#config = {
+		this.#encoderConfig = {
 			codec: config.codec,
 			framerate: settings.frameRate ?? 30,
 			width: settings.width ?? 1280,
@@ -47,17 +43,20 @@ export class Encoder {
 			latencyMode: "realtime", // TODO configurable
 		}
 
-		this.frames = new ReadableStream({
+		this.#encode = new TransformStream({
 			start: this.#start.bind(this),
-			pull: this.#pull.bind(this),
-			cancel: this.#cancel.bind(this),
+			transform: this.#transform.bind(this),
+			flush: this.#flush.bind(this),
 		})
+
+		const reader = new MediaStreamTrackProcessor({ track: input }).readable
+		this.frames = reader.pipeThrough(this.#encode)
 	}
 
 	static async isSupported(config: VideoEncoderConfig) {
 		// Check if we support a specific codec family
 		const short = config.codec.substring(0, 4)
-		if (!EncodecCodecs.includes(short)) return false
+		if (!EncoderCodecs.includes(short)) return false
 
 		// Default to hardware encoding
 		config.hardwareAcceleration ??= "prefer-hardware"
@@ -72,11 +71,7 @@ export class Encoder {
 		return !!res.supported
 	}
 
-	async init(): Promise<MP4.TrackOptions> {
-		return this.#init.promise
-	}
-
-	#start(controller: ReadableStreamDefaultController<EncodedVideoChunk>) {
+	#start(controller: TransformStreamDefaultController<EncodedVideoChunk>) {
 		this.#encoder = new VideoEncoder({
 			output: (frame, metadata) => {
 				this.#enqueue(controller, frame, metadata)
@@ -86,18 +81,10 @@ export class Encoder {
 			},
 		})
 
-		this.#encoder.configure(this.#config)
+		this.#encoder.configure(this.#encoderConfig)
 	}
 
-	async #pull(controller: ReadableStreamDefaultController<EncodedVideoChunk>) {
-		const raw = await this.#input.read()
-		if (raw.done) {
-			this.#encoder.close()
-			controller.close()
-			return
-		}
-
-		const frame = raw.value
+	#transform(frame: VideoFrame) {
 		const encoder = this.#encoder
 
 		// Set keyFrame to undefined when we're not sure so the encoder can decide.
@@ -107,55 +94,36 @@ export class Encoder {
 		frame.close()
 	}
 
-	#cancel() {
-		this.#encoder.close()
-	}
-
 	#enqueue(
-		controller: ReadableStreamDefaultController<EncodedVideoChunk>,
+		controller: TransformStreamDefaultController<VideoDecoderConfig | EncodedVideoChunk>,
 		frame: EncodedVideoChunk,
 		metadata?: EncodedVideoChunkMetadata
 	) {
-		const config = metadata?.decoderConfig
-		if (config && this.#init.pending) {
-			const codec = config.codec.substring(0, 4)
+		if (!this.#decoderConfig) {
+			const config = metadata?.decoderConfig
+			if (!config) throw new Error("missing decoder config")
 
-			const options: MP4.TrackOptions = {
-				type: codec,
-				width: config.codedWidth,
-				height: config.codedHeight,
-				timescale: 1_000_000,
-				layer: metadata.temporalLayerId,
-			}
-
-			if (codec === "avc1") {
-				options.avcDecoderConfigRecord = config.description
-			} else if (codec === "hev1") {
-				options.hevcDecoderConfigRecord = config.description
-			}
-
-			this.#init.resolve(options)
+			controller.enqueue(config)
+			this.#decoderConfig = config
 		}
 
 		if (frame.type === "key") {
 			this.#keyframeCounter = 0
 		} else {
 			this.#keyframeCounter += 1
-			if (this.#keyframeCounter + this.#encoder.encodeQueueSize >= 2 * this.#config.framerate!) {
+			if (this.#keyframeCounter + this.#encoder.encodeQueueSize >= 2 * this.#encoderConfig.framerate!) {
 				this.#keyframeNext = true
 			}
 		}
 
 		controller.enqueue(frame)
 	}
-}
 
-/*
-function isAudioTrack(track: MediaStreamTrack): track is MediaStreamAudioTrack {
-	return track.kind === "audio"
-}
+	#flush() {
+		this.#encoder.close()
+	}
 
-function isVideoTrack(track: MediaStreamTrack): track is MediaStreamVideoTrack {
-	return track.kind === "video"
+	get config() {
+		return this.#encoderConfig
+	}
 }
-*/

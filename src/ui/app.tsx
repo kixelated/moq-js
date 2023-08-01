@@ -57,17 +57,14 @@ export function App(props: { url: string }) {
 
 			<div
 				class="flex flex-col overflow-hidden transition-size duration-1000"
-				classList={{ "h-[500]": !!broadcast(), "h-0": !broadcast() }}
+				classList={{ "h-0": !broadcast() }}
 			>
 				<Show when={broadcast()}>
 					<Publish.Main broadcast={broadcast()!} setBroadcast={setBroadcast} setError={setError} />
 				</Show>
 			</div>
 
-			<div
-				class="flex flex-row bg-white/90 transition-size duration-1000"
-				classList={{ "h-96": setup(), "h-0": setup() }}
-			>
+			<div class="flex flex-row bg-white/90 transition-size duration-1000" classList={{ "h-0": !setup() }}>
 				<div class="basis-1/2 p-6">
 					<p class="mb-6 text-center font-mono text-xl">Watch</p>
 					<Show when={connection()} fallback="Connecting...">

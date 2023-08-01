@@ -22,13 +22,13 @@ export class Objects {
 		this.quic = quic
 	}
 
-	async send(header: Header) {
+	async send(header: Header): Promise<WritableStream<Uint8Array>> {
 		const stream = await this.quic.createUnidirectionalStream()
 		await this.#encode(stream, header)
 		return stream
 	}
 
-	async recv() {
+	async recv(): Promise<{ stream: ReadableStream<Uint8Array>; header: Header } | undefined> {
 		const streams = this.quic.incomingUnidirectionalStreams.getReader()
 
 		const { value, done } = await streams.read()

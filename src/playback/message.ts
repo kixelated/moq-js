@@ -17,9 +17,14 @@ export interface ConfigVideo {
 	canvas: OffscreenCanvas
 }
 
+export interface Init {
+	name: string // name of the init object
+	stream: ReadableStream<Uint8Array>
+}
+
 export interface Segment {
-	init: Uint8Array
-	component: "audio" | "video"
+	init: string // name of the init object
+	kind: "audio" | "video"
 	header: Header
 	stream: ReadableStream<Uint8Array>
 }
@@ -66,6 +71,7 @@ export interface ToWorker {
 	config?: Config
 
 	// Sent on each init/data stream
+	init?: Init
 	segment?: Segment
 
 	// Sent to control playback
@@ -123,6 +129,10 @@ export class Port {
 
 	sendConfig(config: Config) {
 		this.send({ config }, config.video.canvas)
+	}
+
+	sendInit(init: Init) {
+		this.send({ init }, init.stream)
 	}
 
 	sendSegment(segment: Segment) {

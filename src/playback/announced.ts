@@ -1,10 +1,10 @@
 import { Connection } from "../transport/connection"
-import * as MP4 from "../common/mp4"
 import { AnnounceRecv } from "../transport/announce"
-import { decodeInit } from "./container"
 import { asError } from "../common/error"
+import { Reader } from "../transport/stream"
+import { Catalog } from "../common/catalog"
 
-export class Catalog {
+export class Announced {
 	#conn: Connection
 
 	constructor(conn: Connection) {
@@ -23,15 +23,16 @@ export class Catalog {
 
 export class Broadcast {
 	#announce: AnnounceRecv
-	#catalog: Promise<{ info: MP4.Info; raw: Uint8Array }>
+
+	catalog: Promise<Catalog>
 
 	constructor(announce: AnnounceRecv) {
 		this.#announce = announce
-		this.#catalog = this.#fetch()
+		this.catalog = this.#fetch()
 	}
 
-	async #fetch() {
-		const subscribe = await this.#announce.subscribe("0")
+	async #fetch(): Promise<Catalog> {
+		const subscribe = await this.#announce.subscribe(".catalog")
 		try {
 			const segment = await subscribe.data()
 			if (!segment) throw new Error("no catalog data")
@@ -42,11 +43,14 @@ export class Broadcast {
 				throw new Error("TODO delta updates not supported")
 			}
 
-			const { info, raw } = await decodeInit(stream)
+			const reader = new Reader(stream)
+			const raw = await reader.readAll()
+
+			const catalog = Catalog.decode(raw)
 
 			await subscribe.close() // we done
 
-			return { info, raw }
+			return catalog
 		} catch (e) {
 			const err = asError(e)
 
@@ -61,15 +65,7 @@ export class Broadcast {
 		return this.#announce.namespace
 	}
 
-	async info() {
-		return (await this.#catalog).info
-	}
-
-	async init() {
-		return (await this.#catalog).raw
-	}
-
-	async subscribe(track: number) {
-		return this.#announce.subscribe(track.toString())
+	async subscribe(name: string) {
+		return this.#announce.subscribe(name)
 	}
 }

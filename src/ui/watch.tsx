@@ -1,11 +1,10 @@
 import { Connection } from "../transport/connection"
 import { Player } from "../playback/player"
-import { Broadcast, Catalog } from "../playback/catalog"
+import { Broadcast, Announced } from "../playback/announced"
+import { Track } from "../common/catalog"
 import { asError } from "../common/error"
 
-import * as MP4 from "../common/mp4"
-
-import { createSignal, onMount, Switch, Match, For, Show, createEffect } from "solid-js"
+import { createSignal, onMount, Switch, Match, For, createEffect } from "solid-js"
 
 export function Main(props: { player: Player; setError(e: Error): void; setPlayer(): void }) {
 	let canvas: HTMLCanvasElement
@@ -27,14 +26,14 @@ export function Main(props: { player: Player; setError(e: Error): void; setPlaye
 
 	return (
 		<>
-			<canvas ref={canvas!} width="854" height="480" class="aspect-video bg-black"></canvas>
+			<canvas ref={canvas!} class="aspect-video bg-black"></canvas>
 		</>
 	)
 }
 
 export function Setup(props: { connection: Connection; setPlayer(v: Player): void; setError(e: Error): void }) {
-	// Create a catalog that we'll use to list all of the broadcasts
-	const catalog = new Catalog(props.connection)
+	// Create an object that we'll use to list all of the broadcasts
+	const announced = new Announced(props.connection)
 
 	const [broadcast, setBroadcast] = createSignal<Broadcast | undefined>()
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
@@ -42,7 +41,7 @@ export function Setup(props: { connection: Connection; setPlayer(v: Player): voi
 	createEffect(async () => {
 		try {
 			for (;;) {
-				const broadcast = await catalog.broadcast()
+				const broadcast = await announced.broadcast()
 				if (!broadcast) break
 
 				setBroadcasts((prev) => prev.concat(broadcast))
@@ -81,20 +80,24 @@ export function Setup(props: { connection: Connection; setPlayer(v: Player): voi
 function Available(props: { broadcast: Broadcast; select: () => void }) {
 	const name = props.broadcast.name.replace(/\//, " / ")
 
-	const [tracks, setTracks] = createSignal<MP4.Track[]>([])
+	const [tracks, setTracks] = createSignal<Track[]>([])
 	const [error, setError] = createSignal<Error | undefined>()
 
 	createEffect(async () => {
 		try {
-			const info = await props.broadcast.info()
-			setTracks(info.tracks)
+			const catalog = await props.broadcast.catalog
+			setTracks(catalog.tracks)
 		} catch (e) {
 			setError(asError(e))
 		}
 	})
 
 	// A function because Match doesn't work with Typescript type guards
-	const trackInfo = (track: MP4.Track) => {
+	const trackInfo = (track: Track) => {
+		// TODO put this information in the catalog
+		return track.kind
+
+		/*
 		if (MP4.isVideoTrack(track)) {
 			return (
 				<>
@@ -113,6 +116,7 @@ function Available(props: { broadcast: Broadcast; select: () => void }) {
 		} else {
 			return "unknown track type"
 		}
+		*/
 	}
 
 	const watch = (e: MouseEvent) => {
