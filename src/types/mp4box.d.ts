@@ -213,7 +213,7 @@ declare module "mp4box" {
 		schema_location?: string
 		auxiliary_mime_types?: string
 
-		description?: any
+		description?: Box
 		description_boxes?: Box[]
 
 		default_sample_description_index_id?: number
@@ -275,10 +275,22 @@ declare module "mp4box" {
 		): ArrayBuffer
 	}
 
+	// TODO expand this
 	export class Box {
 		size: number
 
+		constructor(type?: string, size?: number)
+
+		add(name: string): Box
+		addBox(box: Box): Box
+
+		set(name: string, value: any): void
+		addEntry(value: string, prop?: string): void
+
+		printHeader(): void
+
 		write(stream: DataStream): void
+		writeHeader(stream: DataStream, msg?: string): void
 		computeSize(): void
 	}
 

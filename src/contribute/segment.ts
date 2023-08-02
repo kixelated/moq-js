@@ -3,29 +3,34 @@ import { Chunk } from "./chunk"
 export class Segment {
 	id: number
 
+	// Take in a stream of chunks
 	input: WritableStream<Chunk>
+
+	// Output a stream of bytes, which we fork for each new subscriber.
 	#cache: ReadableStream<Uint8Array>
 
-	expires?: number
+	timestamp = 0
 
 	constructor(id: number) {
 		this.id = id
 
-		const transport = new TransformStream<Chunk, Uint8Array>({
-			transform: (chunk: Chunk, controller) => {
-				// Compute the new expiration based on the max timestamp
-				const max = chunk.timestamp + chunk.duration
+		// Set a max size for each segment, dropping the tail if it gets too long.
+		// We tee the reader, so this limit applies to the FASTEST reader.
+		const backpressure = new ByteLengthQueuingStrategy({ highWaterMark: 8_000_000 })
 
-				// Convert from microseconds to milliseconds
-				const ms = max / 1000
+		const transport = new TransformStream<Chunk, Uint8Array>(
+			{
+				transform: (chunk: Chunk, controller) => {
+					// Compute the max timestamp of the segment
+					this.timestamp = Math.max(chunk.timestamp + chunk.duration)
 
-				// Expire after 10s
-				this.expires = ms + 10_000
-
-				// Push the chunk to any listeners.
-				controller.enqueue(chunk.data)
+					// Push the chunk to any listeners.
+					controller.enqueue(chunk.data)
+				},
 			},
-		})
+			undefined,
+			backpressure
+		)
 
 		this.input = transport.writable
 		this.#cache = transport.readable

@@ -327,7 +327,6 @@ function Video(props: { config: Store<VideoConfig>; setConfig: SetStoreFunction<
 
 	// Update the store with our computed value.
 	createEffect(() => {
-		console.log("codec", codec.value)
 		props.setConfig({ codec: codec.value })
 	})
 

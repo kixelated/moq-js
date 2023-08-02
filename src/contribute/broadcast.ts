@@ -122,6 +122,8 @@ export class Broadcast {
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
 
+		console.log("serving catalog", bytes)
+
 		const stream = await subscriber.data({
 			group: 0n,
 			sequence: 0n,
@@ -139,6 +141,7 @@ export class Broadcast {
 			throw err
 		} finally {
 			writer.releaseLock()
+			console.log("all done serving catalog", bytes)
 		}
 	}
 
@@ -146,24 +149,17 @@ export class Broadcast {
 		const track = this.#tracks.get(name)
 		if (!track) throw new Error(`no track with name ${subscriber.name}`)
 
+		console.log("serving init", name)
+
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
 
-		const inits = track.init().getReader()
+		console.log("sent ack", name)
 
-		for (;;) {
-			const { value: init, done } = await inits.read()
-			if (done) break
+		const init = await track.init()
 
-			this.#serveInitUpdate(subscriber, init).catch((e) => {
-				// Log any errors that occur.
-				const err = asError(e)
-				console.warn("failed to serve segment", err)
-			})
-		}
-	}
+		console.log("got init", name)
 
-	async #serveInitUpdate(subscriber: SubscribeRecv, init: Uint8Array) {
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
 			group: 0n,
@@ -171,10 +167,24 @@ export class Broadcast {
 			send_order: 0n, // TODO
 		})
 
-		// Write the init segment to the stream.
 		const writer = stream.getWriter()
-		await writer.write(init)
-		await writer.close()
+
+		console.log("writing init", name, init)
+
+		// TODO make a helper to pipe a Uint8Array to a stream
+		try {
+			// Write the init segment to the stream.
+			await writer.write(init)
+			await writer.close()
+		} catch (e) {
+			const err = asError(e)
+			await writer.abort(err.message)
+			throw err
+		} finally {
+			writer.releaseLock()
+		}
+
+		console.log("all done writing init", name)
 	}
 
 	async #serveTrack(subscriber: SubscribeRecv, name: string) {
@@ -184,11 +194,16 @@ export class Broadcast {
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
 
+		console.log("serving track", name)
+
 		const segments = track.segments().getReader()
+		console.log(segments)
 
 		for (;;) {
 			const { value: segment, done } = await segments.read()
 			if (done) break
+
+			console.log("got segment", segment)
 
 			// Serve the segment and log any errors that occur.
 			this.#serveSegment(subscriber, segment).catch((e) => {
@@ -199,6 +214,7 @@ export class Broadcast {
 	}
 
 	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
+		console.log("serving segment", segment)
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
 			group: BigInt(segment.id),

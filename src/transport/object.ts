@@ -25,6 +25,7 @@ export class Objects {
 	async send(header: Header): Promise<WritableStream<Uint8Array>> {
 		const stream = await this.quic.createUnidirectionalStream()
 		await this.#encode(stream, header)
+		console.log("created stream", header)
 		return stream
 	}
 
@@ -38,6 +39,7 @@ export class Objects {
 		const stream = value
 
 		const header = await this.#decode(stream)
+		console.log("received stream", header)
 
 		return { header, stream }
 	}

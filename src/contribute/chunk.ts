@@ -1,4 +1,4 @@
-// Similar to EncodedVideoChunk, allowing a new "init" type
+// Extends EncodedVideoChunk, allowing a new "init" type
 export interface Chunk {
 	type: "init" | "key" | "delta"
 	timestamp: number // microseconds

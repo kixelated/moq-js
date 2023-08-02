@@ -28,7 +28,12 @@ export class Container {
 	}
 
 	#init(frame: DecoderConfig, controller: TransformStreamDefaultController<Chunk>) {
-		const codec = frame.codec.substring(0, 4)
+		if (this.#track) throw new Error("duplicate decoder config")
+
+		let codec = frame.codec.substring(0, 4)
+		if (codec == "opus") {
+			codec = "Opus"
+		}
 
 		const options: MP4.TrackOptions = {
 			type: codec,
@@ -49,9 +54,8 @@ export class Container {
 			options.hevcDecoderConfigRecord = frame.description
 		}
 
-		if (this.#track) throw new Error("duplicate decoder config")
-
 		this.#track = this.#mp4.addTrack(options)
+		if (!this.#track) throw new Error("failed to initialize MP4 track")
 
 		const buffer = MP4.ISOFile.writeInitializationSegment(this.#mp4.ftyp!, this.#mp4.moov!, 0, 0)
 		const data = new Uint8Array(buffer)

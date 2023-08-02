@@ -10,7 +10,7 @@ import * as Video from "./video"
 export class Track {
 	name: string
 
-	#inits: Uint8Array[] = []
+	#init?: Uint8Array
 	#segments: Segment[] = []
 
 	#offset = 0 // number of segments removed from the front of the queue
@@ -50,6 +50,13 @@ export class Track {
 	}
 
 	async #write(chunk: Chunk) {
+		if (chunk.type === "init") {
+			console.log("pushing init")
+			this.#init = chunk.data
+			this.#notify.wake()
+			return
+		}
+
 		let current = this.#segments.at(-1)
 		if (!current || chunk.type === "key") {
 			if (current) {
@@ -62,18 +69,24 @@ export class Track {
 
 			current = segment
 
-			// Clear any expired segments
-			const now = performance.now()
+			// Clear old segments
+			while (this.#segments.length > 1) {
+				const first = this.#segments[0]
 
-			while (this.#segments.length) {
-				const expires = this.#segments[0].expires
-				if (expires && expires > now) break
+				// Expire after 10s
+				if (chunk.timestamp - first.timestamp < 10_000_000) break
 				this.#segments.shift()
 			}
 		}
 
 		const writer = current.input.getWriter()
-		await writer.write(chunk)
+
+		if ((writer.desiredSize || 0) > 0) {
+			await writer.write(chunk)
+		} else {
+			console.warn("dropping chunk", writer.desiredSize)
+		}
+
 		writer.releaseLock()
 	}
 
@@ -87,26 +100,13 @@ export class Track {
 		this.#notify.wake()
 	}
 
-	init(): ReadableStream<Uint8Array> {
-		let index = 0
+	async init(): Promise<Uint8Array> {
+		while (!this.#init) {
+			if (this.#closed) throw new Error("track closed")
+			await this.#notify.next()
+		}
 
-		return new ReadableStream({
-			pull: (controller) => {
-				if (index < this.#segments.length) {
-					controller.enqueue(this.#inits[index])
-					index += 1
-					return
-				}
-
-				if (this.#closed) {
-					controller.close()
-					return
-				}
-
-				// Pull again on wakeup
-				return this.#notify.next()
-			},
-		})
+		return this.#init
 	}
 
 	// TODO generize this

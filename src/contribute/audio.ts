@@ -63,7 +63,6 @@ export class Encoder {
 		frame: EncodedAudioChunk,
 		metadata?: EncodedAudioChunkMetadata
 	) {
-		console.log("encqueu", frame, metadata)
 		const config = metadata?.decoderConfig
 		if (config && !this.#decoderConfig) {
 			const config = metadata.decoderConfig

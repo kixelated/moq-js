@@ -9,28 +9,31 @@ export class Reader {
 	}
 
 	async readAll(): Promise<Uint8Array> {
-		const reader = this.#reader.getReader({ mode: "byob" })
-
-		let buf = new Uint8Array(new ArrayBuffer(1024), 0, 0)
+		const reader = this.#reader.getReader()
+		let buf = new Uint8Array(0)
 
 		for (;;) {
-			if (buf.byteLength == buf.buffer.byteLength) {
-				const tmp = new Uint8Array(new ArrayBuffer(2 * buf.buffer.byteLength), buf.byteLength)
-				tmp.set(buf)
-				buf = tmp
-			}
-
-			const scratch = new Uint8Array(buf.buffer, buf.byteLength, buf.buffer.byteLength - buf.byteLength)
-
-			const { value, done } = await reader.read(scratch)
+			const { value, done } = await reader.read()
 			if (done) break
 
-			buf = new Uint8Array(value.buffer, 0, value.byteOffset + value.byteLength)
+			if (buf.byteLength > 0) {
+				const append = new Uint8Array(buf.byteLength + value.byteLength)
+				append.set(buf)
+				append.set(value, buf.byteLength)
+				buf = append
+			} else {
+				buf = value
+			}
 		}
 
 		reader.releaseLock()
 
 		return buf
+	}
+
+	async readExact(size: number): Promise<Uint8Array> {
+		const dst = new Uint8Array(size)
+		return this.readFull(dst)
 	}
 
 	async readFull(dst: Uint8Array): Promise<Uint8Array> {
@@ -41,7 +44,6 @@ export class Reader {
 		while (offset < dst.byteLength) {
 			const { value, done } = await reader.read(dst.slice(offset))
 			if (done) {
-				console.warn(value)
 				throw new Error(`short buffer: ${offset} < ${dst.byteLength}`)
 			}
 
@@ -60,9 +62,7 @@ export class Reader {
 			throw new Error(`string length ${length} exceeds max length ${maxLength}`)
 		}
 
-		let buffer = new Uint8Array(length)
-		buffer = await this.readFull(buffer)
-
+		const buffer = await this.readExact(length)
 		return new TextDecoder().decode(buffer)
 	}
 

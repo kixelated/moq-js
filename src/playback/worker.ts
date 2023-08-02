@@ -20,6 +20,7 @@ class Worker {
 
 	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
+		console.log("worker:", msg)
 
 		if (msg.config) {
 			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline.audio)

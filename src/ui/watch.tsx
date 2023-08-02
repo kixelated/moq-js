@@ -94,8 +94,8 @@ function Available(props: { broadcast: Broadcast; select: () => void }) {
 
 	// A function because Match doesn't work with Typescript type guards
 	const trackInfo = (track: Track) => {
-		// TODO put this information in the catalog
-		return track.kind
+		// TODO put more information in the catalog
+		return `${track.kind}: ${track.codec}`
 
 		/*
 		if (MP4.isVideoTrack(track)) {
