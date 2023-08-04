@@ -11,7 +11,7 @@ export interface Header {
 	track: bigint
 	group: bigint
 	sequence: bigint
-	send_order: bigint
+	send_order: number // i32
 	// followed by payload
 }
 
@@ -47,13 +47,13 @@ export class Objects {
 	async #decode(s: ReadableStream<Uint8Array>) {
 		const r = new Reader(s)
 
-		const type = await r.vint52()
+		const type = await r.u8()
 		if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
 
-		const track = await r.vint62()
-		const group = await r.vint62()
-		const sequence = await r.vint62()
-		const send_order = await r.vint62()
+		const track = await r.u62()
+		const group = await r.u62()
+		const sequence = await r.u62()
+		const send_order = await r.i32()
 
 		return {
 			track,
@@ -65,10 +65,10 @@ export class Objects {
 
 	async #encode(s: WritableStream<Uint8Array>, h: Header) {
 		const w = new Writer(s)
-		await w.vint52(0)
-		await w.vint62(h.track)
-		await w.vint62(h.group)
-		await w.vint62(h.sequence)
-		await w.vint62(h.send_order)
+		await w.u8(0)
+		await w.u62(h.track)
+		await w.u62(h.group)
+		await w.u62(h.sequence)
+		await w.i32(h.send_order)
 	}
 }

@@ -127,7 +127,7 @@ export class Broadcast {
 		const stream = await subscriber.data({
 			group: 0n,
 			sequence: 0n,
-			send_order: 0n, // Highest priority
+			send_order: 0, // TODO Highest priority
 		})
 
 		const writer = stream.getWriter()
@@ -164,7 +164,7 @@ export class Broadcast {
 		const stream = await subscriber.data({
 			group: 0n,
 			sequence: 0n,
-			send_order: 0n, // TODO
+			send_order: 0, // TODO
 		})
 
 		const writer = stream.getWriter()
@@ -197,7 +197,6 @@ export class Broadcast {
 		console.log("serving track", name)
 
 		const segments = track.segments().getReader()
-		console.log(segments)
 
 		for (;;) {
 			const { value: segment, done } = await segments.read()
@@ -219,7 +218,7 @@ export class Broadcast {
 		const stream = await subscriber.data({
 			group: BigInt(segment.id),
 			sequence: 0n,
-			send_order: 0n, // TODO
+			send_order: 0, // TODO
 		})
 
 		// Pipe the segment to the stream.

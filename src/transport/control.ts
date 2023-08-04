@@ -115,7 +115,7 @@ export class Decoder {
 	}
 
 	private async type(): Promise<Type> {
-		return (await this.r.vint52()) as Type
+		return (await this.r.u52()) as Type
 	}
 
 	async message(): Promise<Message> {
@@ -137,7 +137,7 @@ export class Decoder {
 	}
 
 	private async subscribe(): Promise<Subscribe> {
-		const id = await this.r.vint62()
+		const id = await this.r.u62()
 		const namespace = await this.r.string()
 		const name = await this.r.string()
 
@@ -152,16 +152,16 @@ export class Decoder {
 	private async subscribe_ok(): Promise<SubscribeOk> {
 		return {
 			type: Type.SubscribeOk,
-			id: await this.r.vint62(),
-			expires: await this.r.vint62(),
+			id: await this.r.u62(),
+			expires: await this.r.u62(),
 		}
 	}
 
 	private async subscribe_error(): Promise<SubscribeError> {
 		return {
 			type: Type.SubscribeError,
-			id: await this.r.vint62(),
-			code: await this.r.vint62(),
+			id: await this.r.u62(),
+			code: await this.r.u62(),
 			reason: await this.r.string(),
 		}
 	}
@@ -186,7 +186,7 @@ export class Decoder {
 		return {
 			type: Type.AnnounceError,
 			namespace: await this.r.string(),
-			code: await this.r.vint62(),
+			code: await this.r.u62(),
 			reason: await this.r.string(),
 		}
 	}
@@ -200,7 +200,7 @@ export class Encoder {
 	}
 
 	async message(m: Message) {
-		await this.w.vint52(m.type)
+		await this.w.u52(m.type)
 
 		switch (m.type) {
 			case Type.Subscribe:
@@ -219,19 +219,19 @@ export class Encoder {
 	}
 
 	async subscribe(s: Subscribe) {
-		await this.w.vint62(s.id)
+		await this.w.u62(s.id)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
 	}
 
 	async subscribe_ok(s: SubscribeOk) {
-		await this.w.vint62(s.id)
-		await this.w.vint62(s.expires ?? 0n)
+		await this.w.u62(s.id)
+		await this.w.u62(s.expires ?? 0n)
 	}
 
 	async subscribe_error(s: SubscribeError) {
-		await this.w.vint62(s.id)
-		await this.w.vint62(s.code)
+		await this.w.u62(s.id)
+		await this.w.u62(s.code)
 		await this.w.string(s.reason)
 	}
 
@@ -245,7 +245,7 @@ export class Encoder {
 
 	async announce_error(a: AnnounceError) {
 		await this.w.string(a.namespace)
-		await this.w.vint62(a.code)
+		await this.w.u62(a.code)
 		await this.w.string(a.reason)
 	}
 }

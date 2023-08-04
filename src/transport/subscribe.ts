@@ -123,7 +123,7 @@ export class SubscribeRecv {
 	}
 
 	// Create a writable data stream
-	async data(header: { group: bigint; sequence: bigint; send_order: bigint }) {
+	async data(header: { group: bigint; sequence: bigint; send_order: number }) {
 		return this.#objects.send({ track: this.#id, ...header })
 	}
 }
