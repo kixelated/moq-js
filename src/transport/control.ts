@@ -115,7 +115,7 @@ export class Decoder {
 	}
 
 	private async type(): Promise<Type> {
-		const t = await this.r.u52()
+		const t = await this.r.u53()
 		if (t in Type) return t
 		throw new Error(`unknown control message type: ${t}`)
 	}
@@ -202,7 +202,7 @@ export class Encoder {
 	}
 
 	async message(m: Message) {
-		await this.w.u52(m.type)
+		await this.w.u53(m.type)
 
 		switch (m.type) {
 			case Type.Subscribe:

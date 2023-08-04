@@ -41,14 +41,14 @@ export class Decoder {
 	}
 
 	async client(): Promise<Client> {
-		const type = await this.r.u52()
+		const type = await this.r.u53()
 		if (type !== 1) throw new Error(`client SETUP type must be 1, got ${type}`)
 
-		const count = await this.r.u52()
+		const count = await this.r.u53()
 
 		const versions = []
 		for (let i = 0; i < count; i++) {
-			const version = await this.r.u52()
+			const version = await this.r.u53()
 			versions.push(version)
 		}
 
@@ -63,10 +63,10 @@ export class Decoder {
 	}
 
 	async server(): Promise<Server> {
-		const type = await this.r.u52()
+		const type = await this.r.u53()
 		if (type !== 2) throw new Error(`server SETUP type must be 2, got ${type}`)
 
-		const version = await this.r.u52()
+		const version = await this.r.u53()
 		const role = await this.role()
 
 		return {
@@ -76,7 +76,7 @@ export class Decoder {
 	}
 
 	async role(): Promise<Role> {
-		const v = await this.r.u52()
+		const v = await this.r.u53()
 		if (v == 0) {
 			return "publisher"
 		} else if (v == 1) {
@@ -97,10 +97,10 @@ export class Encoder {
 	}
 
 	async client(c: Client) {
-		await this.w.u52(1) // message_type = 1
-		await this.w.u52(c.versions.length)
+		await this.w.u53(1) // message_type = 1
+		await this.w.u53(c.versions.length)
 		for (const v of c.versions) {
-			await this.w.u52(v)
+			await this.w.u53(v)
 		}
 
 		await this.role(c.role)
@@ -108,8 +108,8 @@ export class Encoder {
 	}
 
 	async server(s: Server) {
-		await this.w.u52(2) // message_type = 2
-		await this.w.u52(s.version)
+		await this.w.u53(2) // message_type = 2
+		await this.w.u53(s.version)
 		await this.role(s.role)
 	}
 
@@ -123,6 +123,6 @@ export class Encoder {
 			v = 2
 		}
 
-		return this.w.u52(v)
+		return this.w.u53(v)
 	}
 }

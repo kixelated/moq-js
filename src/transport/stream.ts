@@ -1,3 +1,10 @@
+const MAX_U6 = Math.pow(2, 6) - 1
+const MAX_U14 = Math.pow(2, 14) - 1
+const MAX_U30 = Math.pow(2, 30) - 1
+const MAX_U31 = Math.pow(2, 31) - 1
+const MAX_U53 = Number.MAX_SAFE_INTEGER
+const MAX_U62: bigint = 2n ** 62n - 1n
+
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 export class Reader {
 	#reader: ReadableStream<Uint8Array>
@@ -56,7 +63,7 @@ export class Reader {
 	}
 
 	async string(maxLength?: number): Promise<string> {
-		const length = await this.u52()
+		const length = await this.u53()
 		if (maxLength !== undefined && length > maxLength) {
 			throw new Error(`string length ${length} exceeds max length ${maxLength}`)
 		}
@@ -76,17 +83,17 @@ export class Reader {
 		return view.getInt32(0)
 	}
 
-	// Returns a Number using 52-bits, the max Javascript can use for integer math
-	async u52(): Promise<number> {
+	// Returns a Number using 53-bits, the max Javascript can use for integer math
+	async u53(): Promise<number> {
 		const v = await this.u62()
-		if (v > Number.MAX_SAFE_INTEGER) {
-			throw new Error("value larger than 52-bits; use v62 instead")
+		if (v > MAX_U53) {
+			throw new Error("value larger than 53-bits; use v62 instead")
 		}
 
 		return Number(v)
 	}
 
-	// NOTE: Returns a bigint instead of a number since it may be larger than 52-bits
+	// NOTE: Returns a bigint instead of a number since it may be larger than 53-bits
 	async u62(): Promise<bigint> {
 		this.#scratch = await this.read(this.#scratch, 0, 1)
 		const first = this.#scratch[0]
@@ -131,7 +138,7 @@ export class Writer {
 	}
 
 	async i32(v: number) {
-		if (Math.abs(v) >= 1 << 31) {
+		if (Math.abs(v) > MAX_U31) {
 			throw new Error(`overflow, value larger than 32-bits: ${v}`)
 		}
 
@@ -140,20 +147,20 @@ export class Writer {
 		await this.write(setInt32(this.#scratch, v))
 	}
 
-	async u52(v: number) {
+	async u53(v: number) {
 		if (v < 0) {
 			throw new Error(`underflow, value is negative: ${v}`)
-		} else if (v >= 1 << 52) {
-			throw new Error(`overflow, value larger than 52-bits: ${v}`)
+		} else if (v > MAX_U53) {
+			throw new Error(`overflow, value larger than 53-bits: ${v}`)
 		}
 
-		await this.write(setVint52(this.#scratch, v))
+		await this.write(setVint53(this.#scratch, v))
 	}
 
 	async u62(v: bigint) {
 		if (v < 0) {
 			throw new Error(`underflow, value is negative: ${v}`)
-		} else if (v >= 1 << 62) {
+		} else if (v >= MAX_U62) {
 			throw new Error(`overflow, value larger than 62-bits: ${v}`)
 		}
 
@@ -171,7 +178,7 @@ export class Writer {
 
 	async string(str: string) {
 		const data = new TextEncoder().encode(str)
-		await this.u52(data.byteLength)
+		await this.u53(data.byteLength)
 		await this.write(data)
 	}
 }
@@ -202,26 +209,28 @@ function setUint32(dst: Uint8Array, v: number): Uint8Array {
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-function setVint52(dst: Uint8Array, v: number): Uint8Array {
-	if (v < 1 << 6) {
+function setVint53(dst: Uint8Array, v: number): Uint8Array {
+	if (v <= MAX_U6) {
 		return setUint8(dst, v)
-	} else if (v < 1 << 14) {
+	} else if (v <= MAX_U14) {
 		return setUint16(dst, v | 0x4000)
-	} else if (v < 1 << 30) {
+	} else if (v <= MAX_U30) {
 		return setUint32(dst, v | 0x80000000)
-	} else {
+	} else if (v <= MAX_U53) {
 		return setUint64(dst, BigInt(v) | 0xc000000000000000n)
+	} else {
+		throw new Error(`overflow, value larger than 53-bits: ${v}`)
 	}
 }
 
 function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
-	if (v < 1 << 6) {
+	if (v < MAX_U6) {
 		return setUint8(dst, Number(v))
-	} else if (v < 1 << 14) {
+	} else if (v < MAX_U14) {
 		return setUint16(dst, Number(v) | 0x4000)
-	} else if (v < 1 << 30) {
+	} else if (v <= MAX_U30) {
 		return setUint32(dst, Number(v) | 0x80000000)
-	} else if (v < 1 << 62) {
+	} else if (v <= MAX_U62) {
 		return setUint64(dst, BigInt(v) | 0xc000000000000000n)
 	} else {
 		throw new Error(`overflow, value larger than 62-bits: ${v}`)
