@@ -115,7 +115,9 @@ export class Decoder {
 	}
 
 	private async type(): Promise<Type> {
-		return (await this.r.u52()) as Type
+		const t = await this.r.u52()
+		if (t in Type) return t
+		throw new Error(`unknown control message type: ${t}`)
 	}
 
 	async message(): Promise<Message> {
