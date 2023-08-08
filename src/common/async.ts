@@ -55,51 +55,53 @@ export class Watch<T> {
 	}
 }
 
-// TODO replace with ReadableStream
-export class Queue<T> {
-	#watch = new Watch<T[]>([])
-
-	push(v: T) {
-		this.#watch.update((q) => {
-			q.push(v)
-			return q
-		})
-	}
-
-	async shift(): Promise<T | undefined> {
-		for (;;) {
-			const [current, next] = this.#watch.value()
-			if (current.length > 0) return current.shift()
-			if (!next) return
-
-			await next
-		}
-	}
-
-	// Returns the entire queue state on each update.
-	value() {
-		return this.#watch.value()
-	}
-
-	close() {
-		this.#watch.close()
-	}
-}
-
+// Wakes up a multiple consumers.
 export class Notify {
-	#watch = new Watch<void>(undefined)
+	#next = new Deferred<void>()
 
-	async next() {
-		const [_, next] = this.#watch.value()
-		await next
+	async wait() {
+		return this.#next.promise
 	}
 
 	wake() {
-		this.#watch.update(undefined)
+		if (!this.#next.pending) {
+			throw new Error("closed")
+		}
+
+		this.#next.resolve()
+		this.#next = new Deferred<void>()
 	}
 
 	close() {
-		this.#watch.close()
+		this.#next.resolve()
+	}
+}
+
+// Allows queuing N values, like a Channel.
+export class Queue<T> {
+	#stream: TransformStream<T, T>
+	#reader: ReadableStreamDefaultReader<T>
+	#writer: WritableStreamDefaultWriter<T>
+
+	constructor(capacity = 1) {
+		const queue = new CountQueuingStrategy({ highWaterMark: capacity })
+		this.#stream = new TransformStream({}, undefined, queue)
+		this.#reader = this.#stream.readable.getReader()
+		this.#writer = this.#stream.writable.getWriter()
+	}
+
+	async push(v: T) {
+		await this.#writer.write(v)
+	}
+
+	async next(): Promise<T | undefined> {
+		const { value, done } = await this.#reader.read()
+		if (done) return
+		return value
+	}
+
+	close() {
+		this.#writer.close()
 	}
 }
 

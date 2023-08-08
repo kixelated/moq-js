@@ -47,7 +47,6 @@ export class Broadcast {
 			const raw = await reader.readAll()
 
 			const catalog = Catalog.decode(raw)
-			console.log("got catalog", catalog)
 
 			await subscribe.close() // we done
 

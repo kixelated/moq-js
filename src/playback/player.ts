@@ -43,27 +43,19 @@ export class Player {
 			tracks.push(track)
 		}
 
-		console.log("waiting for init")
-
 		// Call #runInit on each unique init track
 		// TODO do this in parallel with #runTrack to remove a round trip
 		await Promise.all(Array.from(inits).map((init) => this.#runInit(init)))
-
-		console.log("received init")
 
 		// Call #runTrack on each track
 		await Promise.all(tracks.map((track) => this.#runTrack(track)))
 	}
 
 	async #runInit(name: string) {
-		console.log("running init", name)
-
 		const sub = await this.#broadcast.subscribe(name)
 		try {
 			const init = await sub.data()
 			if (!init) throw new Error("no init data")
-
-			console.log("got obj", name, init)
 
 			if (init.header.sequence !== 0n) {
 				throw new Error("TODO multiple objects per init not supported")
@@ -76,18 +68,16 @@ export class Player {
 		} finally {
 			await sub.close()
 		}
-
-		console.log("done run init", name)
 	}
 
 	async #runTrack(track: TrackMp4) {
-		console.log("run track")
 		if (track.kind !== "audio" && track.kind !== "video") {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		const sub = await this.#broadcast.subscribe(track.data)
 		console.log("subscribe to", track.data)
+
+		const sub = await this.#broadcast.subscribe(track.data)
 		try {
 			for (;;) {
 				const segment = await sub.data()
@@ -96,8 +86,6 @@ export class Player {
 				if (segment.header.sequence !== 0n) {
 					throw new Error("TODO multiple objects per segment not supported")
 				}
-
-				console.log("got an object")
 
 				this.#port.sendSegment({
 					init: track.init,

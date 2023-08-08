@@ -6,7 +6,7 @@ export class Renderer {
 	#canvas: OffscreenCanvas
 	#timeline: Component
 
-	#decoder?: VideoDecoder
+	#decoder!: VideoDecoder
 	#queue: TransformStream<Frame, VideoFrame>
 
 	constructor(config: Message.ConfigVideo, timeline: Component) {
@@ -14,7 +14,8 @@ export class Renderer {
 		this.#timeline = timeline
 
 		this.#queue = new TransformStream({
-			transform: this.#decode.bind(this),
+			start: this.#start.bind(this),
+			transform: this.#transform.bind(this),
 		})
 
 		this.#run().catch(console.error)
@@ -34,9 +35,38 @@ export class Renderer {
 		}
 	}
 
-	#decode(frame: Frame, controller: TransformStreamDefaultController<VideoFrame>) {
-		// Create or reuse the decoder.
-		const decoder = this.#makeDecoder(controller, frame)
+	#start(controller: TransformStreamDefaultController<VideoFrame>) {
+		this.#decoder = new VideoDecoder({
+			output: (frame: VideoFrame) => {
+				controller.enqueue(frame)
+			},
+			error: console.error,
+		})
+	}
+
+	#transform(frame: Frame) {
+		// Configure the decoder with the first frame
+		if (this.#decoder.state !== "configured") {
+			const { sample, track } = frame
+
+			const desc = sample.description
+			const box = desc.avcC ?? desc.hvcC ?? desc.vpcC ?? desc.av1C
+			if (!box) throw new Error(`unsupported codec: ${track.codec}`)
+
+			const buffer = new MP4.Stream(undefined, 0, MP4.Stream.BIG_ENDIAN)
+			box.write(buffer)
+			const description = new Uint8Array(buffer.buffer, 8) // Remove the box header.
+
+			if (!MP4.isVideoTrack(track)) throw new Error("expected video track")
+
+			this.#decoder.configure({
+				codec: track.codec,
+				codedHeight: track.video.height,
+				codedWidth: track.video.width,
+				description,
+				// optimizeForLatency: true
+			})
+		}
 
 		const chunk = new EncodedVideoChunk({
 			type: frame.sample.is_sync ? "key" : "delta",
@@ -44,43 +74,6 @@ export class Renderer {
 			timestamp: frame.timestamp,
 		})
 
-		decoder.decode(chunk)
-	}
-
-	#makeDecoder(controller: TransformStreamDefaultController<VideoFrame>, frame: Frame): VideoDecoder {
-		// Reuse the decoder if it exists
-		if (this.#decoder) return this.#decoder
-
-		const { sample, track } = frame
-
-		const desc = sample.description
-		const box = desc.avcC ?? desc.hvcC ?? desc.vpcC ?? desc.av1C
-		if (!box) throw new Error(`unsupported codec: ${track.codec}`)
-
-		const buffer = new MP4.Stream()
-		buffer.endianness = MP4.Stream.BIG_ENDIAN
-		box.write(buffer)
-		const description = new Uint8Array(buffer.buffer, 8) // Remove the box header.
-
-		const decoder = new VideoDecoder({
-			output: (frame: VideoFrame) => {
-				controller.enqueue(frame)
-			},
-			error: console.error,
-		})
-
-		if (!MP4.isVideoTrack(track)) throw new Error("expected video track")
-
-		decoder.configure({
-			codec: track.codec,
-			codedHeight: track.video.height,
-			codedWidth: track.video.width,
-			description,
-			// optimizeForLatency: true
-		})
-
-		this.#decoder = decoder
-
-		return decoder
+		this.#decoder.decode(chunk)
 	}
 }

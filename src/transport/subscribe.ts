@@ -43,7 +43,7 @@ export class Subscribe {
 
 	// Receive the next new subscription
 	async recv() {
-		return this.#recvQueue.shift()
+		return this.#recvQueue.next()
 	}
 
 	async onSubscribe(msg: Control.Subscribe, announce: AnnounceSend) {
@@ -53,7 +53,7 @@ export class Subscribe {
 
 		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg.id, announce, msg.name)
 		this.#recv.set(msg.id, subscribe)
-		this.#recvQueue.push(subscribe)
+		await this.#recvQueue.push(subscribe)
 
 		await this.#control.send({ type: Control.Type.SubscribeOk, id: msg.id })
 	}
@@ -214,25 +214,27 @@ export class SubscribeSend {
 			// Cancel the stream immediately because we're closed
 			await stream.cancel()
 		} else {
-			this.#data.push({ header, stream })
+			await this.#data.push({ header, stream })
 		}
 	}
 
 	async #close(err: Error) {
 		if (this.closed()) return
 
-		const [streams] = this.#data.value()
-		for (const { stream } of streams) {
-			await stream.cancel()
+		this.#data.close()
+
+		for (;;) {
+			const sub = await this.#data.next()
+			if (!sub) break
+			await sub.stream.cancel()
 		}
 
 		this.#state.update(err)
 		this.#state.close()
-		this.#data.close()
 	}
 
 	// Receive the next a readable data stream
 	async data() {
-		return this.#data.shift()
+		return this.#data.next()
 	}
 }

@@ -17,16 +17,14 @@ export class Container {
 	}
 
 	#start(controller: TransformStreamDefaultController<Frame>) {
-		const mp4 = MP4.New()
-
-		mp4.onError = (err) => {
+		this.#mp4.onError = (err) => {
 			controller.error(err)
 		}
 
-		mp4.onReady = (info: MP4.Info) => {
+		this.#mp4.onReady = (info: MP4.Info) => {
 			// Extract all of the tracks, because we don't know if it's audio or video.
 			for (const track of info.tracks) {
-				mp4.setExtractionOptions(track.id, track, { nbSamples: 1 })
+				this.#mp4.setExtractionOptions(track.id, track, { nbSamples: 1 })
 			}
 		}
 

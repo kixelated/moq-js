@@ -20,17 +20,21 @@ class Worker {
 
 	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
-		console.log("worker:", msg)
 
 		if (msg.config) {
 			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline.audio)
 			this.#video = new Video.Renderer(msg.config.video, this.#timeline.video)
 		} else if (msg.init) {
+			// TODO buffer the init segmnet so we don't hold the stream open.
 			this.onInit(msg.init)
 		} else if (msg.segment) {
-			this.onSegment(msg.segment).catch((e) => {
+			const segment = msg.segment
+			this.onSegment(segment).catch(async (e) => {
 				const err = asError(e)
-				send({ fail: { err } })
+				console.warn("worker error:", err)
+
+				// Cancel the stream so we don't hold it open.
+				await segment.stream.cancel(err)
 			})
 		} else {
 			throw new Error(`unknown message: + ${JSON.stringify(msg)}`)
@@ -68,8 +72,10 @@ class Worker {
 
 		// Decode the init and then the segment itself
 		// TODO avoid decoding the init every time.
-		await initClone.pipeTo(container.decode.writable)
+		await initClone.pipeTo(container.decode.writable, { preventClose: true })
 		await msg.stream.pipeTo(container.decode.writable)
+
+		console.log("read", msg)
 	}
 }
 

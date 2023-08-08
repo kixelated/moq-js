@@ -51,7 +51,6 @@ export class Track {
 
 	async #write(chunk: Chunk) {
 		if (chunk.type === "init") {
-			console.log("pushing init")
 			this.#init = chunk.data
 			this.#notify.wake()
 			return
@@ -65,6 +64,9 @@ export class Track {
 
 			const segment = new Segment(this.#offset + this.#segments.length)
 			this.#segments.push(segment)
+
+			console.log("pushed new segment", segment)
+
 			this.#notify.wake()
 
 			current = segment
@@ -76,6 +78,9 @@ export class Track {
 				// Expire after 10s
 				if (chunk.timestamp - first.timestamp < 10_000_000) break
 				this.#segments.shift()
+				this.#offset += 1
+
+				await first.input.abort("expired")
 			}
 		}
 
@@ -103,7 +108,7 @@ export class Track {
 	async init(): Promise<Uint8Array> {
 		while (!this.#init) {
 			if (this.#closed) throw new Error("track closed")
-			await this.#notify.next()
+			await this.#notify.wait()
 		}
 
 		return this.#init
@@ -114,23 +119,26 @@ export class Track {
 		let pos = this.#offset
 
 		return new ReadableStream({
-			pull: (controller) => {
-				let index = pos - this.#offset
-				if (index < 0) index = 0
+			pull: async (controller) => {
+				for (;;) {
+					let index = pos - this.#offset
+					if (index < 0) index = 0
 
-				if (index < this.#segments.length) {
-					controller.enqueue(this.#segments[index])
-					pos += 1
-					return
+					if (index < this.#segments.length) {
+						controller.enqueue(this.#segments[index])
+						pos += 1
+						return // Called again when more data is requested
+					}
+
+					if (this.#closed) {
+						controller.close()
+						return
+					}
+
+					// Pull again on wakeup
+					// NOTE: We can't return until we enqueue at least one segment.
+					await this.#notify.wait()
 				}
-
-				if (this.#closed) {
-					controller.close()
-					return
-				}
-
-				// Pull again on wakeup
-				return this.#notify.next()
 			},
 		})
 	}

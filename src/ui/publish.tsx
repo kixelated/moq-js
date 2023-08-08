@@ -145,10 +145,13 @@ export function Setup(props: {
 
 	const [broadcast] = createResource(loading, async () => {
 		const media = await window.navigator.mediaDevices.getUserMedia({
+			/*
 			audio: {
 				sampleRate: { ideal: audio.sampleRate },
 				channelCount: { ideal: 2 },
 			},
+			*/
+			audio: false,
 			video: {
 				aspectRatio: { ideal: 16 / 9, max: 16 / 9 },
 				height: { ideal: video.height, max: video.height },

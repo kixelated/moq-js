@@ -48,10 +48,25 @@ export class Container {
 			options.samplerate = frame.sampleRate
 		}
 
+		if (!frame.description) throw new Error("missing frame description")
+		const desc = frame.description as ArrayBufferLike
+
 		if (codec === "avc1") {
-			options.avcDecoderConfigRecord = frame.description
+			options.avcDecoderConfigRecord = desc
 		} else if (codec === "hev1") {
-			options.hevcDecoderConfigRecord = frame.description
+			options.hevcDecoderConfigRecord = desc
+		} else if (codec === "Opus") {
+			// description is an identification header: https://datatracker.ietf.org/doc/html/rfc7845#section-5.1
+			// The first 8 bytes are the magic string "OpusHead", followed by what we actually want.
+			const dops = new MP4.BoxParser.dOpsBox(undefined)
+
+			// Annoyingly, the header is little endian while MP4 is big endian, so we have to parse.
+			const data = new MP4.Stream(desc, 8, MP4.Stream.LITTLE_ENDIAN)
+			dops.parse(data)
+
+			options.description = dops
+		} else {
+			throw new Error(`unsupported codec: ${codec}`)
 		}
 
 		this.#track = this.#mp4.addTrack(options)
@@ -99,8 +114,7 @@ export class Container {
 			is_sync: this.#frame.type == "key",
 		})
 
-		const stream = new MP4.Stream()
-		stream.endianness = MP4.Stream.BIG_ENDIAN
+		const stream = new MP4.Stream(undefined, 0, MP4.Stream.BIG_ENDIAN)
 
 		// Moof and mdat atoms are written in pairs.
 		// TODO remove the moof/mdat from the Box to reclaim memory once everything works
