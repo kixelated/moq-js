@@ -161,6 +161,11 @@ export class Ring {
 		return endPos - startPos
 	}
 
+	clear() {
+		const pos = Atomics.load(this.state, STATE.WRITE_POS)
+		Atomics.store(this.state, STATE.READ_POS, pos)
+	}
+
 	size() {
 		// TODO is this thread safe?
 		const readPos = Atomics.load(this.state, STATE.READ_POS)

@@ -9,6 +9,7 @@ export class Context {
 	worklet: Promise<AudioWorkletNode>
 
 	constructor(config: Message.ConfigAudio) {
+		console.log("renderer sample rate", config.sampleRate)
 		this.context = new AudioContext({
 			latencyHint: "interactive",
 			sampleRate: config.sampleRate,
@@ -85,6 +86,8 @@ export class Renderer {
 			const track = frame.track
 			if (!MP4.isAudioTrack(track)) throw new Error("expected audio track")
 
+			console.log("decoder sample rate", track.audio.sample_rate)
+
 			// We only support OPUS right now which doesn't need a description.
 			this.#decoder.configure({
 				codec: track.codec,
@@ -111,7 +114,11 @@ export class Renderer {
 			if (done) break
 
 			// Write audio samples to the ring buffer, dropping when there's no space.
-			this.#ring.write(frame)
+			const written = this.#ring.write(frame)
+
+			if (written < frame.numberOfFrames) {
+				console.warn(`droppped ${frame.numberOfFrames - written} audio samples`)
+			}
 		}
 	}
 }

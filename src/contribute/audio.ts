@@ -22,12 +22,15 @@ export class Encoder {
 
 	constructor(input: MediaStreamAudioTrack, config: EncoderConfig) {
 		const settings = input.getSettings()
+		if (!isAudioTrackSettings(settings)) {
+			throw new Error("expected audio track")
+		}
 
 		this.#encoderConfig = {
 			codec: config.codec,
 			bitrate: config.bitrate,
-			sampleRate: settings.sampleRate ?? 44100,
-			numberOfChannels: settings.channelCount ?? 2,
+			sampleRate: settings.sampleRate,
+			numberOfChannels: settings.channelCount,
 		}
 
 		this.#encode = new TransformStream({
@@ -91,4 +94,22 @@ export class Encoder {
 	get config() {
 		return this.#encoderConfig
 	}
+}
+
+// MediaTrackSettings can represent both audio and video, which means a LOT of possibly undefined properties.
+// This is a fork of the MediaTrackSettings interface with properties required for audio.
+interface AudioTrackSettings {
+	deviceId: string
+	groupId: string
+
+	autoGainControl: boolean
+	channelCount: number
+	echoCancellation: boolean
+	noiseSuppression: boolean
+	sampleRate: number
+	sampleSize: number
+}
+
+function isAudioTrackSettings(settings: MediaTrackSettings): settings is AudioTrackSettings {
+	return "sampleRate" in settings
 }

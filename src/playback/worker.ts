@@ -74,8 +74,6 @@ class Worker {
 		// TODO avoid decoding the init every time.
 		await initClone.pipeTo(container.decode.writable, { preventClose: true })
 		await msg.stream.pipeTo(container.decode.writable)
-
-		console.log("read", msg)
 	}
 }
 

@@ -1,6 +1,7 @@
 import * as Audio from "./audio"
 import * as Message from "./message"
 import { Broadcast } from "./announced"
+import { Port } from "./port"
 
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
@@ -13,7 +14,7 @@ export type Timeline = Message.Timeline
 // This class must be created on the main thread due to AudioContext.
 export class Player {
 	#conn: Connection
-	#port: Message.Port
+	#port: Port
 	#broadcast: Broadcast
 
 	// The audio context, which must be created on the main thread.
@@ -24,7 +25,7 @@ export class Player {
 
 	constructor(conn: Connection, broadcast: Broadcast) {
 		this.#broadcast = broadcast
-		this.#port = new Message.Port(this.#onMessage.bind(this)) // TODO await an async method instead
+		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
 		this.#conn = conn
 	}
 
@@ -75,8 +76,6 @@ export class Player {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		console.log("subscribe to", track.data)
-
 		const sub = await this.#broadcast.subscribe(track.data)
 		try {
 			for (;;) {
@@ -100,7 +99,7 @@ export class Player {
 	}
 
 	// Attach to the given canvas element
-	render(canvas: HTMLCanvasElement) {
+	attach(canvas: HTMLCanvasElement) {
 		// TODO refactor audio and video configuation
 		const config = {
 			audio: {

@@ -28,8 +28,11 @@ export class Renderer {
 			if (done) break
 
 			self.requestAnimationFrame(() => {
+				this.#canvas.width = frame.displayWidth
+				this.#canvas.height = frame.displayHeight
+
 				const ctx = this.#canvas.getContext("2d")
-				ctx!.drawImage(frame, 0, 0, this.#canvas.width, this.#canvas.height) // TODO aspect ratio
+				ctx!.drawImage(frame, 0, 0, this.#canvas.width, this.#canvas.height) // TODO respect aspect ratio
 				frame.close()
 			})
 		}

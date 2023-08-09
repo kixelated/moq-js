@@ -32,12 +32,15 @@ export class Encoder {
 
 	constructor(input: MediaStreamVideoTrack, config: EncoderConfig) {
 		const settings = input.getSettings()
+		if (!isVideoTrackSettings(settings)) {
+			throw new Error("expected video track")
+		}
 
 		this.#encoderConfig = {
 			codec: config.codec,
-			framerate: settings.frameRate ?? 30,
-			width: settings.width ?? 1280,
-			height: settings.height ?? 720,
+			framerate: settings.frameRate,
+			width: settings.width,
+			height: settings.height,
 			bitrate: config.bitrate,
 			bitrateMode: "constant", // TODO configurable
 			latencyMode: "realtime", // TODO configurable
@@ -126,4 +129,22 @@ export class Encoder {
 	get config() {
 		return this.#encoderConfig
 	}
+}
+
+// MediaTrackSettings can represent both audio and video, which means a LOT of possibly undefined properties.
+// This is a fork of the MediaTrackSettings interface with properties required for video.
+interface VideoTrackSettings {
+	deviceId: string
+	groupId: string
+
+	aspectRatio: number
+	facingMode: "user" | "environment" | "left" | "right"
+	frameRate: number
+	height: number
+	resizeMode: "none" | "crop-and-scale"
+	width: number
+}
+
+function isVideoTrackSettings(settings: MediaTrackSettings): settings is VideoTrackSettings {
+	return "width" in settings
 }

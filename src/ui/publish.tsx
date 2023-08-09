@@ -54,15 +54,16 @@ interface VideoCodec {
 const VIDEO_CODEC_UNDEF: VideoCodec = { name: "", profile: "", value: "" }
 
 const VIDEO_CONSTRAINTS = {
-	height: [480, 720, 1080, 1440],
+	height: [240, 360, 480, 720, 1080],
 	fps: [15, 30, 60],
 	bitrate: { min: 500_000, max: 4_000_000 },
 }
 
+// We have to pay for bandwidth so we're cheap and default to 480p
 const VIDEO_DEFAULT: VideoConfig = {
-	height: 720,
+	height: 480,
 	fps: 30,
-	bitrate: 2_000_000,
+	bitrate: 1_500_000,
 	codec: "",
 }
 
@@ -144,16 +145,16 @@ export function Setup(props: {
 	const [loading, setLoading] = createSignal(false)
 
 	const [broadcast] = createResource(loading, async () => {
+		const width = Math.ceil((video.height * 16) / 9)
+
 		const media = await window.navigator.mediaDevices.getUserMedia({
-			/*
 			audio: {
 				sampleRate: { ideal: audio.sampleRate },
-				channelCount: { ideal: 2 },
+				channelCount: { max: 2, ideal: 2 },
 			},
-			*/
-			audio: false,
 			video: {
-				aspectRatio: { ideal: 16 / 9, max: 16 / 9 },
+				aspectRatio: { ideal: 16 / 9 },
+				width: { ideal: width, max: width },
 				height: { ideal: video.height, max: video.height },
 				frameRate: { ideal: video.fps, max: video.fps },
 			},
@@ -204,13 +205,12 @@ export function Setup(props: {
 		setAdvanced(!advanced())
 	}
 
+	// We pass advanced to each component instead of hiding them so they can compute the config.
 	return (
 		<form class="grid grid-cols-3 items-center justify-center gap-x-4 gap-y-2 text-sm text-gray-900">
-			<div classList={{ hidden: !advanced() }}>
-				<Name name={name()} setName={setName} />
-				<Video config={video} setConfig={setVideo} />
-				<Audio config={audio} setConfig={setAudio} />
-			</div>
+			<General name={name()} setName={setName} advanced={advanced()} />
+			<Video config={video} setConfig={setVideo} advanced={advanced()} />
+			<Audio config={audio} setConfig={setAudio} advanced={advanced()} />
 
 			<button
 				class="transition-color col-start-2 mt-3 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm duration-1000 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -239,10 +239,10 @@ export function Setup(props: {
 	)
 }
 
-function Name(props: { name: string; setName(name: string): void }) {
+function General(props: { name: string; setName(name: string): void; advanced: boolean }) {
 	return (
-		<>
-			<div class="col-span-3 mt-3 border-b-2 border-gray-700/10 pl-3 text-lg">Settings</div>
+		<Show when={props.advanced}>
+			<div class="col-span-3 mt-3 border-b-2 border-gray-700/10 pl-3 text-lg">General</div>
 			<label for="name" class="col-start-1 block font-medium">
 				Name
 			</label>
@@ -257,11 +257,11 @@ function Name(props: { name: string; setName(name: string): void }) {
 					onInput={(e) => props.setName(e.target.value)}
 				/>
 			</div>
-		</>
+		</Show>
 	)
 }
 
-function Video(props: { config: Store<VideoConfig>; setConfig: SetStoreFunction<VideoConfig> }) {
+function Video(props: { config: Store<VideoConfig>; setConfig: SetStoreFunction<VideoConfig>; advanced: boolean }) {
 	const [codec, setCodec] = createStore<VideoCodec>(VIDEO_CODEC_UNDEF)
 
 	// Fetch the list of supported codecs.
@@ -334,7 +334,7 @@ function Video(props: { config: Store<VideoConfig>; setConfig: SetStoreFunction<
 	})
 
 	return (
-		<>
+		<Show when={props.advanced}>
 			<div class="col-span-3 mt-3 border-b-2 border-gray-700/10 pl-3 text-lg ">Video</div>
 			<label class="col-start-1 font-medium leading-6">Codec</label>
 			<select
@@ -409,13 +409,13 @@ function Video(props: { config: Store<VideoConfig>; setConfig: SetStoreFunction<
 				onInput={(e) => props.setConfig({ bitrate: parseInt(e.target.value) })}
 			/>
 			<span class="text-xs leading-6">{Math.floor(props.config.bitrate / 1000)} Kb/s</span>
-		</>
+		</Show>
 	)
 }
 
-function Audio(props: { config: Store<AudioConfig>; setConfig: SetStoreFunction<AudioConfig> }) {
+function Audio(props: { config: Store<AudioConfig>; setConfig: SetStoreFunction<AudioConfig>; advanced: boolean }) {
 	return (
-		<>
+		<Show when={props.advanced}>
 			<div class="col-span-3 mt-3 border-b-2 border-gray-700/10 pl-3 text-lg">Audio</div>
 			<label for="codec" class="col-start-1 font-medium leading-6">
 				Codec
@@ -463,6 +463,6 @@ function Audio(props: { config: Store<AudioConfig>; setConfig: SetStoreFunction<
 				onInput={(e) => props.setConfig({ bitrate: parseInt(e.target.value) })}
 			/>
 			<span class="text-left text-xs">{Math.floor(props.config.bitrate / 1000)} Kb/s</span>
-		</>
+		</Show>
 	)
 }

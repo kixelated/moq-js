@@ -23,12 +23,11 @@ export class Announced {
 
 export class Broadcast {
 	#announce: AnnounceRecv
-
-	catalog: Promise<Catalog>
+	#catalog: Promise<Catalog>
 
 	constructor(announce: AnnounceRecv) {
 		this.#announce = announce
-		this.catalog = this.#fetch()
+		this.#catalog = this.#fetch()
 	}
 
 	async #fetch(): Promise<Catalog> {
@@ -63,6 +62,10 @@ export class Broadcast {
 
 	get name() {
 		return this.#announce.namespace
+	}
+
+	get catalog(): Promise<Catalog> {
+		return this.#catalog
 	}
 
 	async subscribe(name: string) {

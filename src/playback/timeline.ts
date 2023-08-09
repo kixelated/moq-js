@@ -72,7 +72,6 @@ export class Component {
 			const { value, done } = res
 
 			if (done) {
-				console.log("done reading segment")
 				// We assume the current segment has been closed
 				// TODO support the segments stream closing
 				this.#current = undefined

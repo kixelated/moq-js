@@ -10,7 +10,7 @@ export function Main(props: { player: Player; setError(e: Error): void; setPlaye
 	let canvas: HTMLCanvasElement
 
 	onMount(() => {
-		props.player.render(canvas)
+		props.player.attach(canvas)
 		props.player.play()
 	})
 
@@ -24,11 +24,9 @@ export function Main(props: { player: Player; setError(e: Error): void; setPlaye
 		}
 	})
 
-	return (
-		<>
-			<canvas ref={canvas!} class="aspect-video bg-black"></canvas>
-		</>
-	)
+	// NOTE: The canvas automatically has width/height set to the decoded video size.
+	// TODO shrink it if needed via CSS
+	return <canvas ref={canvas!} class="bg-black"></canvas>
 }
 
 export function Setup(props: { connection: Connection; setPlayer(v: Player): void; setError(e: Error): void }) {

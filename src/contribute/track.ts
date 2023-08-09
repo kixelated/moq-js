@@ -65,8 +65,6 @@ export class Track {
 			const segment = new Segment(this.#offset + this.#segments.length)
 			this.#segments.push(segment)
 
-			console.log("pushed new segment", segment)
-
 			this.#notify.wake()
 
 			current = segment
