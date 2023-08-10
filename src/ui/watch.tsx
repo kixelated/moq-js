@@ -1,17 +1,17 @@
 import { Connection } from "../transport/connection"
 import { Player } from "../playback/player"
-import { Broadcast, Announced } from "../playback/announced"
-import { Track } from "../common/catalog"
+import { Broadcast, Broadcasts } from "../playback/broadcast"
+import { Track, isAudioTrack, isVideoTrack } from "../common/catalog"
 import { asError } from "../common/error"
 
-import { createSignal, onMount, Switch, Match, For, createEffect } from "solid-js"
+import { createSignal, onMount, For, createEffect, Show } from "solid-js"
 
 export function Main(props: { player: Player; setError(e: Error): void; setPlayer(): void }) {
 	let canvas: HTMLCanvasElement
 
 	onMount(() => {
 		props.player.attach(canvas)
-		props.player.play()
+		//props.player.play()
 	})
 
 	createEffect(async () => {
@@ -31,7 +31,7 @@ export function Main(props: { player: Player; setError(e: Error): void; setPlaye
 
 export function Setup(props: { connection: Connection; setPlayer(v: Player): void; setError(e: Error): void }) {
 	// Create an object that we'll use to list all of the broadcasts
-	const announced = new Announced(props.connection)
+	const announced = new Broadcasts(props.connection)
 
 	const [broadcast, setBroadcast] = createSignal<Broadcast | undefined>()
 	const [broadcasts, setBroadcasts] = createSignal<Broadcast[]>([])
@@ -39,9 +39,7 @@ export function Setup(props: { connection: Connection; setPlayer(v: Player): voi
 	createEffect(async () => {
 		try {
 			for (;;) {
-				const broadcast = await announced.broadcast()
-				if (!broadcast) break
-
+				const broadcast = await announced.next()
 				setBroadcasts((prev) => prev.concat(broadcast))
 			}
 		} catch (e) {
@@ -76,45 +74,25 @@ export function Setup(props: { connection: Connection; setPlayer(v: Player): voi
 }
 
 function Available(props: { broadcast: Broadcast; select: () => void }) {
-	const name = props.broadcast.name.replace(/\//, " / ")
-
-	const [tracks, setTracks] = createSignal<Track[]>([])
-	const [error, setError] = createSignal<Error | undefined>()
-
-	createEffect(async () => {
-		try {
-			const catalog = await props.broadcast.catalog
-			setTracks(catalog.tracks)
-		} catch (e) {
-			setError(asError(e))
-		}
-	})
-
 	// A function because Match doesn't work with Typescript type guards
 	const trackInfo = (track: Track) => {
-		// TODO put more information in the catalog
-		return `${track.kind}: ${track.codec}`
-
-		/*
-		if (MP4.isVideoTrack(track)) {
+		if (isVideoTrack(track)) {
 			return (
 				<>
-					video: {track.codec} {track.video.width}x{track.video.height}
-					<Show when={track.bitrate}> {track.bitrate} b/s</Show>
+					video: {track.codec} {track.width}x{track.height}
+					<Show when={track.bit_rate}> {track.bit_rate} b/s</Show>
 				</>
 			)
-		} else if (MP4.isAudioTrack(track)) {
+		} else if (isAudioTrack(track)) {
 			return (
 				<>
-					audio: {track.codec} {track.audio.sample_rate}Hz {track.audio.channel_count}.0
-					<Show when={track.bitrate}> {track.bitrate} b/s</Show>
-					<Show when={track.language !== "und"}> {track.language}</Show>
+					audio: {track.codec} {track.sample_rate}Hz {track.channel_count}ch
+					<Show when={track.bit_rate}> {track.bit_rate} b/s</Show>
 				</>
 			)
 		} else {
 			return "unknown track type"
 		}
-		*/
 	}
 
 	const watch = (e: MouseEvent) => {
@@ -124,23 +102,13 @@ function Available(props: { broadcast: Broadcast; select: () => void }) {
 
 	return (
 		<>
-			<a onClick={watch}>{name}</a>
+			<a onClick={watch}>{props.broadcast.name.replace(/\//, " / ")}</a>
 			<div class="ml-4 text-xs italic text-gray-700">
-				<Switch>
-					<Match when={error()}>
-						<p class="text-red-500">{error()!.message}</p>
-					</Match>
-					<Match when={tracks()}>
-						<For each={tracks()}>
-							{(track) => {
-								return <div>{trackInfo(track)}</div>
-							}}
-						</For>
-					</Match>
-					<Match when={true}>
-						<p>loading...</p>
-					</Match>
-				</Switch>
+				<For each={props.broadcast.catalog.tracks}>
+					{(track) => {
+						return <div>{trackInfo(track)}</div>
+					}}
+				</For>
 			</div>
 		</>
 	)

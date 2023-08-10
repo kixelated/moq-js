@@ -1,12 +1,12 @@
 import * as Audio from "./audio"
 import * as Message from "./message"
-import { Broadcast } from "./announced"
+import { Broadcast } from "./broadcast"
 import { Port } from "./port"
 
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
 import { RingShared } from "../common/ring"
-import { isTrackMp4, TrackMp4 } from "../common/catalog"
+import { isAudioTrack, isMp4Track, Mp4Track } from "../common/catalog"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
@@ -30,13 +30,11 @@ export class Player {
 	}
 
 	async run() {
-		const catalog = await this.#broadcast.catalog
-
 		const inits = new Set<string>()
-		const tracks = new Array<TrackMp4>()
+		const tracks = new Array<Mp4Track>()
 
-		for (const track of catalog.tracks) {
-			if (!isTrackMp4(track)) {
+		for (const track of this.#broadcast.catalog.tracks) {
+			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
 			}
 
@@ -71,7 +69,7 @@ export class Player {
 		}
 	}
 
-	async #runTrack(track: TrackMp4) {
+	async #runTrack(track: Mp4Track) {
 		if (track.kind !== "audio" && track.kind !== "video") {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
@@ -100,20 +98,39 @@ export class Player {
 
 	// Attach to the given canvas element
 	attach(canvas: HTMLCanvasElement) {
-		// TODO refactor audio and video configuation
-		const config = {
-			audio: {
-				channels: 2,
-				sampleRate: 44100,
-				ring: new RingShared(2, 4410), // 100ms
-			},
-			video: {
-				canvas: canvas.transferControlToOffscreen(),
-			},
+		let sampleRate: number | undefined
+		let channels: number | undefined
+
+		for (const track of this.#broadcast.catalog.tracks) {
+			if (!isAudioTrack(track)) continue
+
+			if (sampleRate && track.sample_rate !== sampleRate) {
+				throw new Error(`TODO multiple audio tracks with different sample rates`)
+			}
+
+			sampleRate = track.sample_rate
+			channels = Math.max(track.channel_count, channels ?? 0)
+		}
+
+		const config: Message.Config = {}
+
+		// Only configure audio is we have an audio track
+		if (sampleRate && channels) {
+			config.audio = {
+				channels: channels,
+				sampleRate: sampleRate,
+				ring: new RingShared(2, sampleRate / 20), // 50ms
+			}
+
+			this.#context = new Audio.Context(config.audio)
+		}
+
+		// TODO only send the canvas if we have a video track
+		config.video = {
+			canvas: canvas.transferControlToOffscreen(),
 		}
 
 		this.#port.sendConfig(config) // send to the worker
-		this.#context = new Audio.Context(config.audio)
 	}
 
 	#onMessage(msg: Message.FromWorker) {
@@ -126,6 +143,7 @@ export class Player {
 		// TODO
 	}
 
+	/*
 	play() {
 		this.#port.sendPlay({ minBuffer: 0.5 }) // TODO configurable
 	}
@@ -133,6 +151,7 @@ export class Player {
 	seek(timestamp: number) {
 		this.#port.sendSeek({ timestamp })
 	}
+	*/
 
 	async *timeline() {
 		for (;;) {

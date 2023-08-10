@@ -1,3 +1,5 @@
+import { isVideoTrackSettings } from "../common/track"
+
 export const EncoderCodecs = [
 	"avc1", // H.264
 	"hev1", // HEVC (aka h.265)
@@ -129,22 +131,4 @@ export class Encoder {
 	get config() {
 		return this.#encoderConfig
 	}
-}
-
-// MediaTrackSettings can represent both audio and video, which means a LOT of possibly undefined properties.
-// This is a fork of the MediaTrackSettings interface with properties required for video.
-interface VideoTrackSettings {
-	deviceId: string
-	groupId: string
-
-	aspectRatio: number
-	facingMode: "user" | "environment" | "left" | "right"
-	frameRate: number
-	height: number
-	resizeMode: "none" | "crop-and-scale"
-	width: number
-}
-
-function isVideoTrackSettings(settings: MediaTrackSettings): settings is VideoTrackSettings {
-	return "width" in settings
 }

@@ -3,10 +3,11 @@ import { SubscribeRecv } from "../transport/subscribe"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
-import { Catalog, TrackMp4 } from "../common/catalog"
+import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../common/catalog"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
+import { isAudioTrackSettings, isVideoTrackSettings } from "../common/track"
 
 export interface BroadcastConfig {
 	conn: Connection
@@ -41,13 +42,44 @@ export class Broadcast {
 			const track = new Track(media, config)
 			this.#tracks.set(track.name, track)
 
-			const catalog: TrackMp4 = {
+			const settings = media.getSettings()
+
+			let catalog: CatalogTrack
+
+			const mp4Catalog: Mp4Track = {
 				container: "mp4",
-				kind: media.kind,
 				namespace: config.name,
-				codec: track.config.codec,
+				kind: media.kind,
 				init: `${track.name}.mp4`,
 				data: `${track.name}.m4s`,
+			}
+
+			if (isVideoTrackSettings(settings)) {
+				const videoCatalog: VideoTrack = {
+					...mp4Catalog,
+					kind: "video",
+					codec: track.config.codec,
+					width: settings.width,
+					height: settings.height,
+					frame_rate: settings.frameRate,
+					bit_rate: config.video.bitrate,
+				}
+
+				catalog = videoCatalog
+			} else if (isAudioTrackSettings(settings)) {
+				const audioCatalog: AudioTrack = {
+					...mp4Catalog,
+					kind: "audio",
+					codec: track.config.codec,
+					sample_rate: settings.sampleRate,
+					sample_size: settings.sampleSize,
+					channel_count: settings.channelCount,
+					bit_rate: config.audio.bitrate,
+				}
+
+				catalog = audioCatalog
+			} else {
+				throw new Error(`unknown track type: ${media.kind}`)
 			}
 
 			this.#catalog.tracks.push(catalog)

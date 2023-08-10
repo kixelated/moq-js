@@ -1,3 +1,5 @@
+import { isAudioTrackSettings } from "../common/track"
+
 export const EncoderCodecs = [
 	"mp4a.40.2", // AAC
 ]
@@ -94,22 +96,4 @@ export class Encoder {
 	get config() {
 		return this.#encoderConfig
 	}
-}
-
-// MediaTrackSettings can represent both audio and video, which means a LOT of possibly undefined properties.
-// This is a fork of the MediaTrackSettings interface with properties required for audio.
-interface AudioTrackSettings {
-	deviceId: string
-	groupId: string
-
-	autoGainControl: boolean
-	channelCount: number
-	echoCancellation: boolean
-	noiseSuppression: boolean
-	sampleRate: number
-	sampleSize: number
-}
-
-function isAudioTrackSettings(settings: MediaTrackSettings): settings is AudioTrackSettings {
-	return "sampleRate" in settings
 }

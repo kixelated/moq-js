@@ -30,7 +30,8 @@ export class Port {
 	}
 
 	sendConfig(config: Message.Config) {
-		this.send({ config }, config.video.canvas)
+		const transfer = config.video ? [config.video.canvas] : []
+		this.send({ config }, ...transfer)
 	}
 
 	sendInit(init: Message.Init) {
@@ -41,6 +42,7 @@ export class Port {
 		this.send({ segment }, segment.stream)
 	}
 
+	/*
 	sendPlay(play: Message.Play) {
 		this.send({ play })
 	}
@@ -48,6 +50,7 @@ export class Port {
 	sendSeek(seek: Message.Seek) {
 		this.send({ seek })
 	}
+	*/
 
 	private on(e: MessageEvent) {
 		const msg = e.data as Message.FromWorker

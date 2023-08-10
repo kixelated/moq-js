@@ -22,33 +22,42 @@ class Worker {
 		const msg = e.data as Message.ToWorker
 
 		if (msg.config) {
-			this.#audio = new Audio.Renderer(msg.config.audio, this.#timeline.audio)
-			this.#video = new Video.Renderer(msg.config.video, this.#timeline.video)
+			this.#onConfig(msg.config)
 		} else if (msg.init) {
 			// TODO buffer the init segmnet so we don't hold the stream open.
-			this.onInit(msg.init)
+			this.#onInit(msg.init)
 		} else if (msg.segment) {
 			const segment = msg.segment
-			this.onSegment(segment).catch(async (e) => {
-				const err = asError(e)
-				console.warn("worker error:", err)
-
+			this.#onSegment(segment).catch(async (e) => {
 				// Cancel the stream so we don't hold it open.
+				const err = asError(e)
 				await segment.stream.cancel(err)
+
+				throw e
 			})
 		} else {
 			throw new Error(`unknown message: + ${JSON.stringify(msg)}`)
 		}
 	}
 
-	onInit(msg: Message.Init) {
+	#onConfig(msg: Message.Config) {
+		if (msg.audio) {
+			this.#audio = new Audio.Renderer(msg.audio, this.#timeline.audio)
+		}
+
+		if (msg.video) {
+			this.#video = new Video.Renderer(msg.video, this.#timeline.video)
+		}
+	}
+
+	#onInit(msg: Message.Init) {
 		// NOTE: We don't buffer the init segments because I'm lazy.
 		// Instead, we fork the reader on each segment so it gets a copy of the data.
 		// This is mostly done because I'm lazy and don't want to create a promise.
 		this.#inits.set(msg.name, msg.stream)
 	}
 
-	async onSegment(msg: Message.Segment) {
+	async #onSegment(msg: Message.Segment) {
 		const init = this.#inits.get(msg.init)
 		if (!init) throw new Error(`unknown init track: ${msg.init}`)
 
@@ -84,11 +93,11 @@ self.addEventListener("message", (msg) => {
 		worker.on(msg)
 	} catch (e) {
 		const err = asError(e)
-		send({ fail: { err } })
+		console.warn("worker error:", err)
 	}
 })
 
 // Validates this is an expected message
-function send(msg: Message.FromWorker) {
+function _send(msg: Message.FromWorker) {
 	postMessage(msg)
 }

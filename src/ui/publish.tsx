@@ -27,13 +27,13 @@ interface AudioConfig {
 }
 
 const AUDIO_CONSTRAINTS = {
-	sampleRate: [44100],
+	sampleRate: [44100, 48000],
 	bitrate: { min: 64_000, max: 256_000 },
 	codec: AudioCodecs,
 }
 
 const AUDIO_DEFAULT = {
-	sampleRate: 44100,
+	sampleRate: 48000,
 	bitrate: 128_000,
 	codec: AudioCodecs[0],
 }

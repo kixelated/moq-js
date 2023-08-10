@@ -221,7 +221,7 @@ export class SubscribeSend {
 	async #close(err: Error) {
 		if (this.closed()) return
 
-		this.#data.close()
+		await this.#data.close()
 
 		for (;;) {
 			const sub = await this.#data.next()

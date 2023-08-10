@@ -2,8 +2,8 @@ import { Header } from "../transport/object"
 import { RingShared } from "../common/ring"
 
 export interface Config {
-	audio: ConfigAudio
-	video: ConfigVideo
+	audio?: ConfigAudio
+	video?: ConfigVideo
 }
 
 export interface ConfigAudio {
@@ -29,6 +29,7 @@ export interface Segment {
 	stream: ReadableStream<Uint8Array>
 }
 
+/*
 export interface Play {
 	// Start playback once the minimum buffer size has been reached.
 	minBuffer: number
@@ -37,6 +38,7 @@ export interface Play {
 export interface Seek {
 	timestamp: number
 }
+*/
 
 // Sent periodically with the current timeline info.
 export interface Timeline {
@@ -74,17 +76,17 @@ export interface ToWorker {
 	init?: Init
 	segment?: Segment
 
+	/*
 	// Sent to control playback
 	play?: Play
 	seek?: Seek
+	*/
 }
 
 // Any top-level messages that can be sent from the worker.
 export interface FromWorker {
 	// Sent back to the main thread regularly to update the UI
 	timeline?: Timeline
-
-	fail?: Fail
 }
 
 /*
@@ -93,7 +95,3 @@ interface ToWorklet {
 }
 
 */
-
-export interface Fail {
-	err: Error
-}

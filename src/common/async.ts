@@ -100,8 +100,12 @@ export class Queue<T> {
 		return value
 	}
 
-	close() {
-		this.#writer.close()
+	async abort(err: Error) {
+		return this.#writer.abort(err)
+	}
+
+	async close() {
+		return this.#writer.close()
 	}
 }
 
