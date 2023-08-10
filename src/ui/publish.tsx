@@ -130,7 +130,7 @@ export function Main(props: { broadcast: Broadcast; setBroadcast(): void; setErr
 		}
 	})
 
-	return <video ref={preview!} class="aspect-video" autoplay muted></video>
+	return <video ref={preview!} autoplay muted></video>
 }
 
 export function Setup(props: {
