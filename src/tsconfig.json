@@ -1,5 +1,7 @@
 {
-	"files": [], // don't build anything with these settings.
+	"include": [
+		"."
+	],
 	"compilerOptions": {
 		"target": "es2022",
 		"module": "es2022",
@@ -12,7 +14,12 @@
 		"declarationMap": true,
 		"sourceMap": true,
 		"isolatedModules": true,
-		"types": [], // Don't automatically import any @types modules.
+		"types": [
+			"web",
+			"dom-mediacapture-transform",
+			"dom-webcodecs",
+			"mp4box",
+		],
 		"lib": [
 			"es2022",
 		],
@@ -22,21 +29,4 @@
 			"../node_modules/@parcel/types",
 		]
 	},
-	"references": [
-		{
-			"path": "./common"
-		},
-		{
-			"path": "./playback"
-		},
-		{
-			"path": "./contribute"
-		},
-		{
-			"path": "./worklet"
-		},
-		{
-			"path": "./transport"
-		}
-	]
 }

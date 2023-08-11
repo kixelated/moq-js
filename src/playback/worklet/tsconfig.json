@@ -1,5 +1,5 @@
 {
-	"extends": "../tsconfig.json",
+	"extends": "../../tsconfig.json",
 	"include": [
 		"."
 	],
@@ -11,9 +11,4 @@
 			"audioworklet",
 		]
 	},
-	"references": [
-		{
-			"path": "../common"
-		},
-	]
 }

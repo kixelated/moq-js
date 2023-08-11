@@ -5,7 +5,7 @@ import * as Video from "./video"
 
 import { Container } from "./container"
 import * as Message from "./message"
-import { asError } from "../common/error"
+import { asError } from "../../common/error"
 
 class Worker {
 	// Timeline receives samples, buffering them and choosing the timestamp to render.

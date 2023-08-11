@@ -1,4 +1,4 @@
-import * as MP4 from "../common/mp4"
+import * as MP4 from "../../common/mp4"
 
 export interface Range {
 	start: number

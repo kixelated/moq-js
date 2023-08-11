@@ -3,45 +3,39 @@
 	"version": "0.0.1",
 	"description": "Media over QUIC library",
 	"license": "(MIT OR Apache-2.0)",
-	"source": "src/ui/index.html",
+	"source": "src/index.ts",
+	"main": "dist/main.js",
+	"module": "dist/module.js",
+	"types": "dist/types.d.ts",
 	"scripts": {
-		"serve": "parcel serve --https --cert cert/localhost.crt --key cert/localhost.key  --port 4444 --open",
 		"build": "parcel build",
 		"lint": "eslint .",
 		"test": "tsc -b src",
 		"fmt": "prettier --write .",
-		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1",
 		"clean": "rm -r ./.parcel-cache/ ./dist/"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.12.0",
+		"@parcel/packager-ts": "2.9.3",
 		"@parcel/transformer-inline-string": "^2.9.2",
 		"@parcel/transformer-typescript-tsc": "^2.9.3",
 		"@parcel/transformer-typescript-types": "^2.9.2",
 		"@parcel/validator-typescript": "^2.9.2",
-		"@tailwindcss/forms": "^0.5.3",
 		"@types/audioworklet": "^0.0.48",
 		"@types/dom-mediacapture-transform": "^0.1.6",
 		"@types/dom-webcodecs": "^0.1.8",
+		"@types/parcel-bundler": "^1.12.5",
 		"@types/web": "^0.0.103",
 		"@typescript-eslint/eslint-plugin": "^5.60.1",
 		"@typescript-eslint/parser": "^5.61.0",
-		"autoprefixer": "^10.4.14",
-		"babel-preset-solid": "^1.7.7",
 		"eslint": "^8.43.0",
 		"eslint-config-prettier": "^8.8.0",
 		"eslint-plugin-prettier": "^4.2.1",
 		"parcel": "^2.9.2",
-		"postcss": "^8.4.24",
 		"prettier": "^2.8.8",
-		"prettier-plugin-tailwindcss": "^0.3.0",
 		"process": "^0.11.10",
-		"tailwindcss": "^3.3.2",
 		"typescript": "^5.1.6"
 	},
 	"dependencies": {
-		"@types/parcel-bundler": "^1.12.5",
-		"mp4box": "^0.5.2",
-		"solid-js": "^1.7.7"
+		"mp4box": "^0.5.2"
 	}
 }

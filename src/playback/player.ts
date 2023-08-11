@@ -1,11 +1,11 @@
-import * as Audio from "./audio"
-import * as Message from "./message"
+import * as Message from "./worker/message"
 import { Broadcast } from "./broadcast"
 import { Port } from "./port"
 
+import { Context } from "./context"
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
-import { RingShared } from "../common/ring"
+import { RingShared } from "./worklet/ring"
 import { isAudioTrack, isMp4Track, Mp4Track } from "../common/catalog"
 
 export type Range = Message.Range
@@ -18,7 +18,7 @@ export class Player {
 	#broadcast: Broadcast
 
 	// The audio context, which must be created on the main thread.
-	#context?: Audio.Context
+	#context?: Context
 
 	// A periodically updated timeline
 	#timeline = new Watch<Timeline | undefined>(undefined)
@@ -122,7 +122,7 @@ export class Player {
 				ring: new RingShared(2, sampleRate / 20), // 50ms
 			}
 
-			this.#context = new Audio.Context(config.audio)
+			this.#context = new Context(config.audio)
 		}
 
 		// TODO only send the canvas if we have a video track

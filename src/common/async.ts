@@ -108,38 +108,3 @@ export class Queue<T> {
 		return this.#writer.close()
 	}
 }
-
-/* NOTE: Replaced by ReadableStream
-// A list of values that can be iterated over asynchronously
-export class List<T> {
-	#queue = new Queue<T>()
-	#skip = 0
-
-	async *get() {
-		let index = 0
-		for (;;) {
-			index = Math.max(0, index - this.#skip)
-
-			const [current, next] = this.#queue.value()
-			for (const v of current.slice(index)) yield v
-			if (!next) return
-
-			index = this.#skip + current.length
-			await next
-		}
-	}
-
-	push(v: T) {
-		this.#queue.push(v)
-	}
-
-	shift() {
-		this.#skip += 1
-		return this.#queue.shift()
-	}
-
-	close() {
-		this.#queue.close()
-	}
-}
-*/
