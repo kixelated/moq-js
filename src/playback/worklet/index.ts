@@ -1,4 +1,4 @@
-import { Ring } from "./ring"
+import { Ring } from "../../common/ring"
 import * as Message from "./message"
 
 class Renderer extends AudioWorkletProcessor {

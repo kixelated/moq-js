@@ -1,5 +1,5 @@
 import { Header } from "../../transport/object"
-import { RingShared } from "../worklet/ring"
+import { RingShared } from "../../common/ring"
 
 export interface Config {
 	audio?: ConfigAudio

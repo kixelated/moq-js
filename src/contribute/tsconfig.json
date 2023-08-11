@@ -1,0 +1,21 @@
+{
+	"extends": "../tsconfig.json",
+	"include": [
+		"."
+	],
+	"compilerOptions": {
+		"types": [
+			"dom-mediacapture-transform",
+			"dom-webcodecs",
+			"web"
+		]
+	},
+	"references": [
+		{
+			"path": "../common"
+		},
+		{
+			"path": "../transport"
+		},
+	]
+}

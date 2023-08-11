@@ -11,4 +11,9 @@
 			"audioworklet",
 		]
 	},
+	"references": [
+		{
+			"path": "../../common"
+		},
+	]
 }

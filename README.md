@@ -8,38 +8,21 @@ It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
 
 ## Setup
 
-### Node
-
-Install node dependencies using [yarn](https://yarnpkg.com/) (or `npm` if you prefer).
+Install node dependencies using `npm`:
 
 ```
-yarn install
+npm install
 ```
 
-### Certificates
-
-Use [mkcert](https://github.com/FiloSottile/mkcert) to generate a self-signed certificate.
-This is merely for convinence to avoid TLS errors when using parcel.
+## Bulding
 
 ```
-yarn cert
+npm run build
 ```
-
-## Usage
-
-Host a simple demo on `https://localhost:4444`.
-
-```
-yarn serve
-```
-
-This a requires a [MoQ server](https://github.com/kixelated/moq-rs) running on `https://localhost:4443`.
 
 ## License
 
-Licensed under either of
+Licensed under either:
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
+-   Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+-   MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)

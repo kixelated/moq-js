@@ -1,0 +1,12 @@
+{
+	"extends": "../tsconfig.json",
+	"include": [
+		"."
+	],
+	"compilerOptions": {
+		"types": [
+			"mp4box",
+			"web"
+		],
+	},
+}

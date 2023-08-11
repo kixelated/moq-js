@@ -5,7 +5,7 @@ import { Port } from "./port"
 import { Context } from "./context"
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
-import { RingShared } from "./worklet/ring"
+import { RingShared } from "../common/ring"
 import { isAudioTrack, isMp4Track, Mp4Track } from "../common/catalog"
 
 export type Range = Message.Range

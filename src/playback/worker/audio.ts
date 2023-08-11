@@ -1,5 +1,5 @@
 import * as Message from "./message"
-import { Ring } from "../worklet/ring"
+import { Ring } from "../../common/ring"
 import { Component, Frame } from "./timeline"
 import * as MP4 from "../../common/mp4"
 

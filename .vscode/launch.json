@@ -6,10 +6,7 @@
 			"request": "launch",
 			"name": "Launch Chrome against localhost",
 			"url": "https://localhost:4444",
-			"webRoot": "${workspaceFolder}",
-			"sourceMapPathOverrides": {
-				"/__parcel_source_root/*": "${webRoot}/*"
-			}
+			"webRoot": "${workspaceFolder}"
 		}
 	]
 }
