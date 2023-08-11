@@ -1,6 +1,7 @@
 import * as Message from "./message"
 import { Ring } from "../common/ring"
-import { Component } from "./timeline"
+import { Component, Frame } from "./timeline"
+import * as MP4 from "../common/mp4"
 
 // NOTE: This must be on the main thread
 export class Context {
@@ -8,6 +9,7 @@ export class Context {
 	worklet: Promise<AudioWorkletNode>
 
 	constructor(config: Message.ConfigAudio) {
+		console.log("renderer sample rate", config.sampleRate)
 		this.context = new AudioContext({
 			latencyHint: "interactive",
 			sampleRate: config.sampleRate,
@@ -52,68 +54,71 @@ export class Context {
 
 // This is run in a worker.
 export class Renderer {
-	ring?: Ring
-	timeline: Component
+	#ring: Ring
+	#timeline: Component
 
-	queue: AudioData[]
-	interval?: number
-	last?: number // the timestamp of the last rendered frame, in microseconds
+	#decoder!: AudioDecoder
+	#stream: TransformStream<Frame, AudioData>
 
 	constructor(config: Message.ConfigAudio, timeline: Component) {
-		this.timeline = timeline
-		this.queue = []
+		this.#timeline = timeline
+		this.#ring = new Ring(config.ring)
+
+		this.#stream = new TransformStream({
+			start: this.#start.bind(this),
+			transform: this.#transform.bind(this),
+		})
+
+		this.#run().catch(console.error)
 	}
 
-	render(frame: AudioData) {
-		// Drop any old frames
-		if (this.last && frame.timestamp <= this.last) {
-			frame.close()
-			return
-		}
-
-		// Insert the frame into the queue sorted by timestamp.
-		if (this.queue.length > 0 && this.queue[this.queue.length - 1].timestamp <= frame.timestamp) {
-			// Fast path because we normally append to the end.
-			this.queue.push(frame)
-		} else {
-			// Do a full binary search
-			let low = 0
-			let high = this.queue.length
-
-			while (low < high) {
-				const mid = (low + high) >>> 1
-				if (this.queue[mid].timestamp < frame.timestamp) low = mid + 1
-				else high = mid
-			}
-
-			this.queue.splice(low, 0, frame)
-		}
-
-		this.emit()
+	#start(controller: TransformStreamDefaultController) {
+		this.#decoder = new AudioDecoder({
+			output: (frame: AudioData) => {
+				controller.enqueue(frame)
+			},
+			error: console.warn,
+		})
 	}
 
-	emit() {
-		const ring = this.ring
-		if (!ring) {
-			return
+	#transform(frame: Frame) {
+		if (this.#decoder.state !== "configured") {
+			const track = frame.track
+			if (!MP4.isAudioTrack(track)) throw new Error("expected audio track")
+
+			console.log("decoder sample rate", track.audio.sample_rate)
+
+			// We only support OPUS right now which doesn't need a description.
+			this.#decoder.configure({
+				codec: track.codec,
+				sampleRate: track.audio.sample_rate,
+				numberOfChannels: track.audio.channel_count,
+			})
 		}
 
-		while (this.queue.length) {
-			const frame = this.queue[0]
-			if (ring.size() + frame.numberOfFrames > ring.capacity) {
-				// Buffer is full
-				break
+		const chunk = new EncodedAudioChunk({
+			type: frame.sample.is_sync ? "key" : "delta",
+			timestamp: frame.timestamp,
+			duration: frame.sample.duration,
+			data: frame.sample.data,
+		})
+
+		this.#decoder.decode(chunk)
+	}
+
+	async #run() {
+		const reader = this.#timeline.frames.pipeThrough(this.#stream).getReader()
+
+		for (;;) {
+			const { value: frame, done } = await reader.read()
+			if (done) break
+
+			// Write audio samples to the ring buffer, dropping when there's no space.
+			const written = this.#ring.write(frame)
+
+			if (written < frame.numberOfFrames) {
+				console.warn(`droppped ${frame.numberOfFrames - written} audio samples`)
 			}
-
-			const size = ring.write(frame)
-			if (size < frame.numberOfFrames) {
-				throw new Error("audio buffer is full")
-			}
-
-			this.last = frame.timestamp
-
-			frame.close()
-			this.queue.shift()
 		}
 	}
 }

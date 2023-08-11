@@ -1,105 +1,120 @@
 import * as MP4 from "../common/mp4"
-import { Watch } from "../common/async"
+import { Chunk } from "./chunk"
 
-export interface Catalog {
-	sequence: bigint
-	init: Uint8Array
-}
+type DecoderConfig = AudioDecoderConfig | VideoDecoderConfig
+type EncodedChunk = EncodedAudioChunk | EncodedVideoChunk
 
 export class Container {
 	#mp4: MP4.ISOFile
-	#catalog = new Watch<Catalog | undefined>(undefined)
+	#frame?: EncodedAudioChunk | EncodedVideoChunk // 1 frame buffer
+	#track?: number
+	#segment = 0
+
+	encode: TransformStream<DecoderConfig | EncodedChunk, Chunk>
 
 	constructor() {
 		this.#mp4 = new MP4.ISOFile()
 		this.#mp4.init()
-	}
 
-	async catalog() {
-		for (;;) {
-			const [catalog, next] = this.#catalog.value()
-			if (catalog) return catalog
-			if (!next) return
-
-			await next
-		}
-	}
-
-	add(track: MP4.TrackOptions): ContainerTrack {
-		const id = this.#mp4.addTrack(track)
-		const trak = this.#mp4.getTrackById(id)
-		if (!trak) throw new Error("failed to get newly created track")
-
-		const container = new ContainerTrack(this.#mp4, id)
-
-		const buffer = MP4.ISOFile.writeInitializationSegment(this.#mp4.ftyp!, this.#mp4.moov!, 0, 0)
-		const init = new Uint8Array(buffer)
-
-		const [catalog] = this.#catalog.value()
-		const sequence = (catalog?.sequence ?? -1n) + 1n
-		this.#catalog.update({ sequence, init })
-
-		return container
-	}
-}
-
-export interface Fragment {
-	segment: number // incremented on each keyframe
-	data: Uint8Array
-}
-
-export class ContainerTrack {
-	readonly id: number
-
-	#mp4: MP4.ISOFile
-	//#trak: MP4.Trak
-	//#samples = 0
-
-	#segment = 0
-
-	frames: TransformStream<EncodedVideoChunk, Fragment>
-	#frame?: EncodedVideoChunk // 1 frame buffer
-
-	constructor(mp4: MP4.ISOFile, id: number) {
-		this.#mp4 = mp4
-		this.id = id
-
-		this.frames = new TransformStream({
-			transform: this.#transform.bind(this),
-			flush: this.#close.bind(this),
+		this.encode = new TransformStream({
+			transform: (frame, controller) => {
+				if (isDecoderConfig(frame)) {
+					return this.#init(frame, controller)
+				} else {
+					return this.#enqueue(frame, controller)
+				}
+			},
 		})
 	}
 
-	#transform(frame: EncodedVideoChunk, controller: TransformStreamDefaultController<Fragment>) {
+	#init(frame: DecoderConfig, controller: TransformStreamDefaultController<Chunk>) {
+		if (this.#track) throw new Error("duplicate decoder config")
+
+		let codec = frame.codec.substring(0, 4)
+		if (codec == "opus") {
+			codec = "Opus"
+		}
+
+		const options: MP4.TrackOptions = {
+			type: codec,
+			timescale: 1_000_000,
+		}
+
+		if (isVideoConfig(frame)) {
+			options.width = frame.codedWidth
+			options.height = frame.codedHeight
+		} else {
+			options.channel_count = frame.numberOfChannels
+			options.samplerate = frame.sampleRate
+		}
+
+		if (!frame.description) throw new Error("missing frame description")
+		const desc = frame.description as ArrayBufferLike
+
+		if (codec === "avc1") {
+			options.avcDecoderConfigRecord = desc
+		} else if (codec === "hev1") {
+			options.hevcDecoderConfigRecord = desc
+		} else if (codec === "Opus") {
+			// description is an identification header: https://datatracker.ietf.org/doc/html/rfc7845#section-5.1
+			// The first 8 bytes are the magic string "OpusHead", followed by what we actually want.
+			const dops = new MP4.BoxParser.dOpsBox(undefined)
+
+			// Annoyingly, the header is little endian while MP4 is big endian, so we have to parse.
+			const data = new MP4.Stream(desc, 8, MP4.Stream.LITTLE_ENDIAN)
+			dops.parse(data)
+
+			options.description = dops
+		} else {
+			throw new Error(`unsupported codec: ${codec}`)
+		}
+
+		this.#track = this.#mp4.addTrack(options)
+		if (!this.#track) throw new Error("failed to initialize MP4 track")
+
+		const buffer = MP4.ISOFile.writeInitializationSegment(this.#mp4.ftyp!, this.#mp4.moov!, 0, 0)
+		const data = new Uint8Array(buffer)
+
+		controller.enqueue({
+			type: "init",
+			timestamp: 0,
+			duration: 0,
+			data,
+		})
+	}
+
+	#enqueue(frame: EncodedChunk, controller: TransformStreamDefaultController<Chunk>) {
 		// Check if we should create a new segment
-		if (this.#segment > 0 && frame.type == "key") {
+		if (frame.type == "key") {
 			this.#segment += 1
+		} else if (this.#segment == 0) {
+			throw new Error("must start with keyframe")
 		}
 
 		// We need a one frame buffer to compute the duration
-		if (this.#frame) {
-			this.#flush(this.#frame, frame.timestamp - this.#frame.timestamp, controller)
+		if (!this.#frame) {
+			this.#frame = frame
+			return
 		}
 
-		this.#frame = frame
-	}
+		const duration = frame.timestamp - this.#frame.timestamp
 
-	#flush(frame: EncodedVideoChunk, duration: number, controller: TransformStreamDefaultController<Fragment>) {
 		// TODO avoid this extra copy by writing to the mdat directly
 		// ...which means changing mp4box.js to take an offset instead of ArrayBuffer
-		const buffer = new Uint8Array(frame.byteLength)
-		frame.copyTo(buffer)
+		const buffer = new Uint8Array(this.#frame.byteLength)
+		this.#frame.copyTo(buffer)
+
+		if (!this.#track) throw new Error("missing decoder config")
 
 		// Add the sample to the container
-		this.#mp4.addSample(this.id, buffer, {
+		this.#mp4.addSample(this.#track, buffer, {
 			duration,
-			dts: frame.timestamp,
-			cts: frame.timestamp,
-			is_sync: frame.type == "key",
+			dts: this.#frame.timestamp,
+			cts: this.#frame.timestamp,
+			is_sync: this.#frame.type == "key",
 		})
 
-		const stream = new MP4.Stream()
-		stream.endianness = MP4.Stream.BIG_ENDIAN
+		const stream = new MP4.Stream(undefined, 0, MP4.Stream.BIG_ENDIAN)
 
 		// Moof and mdat atoms are written in pairs.
 		// TODO remove the moof/mdat from the Box to reclaim memory once everything works
@@ -115,14 +130,34 @@ export class ContainerTrack {
 			mdat.write(stream)
 		}
 
+		// TODO avoid this extra copy by writing to the buffer provided in copyTo
 		const data = new Uint8Array(stream.buffer)
-		controller.enqueue({ segment: this.#segment, data })
+
+		controller.enqueue({
+			type: this.#frame.type,
+			timestamp: this.#frame.timestamp,
+			duration: this.#frame.duration ?? 0,
+			data,
+		})
+
+		this.#frame = frame
 	}
 
-	#close(controller: TransformStreamDefaultController<Fragment>) {
+	/* TODO flush the last frame
+	#flush(controller: TransformStreamDefaultController<Chunk>) {
 		if (this.#frame) {
 			// TODO guess the duration
-			this.#flush(this.#frame, 0, controller)
+			this.#enqueue(this.#frame, 0, controller)
 		}
 	}
+	*/
+}
+
+function isDecoderConfig(frame: DecoderConfig | EncodedChunk): frame is DecoderConfig {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+	return (frame as DecoderConfig).codec !== undefined
+}
+
+function isVideoConfig(frame: DecoderConfig): frame is VideoDecoderConfig {
+	return (frame as VideoDecoderConfig).codedWidth !== undefined
 }

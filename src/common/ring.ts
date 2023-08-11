@@ -15,6 +15,7 @@ interface FrameCopyToOptions {
 // This is implemented by AudioData in WebCodecs, but we don't import it because it's a DOM type.
 interface Frame {
 	numberOfFrames: number
+	numberOfChannels: number
 	copyTo(dst: Float32Array, options: FrameCopyToOptions): void
 }
 
@@ -79,12 +80,15 @@ export class Ring {
 		for (let i = 0; i < this.channels.length; i += 1) {
 			const channel = this.channels[i]
 
+			// If the AudioData doesn't have enough channels, duplicate it.
+			const planeIndex = Math.min(i, frame.numberOfChannels - 1)
+
 			if (startIndex < endIndex) {
 				// One continuous range to copy.
 				const full = channel.subarray(startIndex, endIndex)
 
 				frame.copyTo(full, {
-					planeIndex: i,
+					planeIndex,
 					frameCount: endIndex - startIndex,
 				})
 			} else {
@@ -92,7 +96,7 @@ export class Ring {
 				const second = channel.subarray(0, endIndex)
 
 				frame.copyTo(first, {
-					planeIndex: i,
+					planeIndex,
 					frameCount: first.length,
 				})
 
@@ -100,7 +104,7 @@ export class Ring {
 				// When capacity=4410 and frameCount=1024, this was happening 52s into the audio.
 				if (second.length) {
 					frame.copyTo(second, {
-						planeIndex: i,
+						planeIndex,
 						frameOffset: first.length,
 						frameCount: second.length,
 					})
@@ -155,6 +159,11 @@ export class Ring {
 		Atomics.store(this.state, STATE.READ_POS, endPos)
 
 		return endPos - startPos
+	}
+
+	clear() {
+		const pos = Atomics.load(this.state, STATE.WRITE_POS)
+		Atomics.store(this.state, STATE.READ_POS, pos)
 	}
 
 	size() {

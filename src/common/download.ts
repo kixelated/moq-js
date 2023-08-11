@@ -1,5 +1,4 @@
 // Utility function to download a Uint8Array for debugging.
-/*
 export function download(data: Uint8Array, name: string) {
 	const blob = new Blob([data], {
 		type: "application/octet-stream",
@@ -17,4 +16,3 @@ export function download(data: Uint8Array, name: string) {
 
 	setTimeout(() => window.URL.revokeObjectURL(url), 1000)
 }
-*/

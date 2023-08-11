@@ -1,43 +1,45 @@
-import { Fragment } from "./container"
+import { Chunk } from "./chunk"
 
 export class Segment {
 	id: number
-	fragments: ReadableStream<Uint8Array>
 
-	constructor(id: number, fragments: ReadableStream<Uint8Array>) {
+	// Take in a stream of chunks
+	input: WritableStream<Chunk>
+
+	// Output a stream of bytes, which we fork for each new subscriber.
+	#cache: ReadableStream<Uint8Array>
+
+	timestamp = 0
+
+	constructor(id: number) {
 		this.id = id
-		this.fragments = fragments
+
+		// Set a max size for each segment, dropping the tail if it gets too long.
+		// We tee the reader, so this limit applies to the FASTEST reader.
+		const backpressure = new ByteLengthQueuingStrategy({ highWaterMark: 8_000_000 })
+
+		const transport = new TransformStream<Chunk, Uint8Array>(
+			{
+				transform: (chunk: Chunk, controller) => {
+					// Compute the max timestamp of the segment
+					this.timestamp = Math.max(chunk.timestamp + chunk.duration)
+
+					// Push the chunk to any listeners.
+					controller.enqueue(chunk.data)
+				},
+			},
+			undefined,
+			backpressure
+		)
+
+		this.input = transport.writable
+		this.#cache = transport.readable
 	}
-}
 
-// Take stream of fragments and return a stream segments (which contain a stream of fragments).
-export function Segmenter(): TransformStream<Fragment, Segment> {
-	let current: WritableStreamDefaultWriter<Uint8Array> | undefined
-	let prev: number | undefined = undefined
-
-	const transformer = new TransformStream<Fragment, Segment>({
-		transform: async (fragment: Fragment, controller: TransformStreamDefaultController<Segment>) => {
-			if (fragment.segment !== prev) {
-				prev = fragment.segment
-
-				if (current) {
-					await current.close()
-				}
-
-				const transformer = new TransformStream()
-				current = transformer.writable.getWriter()
-
-				const segment = new Segment(fragment.segment, transformer.readable)
-				controller.enqueue(segment)
-			}
-
-			if (!current) {
-				throw new Error("stream did not start with a keyframe")
-			}
-
-			await current.write(fragment.data)
-		},
-	})
-
-	return transformer
+	// Split the output reader into two parts.
+	chunks(): ReadableStream<Uint8Array> {
+		const [tee, cache] = this.#cache.tee()
+		this.#cache = cache
+		return tee
+	}
 }

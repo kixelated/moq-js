@@ -38,7 +38,7 @@ export class Announce {
 
 	// Receive a track namespace.
 	async recv(): Promise<AnnounceRecv | undefined> {
-		return this.#recvQueue.shift()
+		return this.#recvQueue.next()
 	}
 
 	async onAnnounce(msg: Control.Announce) {
@@ -50,7 +50,8 @@ export class Announce {
 
 		const announce = new AnnounceRecv(this.#control, this.#subscribe, msg.namespace)
 		this.#recv.set(msg.namespace, announce)
-		this.#recvQueue.push(announce)
+
+		await this.#recvQueue.push(announce)
 	}
 
 	onOk(msg: Control.AnnounceOk) {

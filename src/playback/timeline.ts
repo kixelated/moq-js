@@ -88,11 +88,11 @@ export class Component {
 			if (this.#current) {
 				if (value.sequence < this.#current.sequence) {
 					// Our segment is older than the current, abandon it.
-					await value.frames.cancel("too old")
+					await value.frames.cancel("skipping segment; too old")
 					continue
 				} else {
 					// Our segment is newer than the current, cancel the old one.
-					await this.#current.frames.cancel("too slow")
+					await this.#current.frames.cancel("skipping segment; too slow")
 				}
 			}
 
@@ -117,5 +117,6 @@ export class Component {
 
 // Return if a type is a segment or frame
 function isSegment(value: Segment | Frame): value is Segment {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	return (value as Segment).frames !== undefined
 }

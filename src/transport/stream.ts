@@ -1,3 +1,10 @@
+const MAX_U6 = Math.pow(2, 6) - 1
+const MAX_U14 = Math.pow(2, 14) - 1
+const MAX_U30 = Math.pow(2, 30) - 1
+const MAX_U31 = Math.pow(2, 31) - 1
+const MAX_U53 = Number.MAX_SAFE_INTEGER
+const MAX_U62: bigint = 2n ** 62n - 1n
+
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 export class Reader {
 	#reader: ReadableStream<Uint8Array>
@@ -9,23 +16,21 @@ export class Reader {
 	}
 
 	async readAll(): Promise<Uint8Array> {
-		const reader = this.#reader.getReader({ mode: "byob" })
-
-		let buf = new Uint8Array(new ArrayBuffer(1024), 0, 0)
+		const reader = this.#reader.getReader()
+		let buf = new Uint8Array(0)
 
 		for (;;) {
-			if (buf.byteLength == buf.buffer.byteLength) {
-				const tmp = new Uint8Array(new ArrayBuffer(2 * buf.buffer.byteLength), buf.byteLength)
-				tmp.set(buf)
-				buf = tmp
-			}
-
-			const scratch = new Uint8Array(buf.buffer, buf.byteLength, buf.buffer.byteLength - buf.byteLength)
-
-			const { value, done } = await reader.read(scratch)
+			const { value, done } = await reader.read()
 			if (done) break
 
-			buf = new Uint8Array(value.buffer, 0, value.byteOffset + value.byteLength)
+			if (buf.byteLength > 0) {
+				const append = new Uint8Array(buf.byteLength + value.byteLength)
+				append.set(buf)
+				append.set(value, buf.byteLength)
+				buf = append
+			} else {
+				buf = value
+			}
 		}
 
 		reader.releaseLock()
@@ -33,20 +38,23 @@ export class Reader {
 		return buf
 	}
 
-	async readFull(dst: Uint8Array): Promise<Uint8Array> {
+	async readExact(size: number): Promise<Uint8Array> {
+		const dst = new Uint8Array(size)
+		return this.read(dst, 0, size)
+	}
+
+	async read(dst: Uint8Array, offset: number, size: number): Promise<Uint8Array> {
 		const reader = this.#reader.getReader({ mode: "byob" })
 
-		let offset = 0
-
-		while (offset < dst.byteLength) {
-			const { value, done } = await reader.read(dst.slice(offset))
+		while (offset < size) {
+			const empty = new Uint8Array(dst.buffer, dst.byteOffset + offset, size - offset)
+			const { value, done } = await reader.read(empty)
 			if (done) {
-				console.warn(value)
-				throw new Error(`short buffer: ${offset} < ${dst.byteLength}`)
+				throw new Error(`short buffer`)
 			}
 
+			dst = new Uint8Array(value.buffer, value.byteOffset - offset)
 			offset += value.byteLength
-			dst = new Uint8Array(value.buffer, value.byteOffset)
 		}
 
 		reader.releaseLock()
@@ -55,99 +63,63 @@ export class Reader {
 	}
 
 	async string(maxLength?: number): Promise<string> {
-		const length = await this.vint52()
+		const length = await this.u53()
 		if (maxLength !== undefined && length > maxLength) {
 			throw new Error(`string length ${length} exceeds max length ${maxLength}`)
 		}
 
-		let buffer = new Uint8Array(length)
-		buffer = await this.readFull(buffer)
-
+		const buffer = await this.readExact(length)
 		return new TextDecoder().decode(buffer)
 	}
 
-	private async view(size: number): Promise<DataView> {
-		const scratch = this.#scratch.slice(0, size)
-		const view = await this.readFull(scratch)
-		return new DataView(view.buffer, view.byteOffset, scratch.byteLength)
+	async u8(): Promise<number> {
+		this.#scratch = await this.read(this.#scratch, 0, 1)
+		return this.#scratch[0]
 	}
 
-	async uint8(): Promise<number> {
-		const view = await this.view(1)
-		return view.getUint8(0)
+	async i32(): Promise<number> {
+		this.#scratch = await this.read(this.#scratch, 0, 4)
+		const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 4)
+		return view.getInt32(0)
 	}
 
-	async uint16(): Promise<number> {
-		const view = await this.view(2)
-		return view.getUint16(0)
-	}
-
-	async uint32(): Promise<number> {
-		const view = await this.view(4)
-		return view.getUint32(0)
-	}
-
-	// Returns a Number using 52-bits, the max Javascript can use for integer math
-	async uint52(): Promise<number> {
-		const v = await this.uint64()
-		if (v > Number.MAX_SAFE_INTEGER) {
-			throw new Error("value larger than 52-bits; use vint62 instead")
+	// Returns a Number using 53-bits, the max Javascript can use for integer math
+	async u53(): Promise<number> {
+		const v = await this.u62()
+		if (v > MAX_U53) {
+			throw new Error("value larger than 53-bits; use v62 instead")
 		}
 
 		return Number(v)
 	}
 
-	// Returns a Number using 52-bits, the max Javascript can use for integer math
-	async vint52(): Promise<number> {
-		const v = await this.vint62()
-		if (v > Number.MAX_SAFE_INTEGER) {
-			throw new Error("value larger than 52-bits; use vint62 instead")
-		}
-
-		return Number(v)
-	}
-
-	// NOTE: Returns a bigint instead of a number since it may be larger than 52-bits
-	async vint62(): Promise<bigint> {
-		const scratch = await this.readFull(this.#scratch.slice(0, 1))
-		const first = scratch[0]
+	// NOTE: Returns a bigint instead of a number since it may be larger than 53-bits
+	async u62(): Promise<bigint> {
+		this.#scratch = await this.read(this.#scratch, 0, 1)
+		const first = this.#scratch[0]
 
 		const size = (first & 0xc0) >> 6
 
-		switch (size) {
-			case 0: {
-				return BigInt(first) & 0x3fn
-			}
-			case 1: {
-				await this.readFull(this.#scratch.slice(1, 2))
-				const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 2)
+		if (size == 0) {
+			return BigInt(first) & 0x3fn
+		} else if (size == 1) {
+			this.#scratch = await this.read(this.#scratch, 1, 2)
+			const view = new DataView(this.#scratch.buffer, 0, 2)
 
-				const v = view.getInt16(0)
-				return BigInt(v) & 0x3fffn
-			}
-			case 2: {
-				await this.readFull(this.#scratch.slice(1, 4))
-				const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 4)
+			return BigInt(view.getInt16(0)) & 0x3fffn
+		} else if (size == 2) {
+			this.#scratch = await this.read(this.#scratch, 1, 4)
+			const view = new DataView(this.#scratch.buffer, 0, 4)
 
-				const v = view.getUint32(0)
-				return BigInt(v) & 0x3fffffffn
-			}
-			case 3: {
-				await this.readFull(this.#scratch.slice(1, 8))
-				const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 8)
+			return BigInt(view.getUint32(0)) & 0x3fffffffn
+		} else if (size == 3) {
+			this.#scratch = await this.read(this.#scratch, 1, 8)
+			const view = new DataView(this.#scratch.buffer, 0, 8)
 
-				const v = view.getBigUint64(0)
-				return v & 0x3fffffffffffffffn
-			}
-			default:
-				throw new Error("impossible")
+			return view.getBigUint64(0) & 0x3fffffffffffffffn
+		} else {
+			throw new Error("impossible")
 		}
-	}
-
-	// NOTE: Returns a BigInt instead of a Number
-	async uint64(): Promise<bigint> {
-		const view = await this.view(8)
-		return view.getBigUint64(0)
 	}
 }
 
@@ -161,36 +133,38 @@ export class Writer {
 		this.#writer = writer
 	}
 
-	async uint8(v: number) {
+	async u8(v: number) {
 		await this.write(setUint8(this.#scratch, v))
 	}
 
-	async uint16(v: number) {
-		await this.write(setUint16(this.#scratch, v))
+	async i32(v: number) {
+		if (Math.abs(v) > MAX_U31) {
+			throw new Error(`overflow, value larger than 32-bits: ${v}`)
+		}
+
+		// We don't use a VarInt, so it always takes 4 bytes.
+		// This could be improved but nothing is standardized yet.
+		await this.write(setInt32(this.#scratch, v))
 	}
 
-	async uint24(v: number) {
-		await this.write(setUint24(this.#scratch, v))
+	async u53(v: number) {
+		if (v < 0) {
+			throw new Error(`underflow, value is negative: ${v}`)
+		} else if (v > MAX_U53) {
+			throw new Error(`overflow, value larger than 53-bits: ${v}`)
+		}
+
+		await this.write(setVint53(this.#scratch, v))
 	}
 
-	async uint32(v: number) {
-		await this.write(setUint32(this.#scratch, v))
-	}
+	async u62(v: bigint) {
+		if (v < 0) {
+			throw new Error(`underflow, value is negative: ${v}`)
+		} else if (v >= MAX_U62) {
+			throw new Error(`overflow, value larger than 62-bits: ${v}`)
+		}
 
-	async uint52(v: number) {
-		await this.write(setUint52(this.#scratch, v))
-	}
-
-	async vint52(v: number) {
-		await this.write(setVint52(this.#scratch, v))
-	}
-
-	async vint62(v: bigint) {
 		await this.write(setVint62(this.#scratch, v))
-	}
-
-	async uint64(v: bigint) {
-		await this.write(setUint64(this.#scratch, v))
 	}
 
 	async write(v: Uint8Array) {
@@ -204,103 +178,66 @@ export class Writer {
 
 	async string(str: string) {
 		const data = new TextEncoder().encode(str)
-		await this.vint52(data.byteLength)
+		await this.u53(data.byteLength)
 		await this.write(data)
 	}
 }
 
-export function setUint8(dst: Uint8Array, v: number): Uint8Array {
-	if (v >= 1 << 8) {
-		throw new Error(`overflow, value larger than 8-bits: ${v}`)
-	}
-
+function setUint8(dst: Uint8Array, v: number): Uint8Array {
 	dst[0] = v
-
 	return dst.slice(0, 1)
 }
 
-export function setUint16(dst: Uint8Array, v: number): Uint8Array {
-	if (v >= 1 << 16) {
-		throw new Error(`overflow, value larger than 16-bits: ${v}`)
-	}
-
+function setUint16(dst: Uint8Array, v: number): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 2)
 	view.setUint16(0, v)
 
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-export function setUint24(dst: Uint8Array, v: number): Uint8Array {
-	if (v >= 1 << 24) {
-		throw new Error(`overflow, value larger than 24-bits: ${v}`)
-	}
-
-	const view = new DataView(dst.buffer, dst.byteOffset, 3)
-
-	view.setUint8(0, (v >> 16) & 0xff)
-	view.setUint8(1, (v >> 8) & 0xff)
-	view.setUint8(2, v & 0xff)
+function setInt32(dst: Uint8Array, v: number): Uint8Array {
+	const view = new DataView(dst.buffer, dst.byteOffset, 4)
+	view.setInt32(0, v)
 
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-export function setUint32(dst: Uint8Array, v: number): Uint8Array {
-	if (v >= 1 << 32) {
-		throw new Error(`overflow, value larger than 32-bits: ${v}`)
-	}
-
+function setUint32(dst: Uint8Array, v: number): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 4)
 	view.setUint32(0, v)
 
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-export function setUint52(dst: Uint8Array, v: number): Uint8Array {
-	if (v > Number.MAX_SAFE_INTEGER) {
-		throw new Error(`overflow, value larger than 52-bits: ${v}`)
-	}
-
-	const view = new DataView(dst.buffer, dst.byteOffset, 8)
-	view.setBigUint64(0, BigInt(v))
-
-	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
-}
-
-export function setVint52(dst: Uint8Array, v: number): Uint8Array {
-	if (v > Number.MAX_SAFE_INTEGER) {
-		throw new Error(`overflow, value larger than 52-bits: ${v}`)
-	}
-
-	if (v < 1 << 6) {
+function setVint53(dst: Uint8Array, v: number): Uint8Array {
+	if (v <= MAX_U6) {
 		return setUint8(dst, v)
-	} else if (v < 1 << 14) {
+	} else if (v <= MAX_U14) {
 		return setUint16(dst, v | 0x4000)
-	} else if (v < 1 << 30) {
+	} else if (v <= MAX_U30) {
 		return setUint32(dst, v | 0x80000000)
-	} else {
+	} else if (v <= MAX_U53) {
 		return setUint64(dst, BigInt(v) | 0xc000000000000000n)
+	} else {
+		throw new Error(`overflow, value larger than 53-bits: ${v}`)
 	}
 }
 
-export function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
-	if (v < 1 << 6) {
+function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
+	if (v < MAX_U6) {
 		return setUint8(dst, Number(v))
-	} else if (v < 1 << 14) {
+	} else if (v < MAX_U14) {
 		return setUint16(dst, Number(v) | 0x4000)
-	} else if (v < 1 << 30) {
+	} else if (v <= MAX_U30) {
 		return setUint32(dst, Number(v) | 0x80000000)
-	} else if (v < 1 << 62) {
+	} else if (v <= MAX_U62) {
 		return setUint64(dst, BigInt(v) | 0xc000000000000000n)
 	} else {
 		throw new Error(`overflow, value larger than 62-bits: ${v}`)
 	}
 }
 
-export function setUint64(dst: Uint8Array, v: bigint): Uint8Array {
-	if (v >= 1n << 64n) {
-		throw new Error(`overflow, value larger than 64-bits: ${v}`)
-	}
-
+function setUint64(dst: Uint8Array, v: bigint): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 8)
 	view.setBigUint64(0, v)
 
