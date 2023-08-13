@@ -1,19 +1,13 @@
 {
 	"extends": "../../tsconfig.json",
-	"include": [
-		"."
-	],
+	"include": ["."],
 	"compilerOptions": {
-		"lib": [
-			"es2022",
-		],
-		"types": [
-			"audioworklet",
-		]
+		"lib": ["es2022"],
+		"types": ["audioworklet"]
 	},
 	"references": [
 		{
 			"path": "../../common"
-		},
+		}
 	]
 }
