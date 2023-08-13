@@ -1,4 +1,4 @@
-import { isAudioTrackSettings } from "../common/track"
+import { isAudioTrackSettings } from "../common/settings"
 
 export const EncoderCodecs = [
 	"mp4a.40.2", // AAC

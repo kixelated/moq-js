@@ -7,7 +7,7 @@ import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from
 
 import * as Audio from "./audio"
 import * as Video from "./video"
-import { isAudioTrackSettings, isVideoTrackSettings } from "../common/track"
+import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
 	conn: Connection

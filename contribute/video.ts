@@ -1,4 +1,4 @@
-import { isVideoTrackSettings } from "../common/track"
+import { isVideoTrackSettings } from "../common/settings"
 
 export const EncoderCodecs = [
 	"avc1", // H.264
