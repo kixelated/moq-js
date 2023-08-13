@@ -5,7 +5,7 @@
 	"license": "(MIT OR Apache-2.0)",
 	"repository": "github:kixelated/moq-js",
 	"scripts": {
-		"build": "tsc -b src && cp README.md package.json LICENSE* ./dist",
+		"build": "tsc -b . && cp README.md package.json LICENSE* ./dist",
 		"publish": "npm publish ./dist",
 		"lint": "eslint .",
 		"fmt": "prettier --write ."
