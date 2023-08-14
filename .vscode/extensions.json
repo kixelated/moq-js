@@ -3,7 +3,6 @@
 		"ms-vscode.vscode-typescript-next",
 		"EditorConfig.EditorConfig",
 		"dbaeumer.vscode-eslint",
-		"esbenp.prettier-vscode",
-		"bradlc.vscode-tailwindcss",
+		"esbenp.prettier-vscode"
 	]
 }

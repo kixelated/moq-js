@@ -1,0 +1,16 @@
+{
+	"extends": "../tsconfig.json",
+	"include": ["."],
+	"exclude": ["./worklet"],
+	"compilerOptions": {
+		"types": ["dom-mediacapture-transform", "dom-webcodecs", "web"]
+	},
+	"references": [
+		{
+			"path": "../common"
+		},
+		{
+			"path": "../transport"
+		}
+	]
+}
