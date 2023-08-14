@@ -31,7 +31,7 @@ This command will register the current directory as serving the `@kixelated/moq`
 npm link
 ```
 
-An application you can use is [quic.video](https://github.com/kixelated/quic-video).
+An application you can use is [quic.video](https://github.com/kixelated/quic.video).
 Run this command in the application directory to use the symlink you set up in the previous setp:
 
 ```
