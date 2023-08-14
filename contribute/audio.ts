@@ -66,7 +66,7 @@ export class Encoder {
 	#enqueue(
 		controller: TransformStreamDefaultController<AudioDecoderConfig | EncodedAudioChunk>,
 		frame: EncodedAudioChunk,
-		metadata?: EncodedAudioChunkMetadata
+		metadata?: EncodedAudioChunkMetadata,
 	) {
 		const config = metadata?.decoderConfig
 		if (config && !this.#decoderConfig) {

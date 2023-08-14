@@ -1,7 +1,7 @@
 export class Deferred<T> {
 	promise: Promise<T>
 	resolve!: (value: T | PromiseLike<T>) => void
-	reject!: (reason: any | PromiseLike<any>) => void
+	reject!: (reason: any) => void
 	pending = true
 
 	constructor() {

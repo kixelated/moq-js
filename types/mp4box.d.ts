@@ -288,7 +288,7 @@ export class ISOFile {
 		ftyp: BoxParser.ftypBox,
 		moov: BoxParser.moovBox,
 		total_duration: number,
-		sample_duration: number
+		sample_duration: number,
 	): ArrayBuffer
 
 	// TODO add correct types; these are exported by dts-gen

@@ -29,7 +29,7 @@ export class Segment {
 				},
 			},
 			undefined,
-			backpressure
+			backpressure,
 		)
 
 		this.input = transport.writable

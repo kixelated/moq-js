@@ -102,7 +102,7 @@ export class Encoder {
 	#enqueue(
 		controller: TransformStreamDefaultController<VideoDecoderConfig | EncodedVideoChunk>,
 		frame: EncodedVideoChunk,
-		metadata?: EncodedVideoChunkMetadata
+		metadata?: EncodedVideoChunkMetadata,
 	) {
 		if (!this.#decoderConfig) {
 			const config = metadata?.decoderConfig
