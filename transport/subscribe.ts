@@ -26,12 +26,10 @@ export class Subscribe {
 	async send(name: string, announce: AnnounceRecv) {
 		const id = this.#sendNext++
 
-		const control = this.#control
-
-		const subscribe = new SubscribeSend(control, id, announce, name)
+		const subscribe = new SubscribeSend(this.#control, id, announce, name)
 		this.#send.set(id, subscribe)
 
-		await control.send({
+		await this.#control.send({
 			type: Control.Type.Subscribe,
 			id,
 			namespace: announce.namespace,

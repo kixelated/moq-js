@@ -6,11 +6,12 @@ import { Catalog } from "../common/catalog"
 import { Queue } from "../common/async"
 
 export class Broadcasts {
-	#conn: Connection
 	#queue = new Queue<Broadcast>()
 
-	constructor(conn: Connection) {
-		this.#conn = conn
+	readonly connection: Connection
+
+	constructor(connection: Connection) {
+		this.connection = connection
 		this.#run().catch((e) => {
 			const err = asError(e)
 			return this.#queue.abort(err) // throw an exception on next read
@@ -19,11 +20,11 @@ export class Broadcasts {
 
 	async #run() {
 		for (;;) {
-			const announce = await this.#conn.announce.recv()
-			if (!announce) return
+			const next = await this.connection.announce.recv()
+			if (!next) return
 
 			// Asynchronously fetch the catalog
-			this.#fetch(announce)
+			this.#fetch(next)
 				.then((broadcast) => this.#queue.push(broadcast))
 				.catch((e) => {
 					const err = asError(e)
@@ -56,7 +57,7 @@ export class Broadcasts {
 			await subscribe.close() // we done
 
 			const catalog = Catalog.decode(raw)
-			const broadcast = new Broadcast(announce, catalog)
+			const broadcast = new Broadcast(this, announce, catalog)
 
 			return broadcast
 		} catch (e) {
@@ -72,11 +73,14 @@ export class Broadcasts {
 
 export class Broadcast {
 	#announce: AnnounceRecv
-	readonly catalog: Catalog
 
-	constructor(announce: AnnounceRecv, catalog: Catalog) {
+	readonly catalog: Catalog
+	readonly connection: Connection
+
+	constructor(broadcasts: Broadcasts, announce: AnnounceRecv, catalog: Catalog) {
 		this.#announce = announce
 		this.catalog = catalog
+		this.connection = broadcasts.connection
 	}
 
 	get name() {

@@ -16,11 +16,13 @@ export interface ClientConfig {
 }
 
 export class Client {
-	#config: ClientConfig
 	#fingerprint: Promise<WebTransportHash | undefined>
 
+	readonly config: ClientConfig
+
 	constructor(config: ClientConfig) {
-		this.#config = config
+		this.config = config
+
 		this.#fingerprint = this.#fetchFingerprint(config.fingerprint).catch((e) => {
 			console.warn("failed to fetch fingerprint: ", e)
 			return undefined
@@ -34,7 +36,7 @@ export class Client {
 		const fingerprint = await this.#fingerprint
 		if (fingerprint) options.serverCertificateHashes = [fingerprint]
 
-		const quic = new WebTransport(this.#config.url, options)
+		const quic = new WebTransport(this.config.url, options)
 		await quic.ready
 
 		const stream = await quic.createBidirectionalStream()
@@ -45,7 +47,7 @@ export class Client {
 		const setup = new Setup.Stream(reader, writer)
 
 		// Send the setup message.
-		await setup.send.client({ versions: [Setup.Version.DRAFT_00], role: this.#config.role })
+		await setup.send.client({ versions: [Setup.Version.DRAFT_00], role: this.config.role })
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
@@ -54,7 +56,7 @@ export class Client {
 		const control = new Control.Stream(reader, writer)
 		const objects = new Objects(quic)
 
-		return new Connection(quic, control, objects)
+		return new Connection(this, quic, control, objects)
 	}
 
 	async #fetchFingerprint(url?: string): Promise<WebTransportHash | undefined> {
