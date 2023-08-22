@@ -16,7 +16,7 @@ export class Subscribe {
 
 	// Their subscribed tracks.
 	#recv = new Map<bigint, SubscribeRecv>()
-	#recvQueue = new Queue<SubscribeRecv>()
+	#recvQueue = new Queue<SubscribeRecv>(Number.MAX_SAFE_INTEGER) // Unbounded queue in case there's no receiver
 
 	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
