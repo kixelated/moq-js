@@ -13,7 +13,7 @@ export type Timeline = Message.Timeline
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
-	#conn: Connection
+	#connection: Connection
 	#port: Port
 	#broadcast: Broadcast
 
@@ -23,10 +23,10 @@ export class Player {
 	// A periodically updated timeline
 	#timeline = new Watch<Timeline | undefined>(undefined)
 
-	constructor(conn: Connection, broadcast: Broadcast) {
+	constructor(connection: Connection, broadcast: Broadcast) {
 		this.#broadcast = broadcast
 		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
-		this.#conn = conn
+		this.#connection = connection
 	}
 
 	async run() {
@@ -161,5 +161,13 @@ export class Player {
 
 			await next
 		}
+	}
+
+	get broadcast() {
+		return this.#broadcast
+	}
+
+	get connection() {
+		return this.#connection
 	}
 }

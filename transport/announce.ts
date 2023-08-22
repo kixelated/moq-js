@@ -12,7 +12,7 @@ export class Announce {
 
 	// Their announced tracks.
 	#recv = new Map<string, AnnounceRecv>()
-	#recvQueue = new Queue<AnnounceRecv>()
+	#recvQueue = new Queue<AnnounceRecv>(Number.MAX_SAFE_INTEGER) // unbounded queue in case there's no receiver
 
 	constructor(control: Control.Stream, subscribe: Subscribe) {
 		this.#control = control

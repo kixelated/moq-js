@@ -10,7 +10,7 @@ import * as Video from "./video"
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
-	conn: Connection
+	connection: Connection
 	media: MediaStream
 	name: string // name of the broadcast
 
@@ -24,21 +24,18 @@ export interface BroadcastConfigTrack {
 }
 
 export class Broadcast {
-	#conn: Connection
-	#media: MediaStream
-	#catalog: Catalog
-	#config: BroadcastConfig
-
 	#tracks = new Map<string, Track>()
 
+	readonly config: BroadcastConfig
+	readonly catalog: Catalog
+	readonly connection: Connection
+
 	constructor(config: BroadcastConfig) {
-		this.#conn = config.conn
-		this.#media = config.media
-		this.#config = config
+		this.connection = config.connection
+		this.config = config
+		this.catalog = new Catalog()
 
-		this.#catalog = new Catalog()
-
-		for (const media of this.#media.getTracks()) {
+		for (const media of this.config.media.getTracks()) {
 			const track = new Track(media, config)
 			this.#tracks.set(track.name, track)
 
@@ -82,7 +79,7 @@ export class Broadcast {
 				throw new Error(`unknown track type: ${media.kind}`)
 			}
 
-			this.#catalog.tracks.push(catalog)
+			this.catalog.tracks.push(catalog)
 		}
 	}
 
@@ -99,17 +96,17 @@ export class Broadcast {
 
 	// Attach the captured video stream to the given video element.
 	preview(video: HTMLVideoElement) {
-		video.srcObject = this.#media
+		video.srcObject = this.config.media
 	}
 
 	async #runAnnounce() {
 		// Announce the namespace and wait for an explicit OK.
-		const announce = await this.#conn.announce.send(this.#config.name)
+		const announce = await this.connection.announce.send(this.config.name)
 		await announce.ok()
 
 		try {
 			for (;;) {
-				const subscriber = await this.#conn.subscribe.recv()
+				const subscriber = await this.connection.subscribe.recv()
 				if (!subscriber) break
 
 				// Run an async task to serve each subscription.
@@ -149,7 +146,7 @@ export class Broadcast {
 		// We only support ".catalog"
 		if (name !== "") throw new Error(`unknown catalog: ${name}`)
 
-		const bytes = this.#catalog.encode()
+		const bytes = this.catalog.encode()
 
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
@@ -237,6 +234,10 @@ export class Broadcast {
 
 		// Pipe the segment to the stream.
 		await segment.chunks().pipeTo(stream)
+	}
+
+	get name() {
+		return this.config.name
 	}
 }
 

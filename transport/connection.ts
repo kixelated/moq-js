@@ -3,8 +3,10 @@ import { Objects } from "./object"
 
 import { Announce } from "./announce"
 import { Subscribe } from "./subscribe"
+import { Client } from "./client"
 
 export class Connection {
+	// The established WebTransport session.
 	#quic: WebTransport
 
 	// Use to receive/send control messages.
@@ -13,17 +15,21 @@ export class Connection {
 	// Use to receive/send objects.
 	#objects: Objects
 
+	// The client used to create this connection.
+	readonly client: Client
+
 	// Module for announcing tracks.
 	readonly announce: Announce
 
 	// Module for subscribing to tracks
 	readonly subscribe: Subscribe
 
-	constructor(quic: WebTransport, control: Control.Stream, objects: Objects) {
+	constructor(client: Client, quic: WebTransport, control: Control.Stream, objects: Objects) {
 		this.#quic = quic
 		this.#control = control
 		this.#objects = objects
 
+		this.client = client
 		this.subscribe = new Subscribe(this.#control, this.#objects)
 		this.announce = new Announce(this.#control, this.subscribe)
 	}
