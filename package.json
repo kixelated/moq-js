@@ -5,10 +5,7 @@
 	"version": "0.0.1",
 	"private": true,
 	"source": [
-		"web/index.html",
-		"web/explain.html",
-		"web/publish.html",
-		"web/watch.html"
+		"web/index.html"
 	],
 	"scripts": {
 		"build": "parcel build",
@@ -33,7 +30,7 @@
 		"@types/audioworklet": "^0.0.50",
 		"@types/dom-mediacapture-transform": "^0.1.6",
 		"@types/dom-webcodecs": "^0.1.8",
-		"@types/parcel-bundler": "^1.12.5",
+		"@types/parcel-env": "^0.0.1",
 		"@types/web": "^0.0.113",
 		"@typescript-eslint/eslint-plugin": "^6.4.0",
 		"@typescript-eslint/parser": "^6.4.0",
@@ -44,7 +41,6 @@
 		"eslint-plugin-prettier": "^5.0.0",
 		"parcel": "^2.9.2",
 		"postcss": "^8.4.24",
-		"posthtml-include": "^1.7.4",
 		"prettier": "^3.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.2",
 		"tailwindcss": "^3.3.2",
@@ -52,6 +48,7 @@
 	},
 	"dependencies": {
 		"@kixelated/moq": "*",
+		"@solidjs/router": "^0.8.3",
 		"solid-js": "^1.7.7"
 	}
 }

@@ -4,7 +4,7 @@ import { createSignal, createEffect, Show } from "solid-js"
 import { Announced } from "./announced"
 import { Controls } from "./controls"
 
-export function Main() {
+export default function Main() {
 	const [error, setError] = createSignal<Error | undefined>()
 	const [player, setPlayer] = createSignal<Player | undefined>()
 
@@ -27,10 +27,3 @@ export function Main() {
 		</>
 	)
 }
-
-import { render } from "solid-js/web"
-
-const main = document.getElementById("main")
-if (!main) throw new Error("no container")
-
-render(() => <Main />, main)
