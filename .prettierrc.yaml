@@ -2,3 +2,6 @@
 
 # Don't insert semi-colons unless needed
 semi: false
+
+plugins:
+    - "prettier-plugin-tailwindcss"

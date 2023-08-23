@@ -3,14 +3,22 @@
 Media over QUIC (MoQ) is a live media delivery protocol utilizing QUIC streams.
 See the [Warp draft](https://datatracker.ietf.org/doc/draft-lcurley-warp/).
 
-This repository is a Typescript library that supports both contribution (ingest) and distribution (playback).
-It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
+This repository contains the source for [quic.video](https://quic.video).
+Both contribution (ingest) and distribution (playback) are supported via WebCodecs.
+It's split into a reusable Typescript library (`lib`) and the demo application (`web`).
+
+You will also need to host a relay, such as [moq-rs](https://github.com/kixelated/moq-rs).
 
 ## Usage
 
+The library is released periodically and available on NPM.
+There's no documentation until the API settles down.
+
+```bash
+npm i -P @kixelated/moq
 ```
-npm install --save-dev @kixelated/moq
-```
+
+The website is published automatically on merge and available at [quic.video](https://quic.video).
 
 ## Development
 
@@ -18,38 +26,31 @@ npm install --save-dev @kixelated/moq
 
 Install node dependencies using `npm`:
 
-```
-npm install
-```
-
-### Linking
-
-There's no demo application so you will need to link this library to test changes.
-This command will register the current directory as serving the `@kixelated/moq` package.
-
-```
-npm link
+```bash
+npm i
 ```
 
-An application you can use is [quic.video](https://github.com/kixelated/quic.video).
-Run this command in the application directory to use the symlink you set up in the previous setp:
+Parcel introduces some annoying TLS errors.
+We use [mkcert](https://github.com/FiloSottile/mkcert) to generate a self-signed certificate instead.
 
-```
-npm link @kixelated/moq
-```
-
-### Javascript
-
-Linking works only if you're using Typescript.
-If you're only using Javascript, then you'll have to build first and link from the `dist` folder:
-
-```
-npm run build
-cd dist
-npm link
+```bash
+brew install mkcert # see instructions for other platforms
+npm run cert
 ```
 
-You'll have to rebuild for each change or use the `tsc watch` command to automatically rebuild.
+### Serve
+
+You can run a dev web server with:
+
+```bash
+npm run serve
+```
+
+Parcel sometimes does a poor job invalidating the cache; you might need to clear it:
+
+```bash
+npm run clean
+```
 
 ## License
 

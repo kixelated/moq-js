@@ -1,0 +1,6 @@
+dist/
+node_modules/
+cert/
+.parcel-cache/
+.DS_Store
+tsconfig.tsbuildinfo
