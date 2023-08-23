@@ -3,14 +3,25 @@
 Media over QUIC (MoQ) is a live media delivery protocol utilizing QUIC streams.
 See the [Warp draft](https://datatracker.ietf.org/doc/draft-lcurley-warp/).
 
-This repository is a Typescript library that supports both contribution (ingest) and distribution (playback).
-It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
+This repository contains the source for [quic.video](https://quic.video).
+It's split into a reusable Typescript library (`lib`) and the demo application (`web`).
+
+You will also need to run a relay, such as [moq-rs](https://github.com/kixelated/moq-rs).
 
 ## Usage
 
+### Library
+
+The library is released periodically and available on NPM.
+There's no documentation until the API settles down.
+
 ```bash
-npm install --save-dev @kixelated/moq
+npm install --save @kixelated/moq
 ```
+
+### Web
+
+The website is published automatically on merge and available at [quic.video](https://quic.video).
 
 ## Development
 
@@ -22,20 +33,26 @@ Install node dependencies using `npm`:
 npm install
 ```
 
-### Linking
-
-There's no demo application so you will need to link this library to test changes.
-This command will register the current directory as serving the `@kixelated/moq` package.
+Parcel can generate TLS certificates but introduces some annoying TLS errors.
+We use [mkcert](https://github.com/FiloSottile/mkcert) instead to generate a self-signed certificate.
 
 ```bash
-npm link
+brew install mkcert # see instructions for other platforms
+npm run cert
 ```
 
-An application you can use is [quic.video](https://github.com/kixelated/quic.video).
-Run this command in the application directory to use the symlink you set up in the previous setp:
+### Serve
 
+You can run a dev web server with:
+
+```bash
+npm run serve
 ```
-npm link @kixelated/moq
+
+Parcel sometimes does a poor job invalidating the cache; you might need to clear it:
+
+```bash
+npm run clean
 ```
 
 ## License

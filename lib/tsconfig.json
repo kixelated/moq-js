@@ -14,7 +14,7 @@
 		"isolatedModules": true,
 		"types": [], // Don't automatically import any @types modules.
 		"lib": ["es2022"],
-		"typeRoots": ["./types", "./node_modules/@types"]
+		"typeRoots": ["./types", "../node_modules/@types"]
 	},
 	"references": [
 		{
