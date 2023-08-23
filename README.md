@@ -8,7 +8,7 @@ It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
 
 ## Usage
 
-```
+```bash
 npm install --save-dev @kixelated/moq
 ```
 
@@ -18,7 +18,7 @@ npm install --save-dev @kixelated/moq
 
 Install node dependencies using `npm`:
 
-```
+```bash
 npm install
 ```
 
@@ -27,7 +27,7 @@ npm install
 There's no demo application so you will need to link this library to test changes.
 This command will register the current directory as serving the `@kixelated/moq` package.
 
-```
+```bash
 npm link
 ```
 
@@ -37,19 +37,6 @@ Run this command in the application directory to use the symlink you set up in t
 ```
 npm link @kixelated/moq
 ```
-
-### Javascript
-
-Linking works only if you're using Typescript.
-If you're only using Javascript, then you'll have to build first and link from the `dist` folder:
-
-```
-npm run build
-cd dist
-npm link
-```
-
-You'll have to rebuild for each change or use the `tsc watch` command to automatically rebuild.
 
 ## License
 
