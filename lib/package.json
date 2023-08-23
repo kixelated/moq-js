@@ -6,9 +6,7 @@
 	"repository": "github:kixelated/moq-js",
 	"scripts": {
 		"build": "tsc -b . && cp README.md package.json ../LICENSE* ./dist",
-		"release": "npm run build && npm publish ./dist",
-		"lint": "eslint .",
-		"fmt": "prettier --write ."
+		"release": "npm run build && npm publish ./dist"
 	},
 	"devDependencies": {
 		"@types/audioworklet": "^0.0.50",

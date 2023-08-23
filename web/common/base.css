@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 a {
-	@apply text-green-500 hover:cursor-pointer hover:text-green-600 font-bold;
+	@apply font-bold text-green-500 hover:cursor-pointer hover:text-green-600;
 }
 
 html {

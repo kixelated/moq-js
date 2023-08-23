@@ -27,7 +27,7 @@ jobs:
             - name: upload
               uses: "google-github-actions/upload-cloud-storage@v1"
               with:
-                  path: "web/dist"
+                  path: "dist"
                   destination: ${{ secrets.GCP_BUCKET }}
                   parent: false
                   process_gcloudignore: false
