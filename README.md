@@ -16,7 +16,7 @@ The library is released periodically and available on NPM.
 There's no documentation until the API settles down.
 
 ```bash
-npm i -P @kixelated/moq
+npm install --save @kixelated/moq
 ```
 
 ### Web
@@ -30,7 +30,7 @@ The website is published automatically on merge and available at [quic.video](ht
 Install node dependencies using `npm`:
 
 ```bash
-npm i
+npm install
 ```
 
 Parcel can generate TLS certificates but introduces some annoying TLS errors.
