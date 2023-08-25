@@ -41,6 +41,15 @@ brew install mkcert # see instructions for other platforms
 npm run cert
 ```
 
+Or if you are using SSS as server you can use the certs generated there by using:
+
+```bash
+cd certs
+rm localhost.*
+ln -s [MOQ-RS-PATH]/cert/localhost.key localhost.key
+ln -s [MOQ-RS-PATH]/cert/localhost.crt localhost.crt
+```
+
 ### Serve
 
 You can run a dev web server with:
