@@ -1,12 +1,11 @@
 import * as Message from "./worker/message"
-import { Broadcast } from "./broadcast"
 import { Port } from "./port"
 
 import { Context } from "./context"
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
 import { RingShared } from "../common/ring"
-import { isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
+import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
 
 export type Range = Message.Range
@@ -14,7 +13,8 @@ export type Timeline = Message.Timeline
 
 export interface PlayerConfig {
 	connection: Connection
-	broadcast: Broadcast
+	namespace: string
+	catalog: Catalog // TODO optional; fetch if not provided
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -30,12 +30,14 @@ export class Player {
 	#running: Promise<void>
 
 	readonly connection: Connection
-	readonly broadcast: Broadcast
+	readonly namespace: string
+	readonly catalog: Catalog
 
 	constructor(config: PlayerConfig) {
 		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
 		this.connection = config.connection
-		this.broadcast = config.broadcast
+		this.namespace = config.namespace
+		this.catalog = config.catalog
 
 		// Async work
 		this.#running = this.#run()
@@ -45,7 +47,7 @@ export class Player {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
 
-		for (const track of this.broadcast.catalog.tracks) {
+		for (const track of this.catalog.tracks) {
 			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
 			}
@@ -63,7 +65,7 @@ export class Player {
 	}
 
 	async #runInit(name: string) {
-		const sub = await this.connection.subscribe(this.broadcast.namespace, name)
+		const sub = await this.connection.subscribe(this.namespace, name)
 		try {
 			const init = await sub.data()
 			if (!init) throw new Error("no init data")
@@ -86,7 +88,7 @@ export class Player {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		const sub = await this.connection.subscribe(this.broadcast.namespace, track.data_track)
+		const sub = await this.connection.subscribe(this.namespace, track.data_track)
 		try {
 			for (;;) {
 				const segment = await sub.data()
@@ -113,7 +115,7 @@ export class Player {
 		let sampleRate: number | undefined
 		let channels: number | undefined
 
-		for (const track of this.broadcast.catalog.tracks) {
+		for (const track of this.catalog.tracks) {
 			if (!isAudioTrack(track)) continue
 
 			if (sampleRate && track.sample_rate !== sampleRate) {

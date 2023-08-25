@@ -15,14 +15,13 @@ import { createFetch, createRunner } from "./common"
 import { useConnection } from "./connection"
 
 export function Watch() {
-	const params = useParams()
+	const params = useParams() // TODO can we type this better
+	const namespace = params.name
 
 	const player = createRunner<Player, Connection>(async (ready, connection) => {
 		// TODO move the catalog fetch into the player
 		const catalog = await Catalog.fetch(connection, params.name)
-
-		const broadcast = { namespace: params.name, catalog }
-		const player = new Player({ connection, broadcast })
+		const player = new Player({ connection, namespace, catalog })
 
 		ready(player)
 
@@ -47,7 +46,7 @@ export function Watch() {
 					{player.error()!.name}: {player.error()!.message}
 				</div>
 			</Show>
-			<Listing name={params.name} catalog={player()?.broadcast.catalog} />
+			<Listing name={params.name} catalog={player()?.catalog} />
 			<canvas ref={canvas!} class="rounded-md" />
 		</>
 	)
@@ -55,16 +54,12 @@ export function Watch() {
 
 export function Listings() {
 	const broadcasts = createRunner<string[], Connection>(async (set, connection) => {
-		let broadcasts = new Array<string>()
+		let [announced, next] = connection.announced().value()
+		set(announced.map((a) => a.namespace))
 
-		for (;;) {
-			// Wait for the next broadcast
-			const broadcast = await connection.announced()
-			if (!broadcast) break
-
-			// Append to the start so newest entries are first.
-			broadcasts = [broadcast.namespace, ...broadcasts]
-			set(broadcasts)
+		while (next) {
+			;[announced, next] = await next
+			set(announced.map((a) => a.namespace))
 		}
 	}, useConnection())
 

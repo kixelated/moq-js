@@ -1,32 +1,49 @@
 import * as Control from "./control"
+import { Queue, Watch } from "../common/async"
 import { Header, Objects } from "./object"
-import { Queue } from "../common/async"
 
-export class Subscribe {
+export class Subscriber {
 	// Use to send control messages.
 	#control: Control.Stream
 
 	// Use to send objects.
 	#objects: Objects
 
-	// Our subscribed tracks.
-	#send = new Map<bigint, SubscribeSend>()
-	#sendNext = 0n
+	// Announced broadcasts.
+	#announce = new Map<string, AnnounceRecv>()
+	#announceQueue = new Watch<AnnounceRecv[]>([])
 
-	// Their subscribed tracks.
-	#recv = new Map<bigint, SubscribeRecv>()
-	#recvQueue = new Queue<SubscribeRecv>(Number.MAX_SAFE_INTEGER) // Unbounded queue in case there's no receiver
+	// Our subscribed tracks.
+	#subscribe = new Map<bigint, SubscribeSend>()
+	#subscribeNext = 0n
 
 	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
 		this.#objects = objects
 	}
 
-	async send(namespace: string, track: string) {
-		const id = this.#sendNext++
+	announced(): Watch<AnnounceRecv[]> {
+		return this.#announceQueue
+	}
+
+	async recvAnnounce(msg: Control.Announce) {
+		if (this.#announce.has(msg.namespace)) {
+			throw new Error(`duplicate announce for namespace: ${msg.namespace}`)
+		}
+
+		await this.#control.send({ type: Control.Type.AnnounceOk, namespace: msg.namespace })
+
+		const announce = new AnnounceRecv(this.#control, msg.namespace)
+		this.#announce.set(msg.namespace, announce)
+
+		this.#announceQueue.update((queue) => [...queue, announce])
+	}
+
+	async subscribe(namespace: string, track: string) {
+		const id = this.#subscribeNext++
 
 		const subscribe = new SubscribeSend(this.#control, id, namespace, track)
-		this.#send.set(id, subscribe)
+		this.#subscribe.set(id, subscribe)
 
 		await this.#control.send({
 			type: Control.Type.Subscribe,
@@ -38,34 +55,8 @@ export class Subscribe {
 		return subscribe
 	}
 
-	// Receive the next new subscription
-	async recv() {
-		return this.#recvQueue.next()
-	}
-
-	async onSubscribe(msg: Control.Subscribe) {
-		if (this.#recv.has(msg.id)) {
-			throw new Error(`duplicate subscribe for id: ${msg.id}`)
-		}
-
-		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg.id, msg.namespace, msg.name)
-		this.#recv.set(msg.id, subscribe)
-		await this.#recvQueue.push(subscribe)
-
-		await this.#control.send({ type: Control.Type.SubscribeOk, id: msg.id })
-	}
-
-	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
-		const subscribe = this.#send.get(header.track)
-		if (!subscribe) {
-			throw new Error(`data for for unknown track: ${header.track}`)
-		} else {
-			await subscribe.onData(header, stream)
-		}
-	}
-
-	onOk(msg: Control.SubscribeOk) {
-		const subscribe = this.#send.get(msg.id)
+	recvSubscribeOk(msg: Control.SubscribeOk) {
+		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
 			throw new Error(`subscribe ok for unknown id: ${msg.id}`)
 		}
@@ -73,55 +64,52 @@ export class Subscribe {
 		subscribe.onOk()
 	}
 
-	async onError(msg: Control.SubscribeError) {
-		const subscribe = this.#send.get(msg.id)
+	async recvSubscribeError(msg: Control.SubscribeError) {
+		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
 			throw new Error(`subscribe error for unknown id: ${msg.id}`)
 		}
 
 		await subscribe.onError(msg.code, msg.reason)
 	}
+
+	async recvObject(header: Header, stream: ReadableStream<Uint8Array>) {
+		const subscribe = this.#subscribe.get(header.track)
+		if (!subscribe) {
+			throw new Error(`data for for unknown track: ${header.track}`)
+		} else {
+			await subscribe.onData(header, stream)
+		}
+	}
 }
 
-export class SubscribeRecv {
+export class AnnounceRecv {
 	#control: Control.Stream
-	#objects: Objects
-	#id: bigint
 
 	readonly namespace: string
-	readonly track: string
 
-	// The current state of the subscription.
+	// The current state of the announce
 	#state: "init" | "ack" | "closed" = "init"
 
-	constructor(control: Control.Stream, objects: Objects, id: bigint, namespace: string, track: string) {
+	constructor(control: Control.Stream, namespace: string) {
 		this.#control = control // so we can send messages
-		this.#objects = objects // so we can send objects
-		this.#id = id
 		this.namespace = namespace
-		this.track = track
 	}
 
 	// Acknowledge the subscription as valid.
-	async ack() {
+	async ok() {
 		if (this.#state !== "init") return
 		this.#state = "ack"
 
 		// Send the control message.
-		return this.#control.send({ type: Control.Type.SubscribeOk, id: this.#id })
+		return this.#control.send({ type: Control.Type.AnnounceOk, namespace: this.namespace })
 	}
 
-	// Close the subscription with an error.
 	async close(code = 0n, reason = "") {
 		if (this.#state === "closed") return
 		this.#state = "closed"
 
-		return this.#control.send({ type: Control.Type.SubscribeError, id: this.#id, code, reason })
-	}
-
-	// Create a writable data stream
-	async data(header: { group: bigint; sequence: bigint; send_order: number }) {
-		return this.#objects.send({ track: this.#id, ...header })
+		return this.#control.send({ type: Control.Type.AnnounceError, namespace: this.namespace, code, reason })
 	}
 }
 
