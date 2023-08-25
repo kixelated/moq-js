@@ -157,9 +157,7 @@ export function Publish() {
 	createEffect(() => broadcast()?.attach(preview))
 
 	// Fetch the list of devices.
-	const devices = createFetch(async () => {
-		return await window.navigator.mediaDevices.enumerateDevices()
-	})
+	const devices = createFetch(() => window.navigator.mediaDevices.enumerateDevices(), true)
 
 	const getDevices = (deviceType: MediaDeviceKind) => {
 		return devices()?.filter((device: MediaDeviceInfo) => device.kind == deviceType) || []
@@ -278,7 +276,6 @@ function Video(props: {
 	devices: MediaDeviceInfo[]
 }) {
 	const [codec, setCodec] = createStore<VideoCodec>(VIDEO_CODEC_UNDEF)
-	const [deviceId, setDeviceId] = createSignal(props.devices[0]?.deviceId)
 
 	// Fetch the list of supported codecs.
 	const [supportedCodecs] = createResource(
@@ -344,18 +341,9 @@ function Video(props: {
 		return [...unique]
 	}
 
-	const getDeviceId = (deviceId: string) => {
-		const device = props.devices.find((device: MediaDeviceInfo) => device.deviceId == deviceId)
-		return device ? device.deviceId : ""
-	}
-
 	// Update the store with our computed value.
 	createEffect(() => {
 		props.setConfig({ codec: codec.value })
-	})
-
-	createEffect(() => {
-		props.setConfig({ deviceId: deviceId() })
 	})
 
 	return (
@@ -366,12 +354,12 @@ function Video(props: {
 			<select
 				name="video-input"
 				class="rounded-md border-0 bg-slate-700 text-sm shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-600"
-				onInput={(e) => setDeviceId(getDeviceId(e.target.value))}
+				onInput={(e) => props.setConfig({ deviceId: e.target.value })}
 			>
 				<For each={[...props.devices]}>
 					{(device) => {
 						return (
-							<option value={device.deviceId} selected={deviceId() === device.deviceId}>
+							<option value={device.deviceId} selected={props.config.deviceId === device.deviceId}>
 								{device.label}
 							</option>
 						)
@@ -483,17 +471,6 @@ function Audio(props: {
 	advanced: boolean
 	devices: MediaDeviceInfo[]
 }) {
-	const [deviceId, setDeviceId] = createSignal(props.devices[0]?.deviceId)
-
-	const getDeviceId = (deviceId: string) => {
-		const device = props.devices.find((device: MediaDeviceInfo) => device.deviceId == deviceId)
-		return device ? device.deviceId : ""
-	}
-
-	createEffect(() => {
-		props.setConfig({ deviceId: deviceId() })
-	})
-
 	return (
 		<>
 			<header class="col-span-2 mt-6 border-b-2 border-green-600 pl-3 text-xl">Audio</header>
@@ -502,12 +479,12 @@ function Audio(props: {
 			<select
 				name="audio-input"
 				class="rounded-md border-0 bg-slate-700 text-sm shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-500"
-				onInput={(e) => setDeviceId(getDeviceId(e.target.value))}
+				onInput={(e) => props.setConfig({ deviceId: e.target.value })}
 			>
-				<For each={[...props.devices]}>
+				<For each={props.devices}>
 					{(device) => {
 						return (
-							<option value={device.deviceId} selected={deviceId() === device.deviceId}>
+							<option value={device.deviceId} selected={props.config.deviceId === device.deviceId}>
 								{device.label}
 							</option>
 						)

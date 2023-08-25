@@ -27,7 +27,7 @@ export function Connect(props: { children: any }) {
 					{error()!.name}: {error()!.message}
 				</div>
 			</Show>
-			{props.children}
+			<Show when={connection}>{props.children}</Show>
 		</context.Provider>
 	)
 }
