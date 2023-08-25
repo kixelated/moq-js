@@ -85,7 +85,7 @@ export class Queue<T> {
 
 	constructor(capacity = 1) {
 		const queue = new CountQueuingStrategy({ highWaterMark: capacity })
-		this.#stream = new TransformStream({}, queue)
+		this.#stream = new TransformStream({}, undefined, queue)
 		this.#reader = this.#stream.readable.getReader()
 		this.#writer = this.#stream.writable.getWriter()
 	}
