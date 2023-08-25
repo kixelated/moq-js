@@ -41,7 +41,7 @@ brew install mkcert # see instructions for other platforms
 npm run cert
 ```
 
-Or if you are using SSS as server you can use the certs generated there by using:
+Or if you are using [moq-rs](https://github.com/kixelated/moq-rs) as server you can use the certs generated there by using:
 
 ```bash
 cd certs
