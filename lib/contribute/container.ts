@@ -1,4 +1,4 @@
-import * as MP4 from "../common/mp4"
+import * as MP4 from "../media/mp4"
 import { Chunk } from "./chunk"
 
 type DecoderConfig = AudioDecoderConfig | VideoDecoderConfig

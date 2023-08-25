@@ -2,17 +2,14 @@
 	"extends": "../tsconfig.json",
 	"include": ["."],
 	"compilerOptions": {
-		"types": ["dom-mediacapture-transform", "dom-webcodecs", "web"]
+		"types": ["mp4box", "web"]
 	},
 	"references": [
-		{
-			"path": "../common"
-		},
 		{
 			"path": "../transport"
 		},
 		{
-			"path": "../media"
+			"path": "../common"
 		}
 	]
 }

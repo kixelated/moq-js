@@ -1,4 +1,4 @@
-import * as MP4 from "../../common/mp4"
+import * as MP4 from "../../media/mp4"
 import { Frame } from "./timeline"
 
 // Decode a MP4 container into individual frames.

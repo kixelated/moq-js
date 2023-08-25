@@ -1,14 +1,13 @@
 import { Broadcast, VideoEncoder, AudioEncoderCodecs } from "@kixelated/moq/contribute"
-import { Client } from "@kixelated/moq/transport"
-import { asError } from "@kixelated/moq/common"
 
-import { createEffect, createSignal, For, createResource, Show } from "solid-js"
-
+import { createEffect, createSignal, For, createResource, Show, Switch, Match, createMemo } from "solid-js"
 import { SetStoreFunction, Store, createStore } from "solid-js/store"
 
+import { Listing } from "./watch"
+import { createFetch } from "./common"
+import { useConnection } from "./connection"
+
 interface GeneralConfig {
-	server: string
-	local: boolean
 	name: string
 }
 
@@ -109,42 +108,15 @@ const VIDEO_CODECS: VideoCodec[] = [
 	{ name: "h.264", profile: "baseline", value: "avc1.420034" },
 ]
 
-export function Setup(props: { setBroadcast(v: Broadcast | undefined): void; setError(e: Error): void }) {
-	const params = new URLSearchParams(window.location.search)
-
-	// Defaults based on the query parameters and environment.
-	const server =
-		params.get("server") ?? process.env.NODE_ENV === "production" ? "moq-demo.englishm.net:4443" : "localhost:4443"
-	const local = params.get("local") === "true" || process.env.NODE_ENV !== "production"
-
-	const [general, setGeneral] = createStore<GeneralConfig>({
-		server,
-		local,
-		name: "",
-	})
-
+export function Publish() {
+	const [general, setGeneral] = createStore<GeneralConfig>({ name: "" })
 	const [audio, setAudio] = createStore<AudioConfig>(AUDIO_DEFAULT)
 	const [video, setVideo] = createStore<VideoConfig>(VIDEO_DEFAULT)
-	const [inputDevices, setInputDevices] = createStore<MediaDeviceInfo[]>([])
 
-	const [loading, setLoading] = createSignal(false)
-
-	// Starting establishing the connection when the load button is clicked.
-	const [connection] = createResource(loading, async () => {
-		const url = "https://" + general.server
-
-		// Start connecting while we wait for the media to be ready.
-		const client = new Client({
-			url: url,
-			role: "both",
-			fingerprint: general.local ? url + "/fingerprint" : undefined,
-		})
-
-		return await client.connect()
-	})
+	const connection = useConnection()
 
 	// Start loading the selected media device.
-	const [media] = createResource(loading, async () => {
+	const media = createFetch(async () => {
 		const width = Math.ceil((video.height * 16) / 9)
 
 		return await window.navigator.mediaDevices.getUserMedia({
@@ -163,62 +135,50 @@ export function Setup(props: { setBroadcast(v: Broadcast | undefined): void; set
 		})
 	})
 
-	// Load the connection and media, then run the broadcast.
-	createEffect(async () => {
-		try {
-			const c = connection()
-			const m = media()
-			if (!c || !m) return // Don't unset loading since the other is still loading
+	const broadcast = createMemo(() => {
+		const m = media()
+		const c = connection()
+		if (!m || !c) return
 
-			let full = general.name != "" ? general.name : crypto.randomUUID()
-			full = `anon.quic.video/${full}`
+		let full = general.name != "" ? general.name : crypto.randomUUID()
+		full = `anon.quic.video/${full}`
 
-			const b = new Broadcast({
-				connection: c,
-				media: m,
-				name: full,
-				audio: { codec: "opus", bitrate: 128_000 },
-				video: { codec: video.codec, bitrate: video.bitrate },
-			})
-
-			props.setBroadcast(b)
-
-			try {
-				await Promise.any([b.run(), c.run()])
-			} finally {
-				props.setBroadcast(undefined)
-				setLoading(false)
-			}
-		} catch (e) {
-			props.setError(asError(e))
-			setLoading(false)
-		}
+		return new Broadcast({
+			connection: c,
+			media: m,
+			name: full,
+			audio: { codec: "opus", bitrate: 128_000 },
+			video: { codec: video.codec, bitrate: video.bitrate },
+		})
 	})
 
+	const broadcastClosed = createFetch((b) => b?.closed(), broadcast)
+
+	createEffect(() => broadcast()?.attach(preview))
+
 	// Fetch the list of devices.
-	const [devices] = createResource(async () => {
+	const devices = createFetch(async () => {
 		return await window.navigator.mediaDevices.enumerateDevices()
 	})
 
-	createEffect(() => {
-		const allDevices = devices()
-		if (allDevices && allDevices.length > 0) {
-			setInputDevices(
-				allDevices.filter(
-					(device: MediaDeviceInfo) => device.kind == "videoinput" || device.kind == "audioinput",
-				),
-			)
-		}
-	})
-
 	const getDevices = (deviceType: MediaDeviceKind) => {
-		return inputDevices.filter((device: MediaDeviceInfo) => device.kind == deviceType)
+		return devices()?.filter((device: MediaDeviceInfo) => device.kind == deviceType) || []
 	}
 
 	const start = (e: Event) => {
 		e.preventDefault()
-		setLoading(true)
+		media.fetch(undefined)
 	}
+
+	// Return a single error when something fails, in order of importance
+	const error = createMemo(() => {
+		return media.error() ?? broadcastClosed()
+	})
+
+	// Report errors to terminal too so we'll get stack traces
+	createEffect(() => {
+		if (error()) console.error(error())
+	})
 
 	const [advanced, setAdvanced] = createSignal(false)
 	const toggleAdvanced = (e: MouseEvent) => {
@@ -226,17 +186,32 @@ export function Setup(props: { setBroadcast(v: Broadcast | undefined): void; set
 		setAdvanced(!advanced())
 	}
 
-	if (!("WebTransport" in window)) {
-		props.setError(new Error("WebTransport is required; try another browser"))
-	} else if (!("VideoEncoder" in window) || !("AudioEncoder" in window)) {
-		props.setError(new Error("WebCodecs is required; try another browser"))
-	}
+	// Render the preview when the DOM is inserted
+	let preview: HTMLVideoElement
+	createEffect(() => broadcast()?.attach(preview))
 
 	return (
 		<>
-			<p class="p-6">
-				Create a <b class="text-green-500">PUBLIC</b> broadcast. Don't abuse it pls.
+			<p class="p-4">
+				<Switch>
+					<Match when={broadcast()}>
+						You've made a <b class="text-green-500">PUBLIC</b> broadcast. Don't abuse it pls.
+					</Match>
+					<Match when={!broadcast()}>
+						Make a <b class="text-green-500">PUBLIC</b> broadcast. Don't abuse it pls.
+					</Match>
+				</Switch>
 			</p>
+			<Show when={error()}>
+				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
+					{error()!.name}: {error()!.message}
+				</div>
+			</Show>
+			<Show when={broadcast()}>
+				<header class="mt-6 border-b-2 border-green-600 pl-3 text-xl">Preview</header>
+				<Listing name={broadcast()!.name} catalog={broadcast()!.catalog} />
+				<video ref={preview!} autoplay muted class="rounded-md" />
+			</Show>
 			<form class="grid items-center gap-x-6 gap-y-3 text-sm">
 				<General config={general} setConfig={setGeneral} advanced={advanced()} />
 				<Video config={video} setConfig={setVideo} devices={getDevices("videoinput")} advanced={advanced()} />
@@ -248,9 +223,12 @@ export function Setup(props: { setBroadcast(v: Broadcast | undefined): void; set
 						type="submit"
 						onClick={start}
 					>
-						<Show when={loading()} fallback="Go Live">
-							Connecting
-						</Show>
+						<Switch fallback="Go Live">
+							<Match when={error()}>Error</Match>
+							<Match when={broadcast()}>Live</Match>
+							<Match when={media.loading()}>Starting</Match>
+							<Match when={!connection()}>Connecting</Match>
+						</Switch>
 					</button>
 					<a onClick={toggleAdvanced} class="basis-1/2 p-2 text-center">
 						<Show when={advanced()} fallback="Advanced">
@@ -271,26 +249,7 @@ function General(props: {
 	return (
 		<>
 			<Show when={props.advanced}>
-				<header class="col-span-2 my-3 border-b-2 border-green-600 pl-3 text-xl">General</header>
-
-				<label for="url" class="col-start-1 p-2">
-					Server
-				</label>
-				<div class="flex items-center gap-3">
-					<input
-						name="server"
-						class="flex-grow rounded-md border-0 bg-slate-700 text-sm shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-600"
-						value={props.config.server}
-						onInput={(e) => props.setConfig({ server: e.target.value })}
-					/>
-					<label for="local">Self-Signed?</label>
-					<input
-						name="local"
-						type="checkbox"
-						checked={props.config.local}
-						onInput={(e) => props.setConfig({ local: e.target.checked })}
-					/>
-				</div>
+				<header class="col-span-2 mt-6 border-b-2 border-green-600 pl-3 text-xl">General</header>
 
 				<label for="name" class="p-2">
 					Name
@@ -401,7 +360,7 @@ function Video(props: {
 
 	return (
 		<>
-			<header class="col-span-2 my-3 border-b-2 border-green-600 pl-3 text-xl">Video</header>
+			<header class="col-span-2 mt-6 border-b-2 border-green-600 pl-3 text-xl">Video</header>
 
 			<label class="p-2">Input</label>
 			<select
@@ -537,7 +496,7 @@ function Audio(props: {
 
 	return (
 		<>
-			<header class="col-span-2 my-3 border-b-2 border-green-600 pl-3 text-xl">Audio</header>
+			<header class="col-span-2 mt-6 border-b-2 border-green-600 pl-3 text-xl">Audio</header>
 
 			<label class="p-2">Input</label>
 			<select
@@ -615,3 +574,6 @@ function Audio(props: {
 		</>
 	)
 }
+
+// We take the client used to create the broadcast so we can create a sharable link
+export function Preview() {}

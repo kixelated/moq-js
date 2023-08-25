@@ -1,7 +1,6 @@
 import * as Control from "./control"
 import { Header, Objects } from "./object"
-import { Queue, Watch } from "../common/async"
-import { AnnounceSend, AnnounceRecv } from "./announce"
+import { Queue } from "../common/async"
 
 export class Subscribe {
 	// Use to send control messages.
@@ -23,17 +22,17 @@ export class Subscribe {
 		this.#objects = objects
 	}
 
-	async send(name: string, announce: AnnounceRecv) {
+	async send(namespace: string, track: string) {
 		const id = this.#sendNext++
 
-		const subscribe = new SubscribeSend(this.#control, id, announce, name)
+		const subscribe = new SubscribeSend(this.#control, id, namespace, track)
 		this.#send.set(id, subscribe)
 
 		await this.#control.send({
 			type: Control.Type.Subscribe,
 			id,
-			namespace: announce.namespace,
-			name,
+			namespace,
+			name: track,
 		})
 
 		return subscribe
@@ -44,12 +43,12 @@ export class Subscribe {
 		return this.#recvQueue.next()
 	}
 
-	async onSubscribe(msg: Control.Subscribe, announce: AnnounceSend) {
+	async onSubscribe(msg: Control.Subscribe) {
 		if (this.#recv.has(msg.id)) {
 			throw new Error(`duplicate subscribe for id: ${msg.id}`)
 		}
 
-		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg.id, announce, msg.name)
+		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg.id, msg.namespace, msg.name)
 		this.#recv.set(msg.id, subscribe)
 		await this.#recvQueue.push(subscribe)
 
@@ -89,18 +88,18 @@ export class SubscribeRecv {
 	#objects: Objects
 	#id: bigint
 
-	readonly announce: AnnounceSend
-	readonly name: string
+	readonly namespace: string
+	readonly track: string
 
 	// The current state of the subscription.
 	#state: "init" | "ack" | "closed" = "init"
 
-	constructor(control: Control.Stream, objects: Objects, id: bigint, announce: AnnounceSend, name: string) {
+	constructor(control: Control.Stream, objects: Objects, id: bigint, namespace: string, track: string) {
 		this.#control = control // so we can send messages
 		this.#objects = objects // so we can send objects
 		this.#id = id
-		this.announce = announce
-		this.name = name
+		this.namespace = namespace
+		this.track = track
 	}
 
 	// Acknowledge the subscription as valid.
@@ -128,107 +127,45 @@ export class SubscribeRecv {
 
 export class SubscribeSend {
 	#control: Control.Stream
+	#id: bigint
 
-	readonly #id: bigint
-	readonly announce: AnnounceRecv
-	readonly name: string
-
-	// The current state, updated by control messages.
-	#state = new Watch<"init" | "ack" | Error>("init")
+	readonly namespace: string
+	readonly track: string
 
 	// A queue of received streams for this subscription.
 	#data = new Queue<{ header: Header; stream: ReadableStream<Uint8Array> }>()
 
-	constructor(control: Control.Stream, id: bigint, announce: AnnounceRecv, name: string) {
+	constructor(control: Control.Stream, id: bigint, namespace: string, track: string) {
 		this.#control = control // so we can send messages
 		this.#id = id
-		this.announce = announce
-		this.name = name
-	}
-
-	// Resolved when the remote sends an ok, rejected when the remote sends an error.
-	async acked() {
-		for (;;) {
-			const [state, next] = this.#state.value()
-			if (state === "ack") return
-			if (state instanceof Error) throw state
-			if (!next) throw new Error("closed")
-
-			await next
-		}
-	}
-
-	// Resolved when the subscription is closed.
-	async active() {
-		for (;;) {
-			const [state, next] = this.#state.value()
-			if (state instanceof Error) throw state
-			if (!next) return
-
-			await next
-		}
-	}
-
-	closed() {
-		const [state, next] = this.#state.value()
-		return state instanceof Error || next == undefined
+		this.namespace = namespace
+		this.track = track
 	}
 
 	async close(code = 0n, reason = "") {
-		if (this.closed()) {
-			// Already closed
-			return
-		}
-
 		// TODO implement unsubscribe
 		// await this.#inner.sendReset(code, reason)
-
-		if (reason !== "") {
-			reason = `: ${reason}`
-		}
-
-		const err = new Error(`local error (${code})${reason}`)
-		await this.#close(err)
 	}
 
 	onOk() {
-		if (this.closed()) return
-		this.#state.update("ack")
+		// noop
 	}
 
 	async onError(code: bigint, reason: string) {
-		if (this.closed()) return
+		if (code == 0n) {
+			return await this.#data.close()
+		}
 
 		if (reason !== "") {
 			reason = `: ${reason}`
 		}
 
-		const err = new Error(`remote error (${code})${reason}`)
-		await this.#close(err)
+		const err = new Error(`SUBSCRIBE_ERROR (${code})${reason}`)
+		return await this.#data.abort(err)
 	}
 
 	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
-		if (this.closed()) {
-			// Cancel the stream immediately because we're closed
-			await stream.cancel()
-		} else {
-			await this.#data.push({ header, stream })
-		}
-	}
-
-	async #close(err: Error) {
-		if (this.closed()) return
-
-		await this.#data.close()
-
-		for (;;) {
-			const sub = await this.#data.next()
-			if (!sub) break
-			await sub.stream.cancel()
-		}
-
-		this.#state.update(err)
-		this.#state.close()
+		if (!this.#data.closed()) await this.#data.push({ header, stream })
 	}
 
 	// Receive the next a readable data stream

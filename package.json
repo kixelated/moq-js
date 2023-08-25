@@ -36,18 +36,19 @@
 		"@typescript-eslint/parser": "^6.4.0",
 		"autoprefixer": "^10.4.15",
 		"babel-preset-solid": "^1.7.7",
-		"eslint": "^8.43.0",
+		"eslint": "^8.47.0",
 		"eslint-config-prettier": "^9.0.0",
 		"eslint-plugin-prettier": "^5.0.0",
+		"eslint-plugin-solid": "^0.13.0",
 		"parcel": "^2.9.2",
 		"postcss": "^8.4.24",
 		"prettier": "^3.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.2",
+		"process": "^0.11.10",
 		"tailwindcss": "^3.3.2",
 		"typescript": "^5.1.6"
 	},
 	"dependencies": {
-		"@kixelated/moq": "*",
 		"@solidjs/router": "^0.8.3",
 		"solid-js": "^1.7.7"
 	}

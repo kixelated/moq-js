@@ -1,16 +1,19 @@
+import { ErrorBoundary } from "solid-js"
 import { render } from "solid-js/web"
 import { A, Route, Router, Routes } from "@solidjs/router"
 
-const icons = {
-	logo: new URL("./nav/logo.svg", import.meta.url),
-	watch: new URL("./nav/watch.svg", import.meta.url),
-	publish: new URL("./nav/publish.svg", import.meta.url),
-	explain: new URL("./nav/explain.svg", import.meta.url),
-	source: new URL("./nav/source.svg", import.meta.url),
-}
+import { Watch, Listings } from "./watch"
+import { Publish } from "./publish"
+import { Connect } from "./connection"
 
-import Watch from "./watch"
-import Publish from "./publish"
+// Import the icons using this trick so Parcel can rewrite the URLs.
+const icons = {
+	logo: new URL("./img/logo.svg", import.meta.url),
+	watch: new URL("./img/watch.svg", import.meta.url),
+	publish: new URL("./img/publish.svg", import.meta.url),
+	explain: new URL("./img/explain.svg", import.meta.url),
+	source: new URL("./img/source.svg", import.meta.url),
+}
 
 function Home() {
 	return "UNDER CONTRSTRUCTION"
@@ -20,7 +23,7 @@ function Main() {
 	return (
 		<Router>
 			<div class="flex flex-col sm:flex-row">
-				<div class="flex-grow"></div>
+				<div class="flex-grow" />
 				<nav class="flex basis-[120] flex-row items-center sm:basis-[200] sm:flex-col">
 					<A href="/" class="p-4">
 						<img src={icons.logo.toString()} width="200" alt="Media over QUIC" />
@@ -41,13 +44,25 @@ function Main() {
 					</div>
 				</nav>
 				<div class="basis-[720] p-4">
-					<Routes>
-						<Route path="/" component={Home} />
-						<Route path="/watch" component={Watch} />
-						<Route path="/publish" component={Publish} />
-					</Routes>
+					<ErrorBoundary
+						fallback={(err: Error) => (
+							<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
+								Uncaught Error: {err.name}: {err.message}
+							</div>
+						)}
+					>
+						<Connect>
+							<Routes>
+								<Route path="/" component={Home} />
+								<Route path="/watch" component={Listings} />
+								<Route path="/watch/*name" component={Watch} />
+								<Route path="/publish" component={Publish} />
+								<Route path="/*all" element={<p>404 Not found</p>} />
+							</Routes>
+						</Connect>
+					</ErrorBoundary>
 				</div>
-				<div class="flex-grow"></div>
+				<div class="flex-grow" />
 			</div>
 		</Router>
 	)
