@@ -6,6 +6,11 @@ terraform {
     }
   }
 
+  backend "gcs" {
+    bucket = "quic-video-tfstate"
+    prefix = "terraform/state"
+  }
+
   required_version = ">= 0.14"
 }
 
