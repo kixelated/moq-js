@@ -1,5 +1,4 @@
-import { Connection } from "../transport/connection"
-import { SubscribeRecv } from "../transport/subscribe"
+import { Connection, SubscribeRecv } from "../transport"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
@@ -96,8 +95,6 @@ export class Broadcast {
 			for (;;) {
 				const subscriber = await this.connection.subscribed()
 				if (!subscriber) break
-
-				console.log("got a subscription", subscriber)
 
 				// Run an async task to serve each subscription.
 				this.#serveSubscribe(subscriber).catch((e) => {
