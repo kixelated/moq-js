@@ -1,9 +1,8 @@
-import { Connection } from "../transport/connection"
-import { SubscribeRecv } from "../transport/subscribe"
+import { Connection, SubscribeRecv } from "../transport"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
-import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../common/catalog"
+import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../media/catalog"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
@@ -30,6 +29,8 @@ export class Broadcast {
 	readonly catalog: Catalog
 	readonly connection: Connection
 
+	#running: Promise<void>
+
 	constructor(config: BroadcastConfig) {
 		this.connection = config.connection
 		this.config = config
@@ -47,8 +48,8 @@ export class Broadcast {
 				container: "mp4",
 				namespace: config.name,
 				kind: media.kind,
-				init: `${track.name}.mp4`,
-				data: `${track.name}.m4s`,
+				init_track: `${track.name}.mp4`,
+				data_track: `${track.name}.m4s`,
 			}
 
 			if (isVideoTrackSettings(settings)) {
@@ -81,32 +82,18 @@ export class Broadcast {
 
 			this.catalog.tracks.push(catalog)
 		}
+
+		this.#running = this.#run()
 	}
 
-	// Run the broadcast.
-	async run() {
-		await Promise.all([this.#runAnnounce(), this.#runTracks()])
-	}
-
-	async #runTracks() {
-		// For each track, call the run method.
-		const tracks = [...this.#tracks.values()]
-		await Promise.all(tracks.map((track) => track.run()))
-	}
-
-	// Attach the captured video stream to the given video element.
-	preview(video: HTMLVideoElement) {
-		video.srcObject = this.config.media
-	}
-
-	async #runAnnounce() {
+	async #run() {
 		// Announce the namespace and wait for an explicit OK.
-		const announce = await this.connection.announce.send(this.config.name)
+		const announce = await this.connection.announce(this.config.name)
 		await announce.ok()
 
 		try {
 			for (;;) {
-				const subscriber = await this.connection.subscribe.recv()
+				const subscriber = await this.connection.subscribed()
 				if (!subscriber) break
 
 				// Run an async task to serve each subscription.
@@ -123,7 +110,12 @@ export class Broadcast {
 
 	async #serveSubscribe(subscriber: SubscribeRecv) {
 		try {
-			const [base, ext] = splitExt(subscriber.name)
+			if (subscriber.namespace != this.config.name) {
+				// Don't reuse connections if you get this error; we don't demultiplex them.
+				throw new Error(`unknown namespace: ${subscriber.namespace}`)
+			}
+
+			const [base, ext] = splitExt(subscriber.track)
 			if (ext === "catalog") {
 				await this.#serveCatalog(subscriber, base)
 			} else if (ext === "mp4") {
@@ -131,7 +123,7 @@ export class Broadcast {
 			} else if (ext === "m4s") {
 				await this.#serveTrack(subscriber, base)
 			} else {
-				throw new Error(`unknown subscription: ${subscriber.name}`)
+				throw new Error(`unknown subscription: ${subscriber.track}`)
 			}
 		} catch (e) {
 			const err = asError(e)
@@ -173,7 +165,7 @@ export class Broadcast {
 
 	async #serveInit(subscriber: SubscribeRecv, name: string) {
 		const track = this.#tracks.get(name)
-		if (!track) throw new Error(`no track with name ${subscriber.name}`)
+		if (!track) throw new Error(`no track with name ${subscriber.track}`)
 
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
@@ -205,7 +197,7 @@ export class Broadcast {
 
 	async #serveTrack(subscriber: SubscribeRecv, name: string) {
 		const track = this.#tracks.get(name)
-		if (!track) throw new Error(`no track with name ${subscriber.name}`)
+		if (!track) throw new Error(`no track with name ${subscriber.track}`)
 
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
@@ -236,8 +228,23 @@ export class Broadcast {
 		await segment.chunks().pipeTo(stream)
 	}
 
+	// Attach the captured video stream to the given video element.
+	attach(video: HTMLVideoElement) {
+		video.srcObject = this.config.media
+	}
+
 	get name() {
 		return this.config.name
+	}
+
+	// Returns the error message when the connection is closed
+	async closed(): Promise<Error> {
+		try {
+			await this.#running
+			return new Error("closed") // clean termination
+		} catch (e) {
+			return asError(e)
+		}
 	}
 }
 

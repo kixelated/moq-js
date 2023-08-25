@@ -9,7 +9,7 @@ It requires a server, such as [moq-rs](https://github.com/kixelated/moq-rs).
 ## Usage
 
 ```
-npm i -S @kixelated/moq
+npm install @kixelated/moq
 ```
 
 ## License

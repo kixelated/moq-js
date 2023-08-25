@@ -1,21 +1,25 @@
 import * as Message from "./worker/message"
-import { Broadcast } from "./broadcast"
 import { Port } from "./port"
 
 import { Context } from "./context"
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
 import { RingShared } from "../common/ring"
-import { isAudioTrack, isMp4Track, Mp4Track } from "../common/catalog"
+import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
+import { asError } from "../common/error"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
 
+export interface PlayerConfig {
+	connection: Connection
+	namespace: string
+	catalog: Catalog // TODO optional; fetch if not provided
+}
+
 // This class must be created on the main thread due to AudioContext.
 export class Player {
-	#connection: Connection
 	#port: Port
-	#broadcast: Broadcast
 
 	// The audio context, which must be created on the main thread.
 	#context?: Context
@@ -23,22 +27,32 @@ export class Player {
 	// A periodically updated timeline
 	#timeline = new Watch<Timeline | undefined>(undefined)
 
-	constructor(connection: Connection, broadcast: Broadcast) {
-		this.#broadcast = broadcast
+	#running: Promise<void>
+
+	readonly connection: Connection
+	readonly namespace: string
+	readonly catalog: Catalog
+
+	constructor(config: PlayerConfig) {
 		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
-		this.#connection = connection
+		this.connection = config.connection
+		this.namespace = config.namespace
+		this.catalog = config.catalog
+
+		// Async work
+		this.#running = this.#run()
 	}
 
-	async run() {
+	async #run() {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
 
-		for (const track of this.#broadcast.catalog.tracks) {
+		for (const track of this.catalog.tracks) {
 			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
 			}
 
-			inits.add(track.init)
+			inits.add(track.init_track)
 			tracks.push(track)
 		}
 
@@ -51,7 +65,7 @@ export class Player {
 	}
 
 	async #runInit(name: string) {
-		const sub = await this.#broadcast.subscribe(name)
+		const sub = await this.connection.subscribe(this.namespace, name)
 		try {
 			const init = await sub.data()
 			if (!init) throw new Error("no init data")
@@ -74,7 +88,7 @@ export class Player {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		const sub = await this.#broadcast.subscribe(track.data)
+		const sub = await this.connection.subscribe(this.namespace, track.data_track)
 		try {
 			for (;;) {
 				const segment = await sub.data()
@@ -85,7 +99,7 @@ export class Player {
 				}
 
 				this.#port.sendSegment({
-					init: track.init,
+					init: track.init_track,
 					kind: track.kind,
 					header: segment.header,
 					stream: segment.stream,
@@ -101,7 +115,7 @@ export class Player {
 		let sampleRate: number | undefined
 		let channels: number | undefined
 
-		for (const track of this.#broadcast.catalog.tracks) {
+		for (const track of this.catalog.tracks) {
 			if (!isAudioTrack(track)) continue
 
 			if (sampleRate && track.sample_rate !== sampleRate) {
@@ -143,6 +157,15 @@ export class Player {
 		// TODO
 	}
 
+	async closed(): Promise<Error> {
+		try {
+			await this.#running
+			return new Error("closed") // clean termination
+		} catch (e) {
+			return asError(e)
+		}
+	}
+
 	/*
 	play() {
 		this.#port.sendPlay({ minBuffer: 0.5 }) // TODO configurable
@@ -161,13 +184,5 @@ export class Player {
 
 			await next
 		}
-	}
-
-	get broadcast() {
-		return this.#broadcast
-	}
-
-	get connection() {
-		return this.#connection
 	}
 }

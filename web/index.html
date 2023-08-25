@@ -4,10 +4,22 @@
 		<meta charset="UTF-8" />
 		<title>quic.video</title>
 
-		<link rel="stylesheet" href="common/base.css" />
+		<style>
+			@tailwind base;
+			@tailwind components;
+			@tailwind utilities;
+
+			a {
+				@apply font-bold text-green-500 hover:cursor-pointer hover:text-green-600;
+			}
+
+			html {
+				@apply bg-slate-900 text-slate-100;
+			}
+		</style>
 	</head>
 
 	<body>
-		<include src="nav.html"></include>
+		<script src="index.tsx" type="module"></script>
 	</body>
 </html>

@@ -56,7 +56,7 @@ export class Client {
 		const control = new Control.Stream(reader, writer)
 		const objects = new Objects(quic)
 
-		return new Connection(this, quic, control, objects)
+		return new Connection(quic, control, objects)
 	}
 
 	async #fetchFingerprint(url?: string): Promise<WebTransportHash | undefined> {

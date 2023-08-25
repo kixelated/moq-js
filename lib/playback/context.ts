@@ -6,7 +6,6 @@ export class Context {
 	worklet: Promise<AudioWorkletNode>
 
 	constructor(config: Message.ConfigAudio) {
-		console.log("renderer sample rate", config.sampleRate)
 		this.context = new AudioContext({
 			latencyHint: "interactive",
 			sampleRate: config.sampleRate,

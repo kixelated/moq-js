@@ -15,6 +15,7 @@ export class Track {
 
 	#offset = 0 // number of segments removed from the front of the queue
 	#closed = false
+	#error?: Error
 	#notify = new Notify()
 
 	#container = new Container()
@@ -33,9 +34,12 @@ export class Track {
 		} else {
 			throw new Error(`unknown track type: ${media.kind}`)
 		}
+
+		// Async function that closes on exit
+		this.#run().catch((e) => console.error("uncaught", e))
 	}
 
-	async run() {
+	async #run() {
 		// Encode the output into CMAF fragments
 		const chunks = this.#encoder.frames.pipeThrough(this.#container.encode)
 
@@ -43,6 +47,7 @@ export class Track {
 		const writer = new WritableStream({
 			write: (chunk) => this.#write(chunk),
 			close: () => this.#close(),
+			abort: (e) => this.#abort(e),
 		})
 
 		// Keep running until the encoder is closed
@@ -93,6 +98,11 @@ export class Track {
 		writer.releaseLock()
 	}
 
+	async #abort(e: Error) {
+		this.#error = e
+		await this.#close()
+	}
+
 	async #close() {
 		const current = this.#segments.at(-1)
 		if (current) {
@@ -128,7 +138,10 @@ export class Track {
 						return // Called again when more data is requested
 					}
 
-					if (this.#closed) {
+					if (this.#error) {
+						controller.error(this.#error)
+						return
+					} else if (this.#closed) {
 						controller.close()
 						return
 					}

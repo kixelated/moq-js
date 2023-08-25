@@ -1,7 +1,7 @@
 import * as Message from "./message"
 import { Ring } from "../../common/ring"
 import { Component, Frame } from "./timeline"
-import * as MP4 from "../../common/mp4"
+import * as MP4 from "../../media/mp4"
 
 // This is run in a worker.
 export class Renderer {
@@ -36,8 +36,6 @@ export class Renderer {
 		if (this.#decoder.state !== "configured") {
 			const track = frame.track
 			if (!MP4.isAudioTrack(track)) throw new Error("expected audio track")
-
-			console.log("decoder sample rate", track.audio.sample_rate)
 
 			// We only support OPUS right now which doesn't need a description.
 			this.#decoder.configure({

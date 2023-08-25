@@ -80,31 +80,41 @@ export class Notify {
 // Allows queuing N values, like a Channel.
 export class Queue<T> {
 	#stream: TransformStream<T, T>
-	#reader: ReadableStreamDefaultReader<T>
-	#writer: WritableStreamDefaultWriter<T>
+	#closed = false
 
 	constructor(capacity = 1) {
 		const queue = new CountQueuingStrategy({ highWaterMark: capacity })
 		this.#stream = new TransformStream({}, undefined, queue)
-		this.#reader = this.#stream.readable.getReader()
-		this.#writer = this.#stream.writable.getWriter()
 	}
 
 	async push(v: T) {
-		await this.#writer.write(v)
+		const w = this.#stream.writable.getWriter()
+		await w.write(v)
+		w.releaseLock()
 	}
 
 	async next(): Promise<T | undefined> {
-		const { value, done } = await this.#reader.read()
+		const r = this.#stream.readable.getReader()
+		const { value, done } = await r.read()
+		r.releaseLock()
+
 		if (done) return
 		return value
 	}
 
 	async abort(err: Error) {
-		return this.#writer.abort(err)
+		if (this.#closed) return
+		await this.#stream.writable.abort(err)
+		this.#closed = true
 	}
 
 	async close() {
-		return this.#writer.close()
+		if (this.#closed) return
+		await this.#stream.writable.close()
+		this.#closed = true
+	}
+
+	closed() {
+		return this.#closed
 	}
 }

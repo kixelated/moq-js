@@ -5,10 +5,11 @@ module.exports = {
 		"plugin:@typescript-eslint/recommended",
 		"plugin:@typescript-eslint/recommended-requiring-type-checking",
 		"plugin:@typescript-eslint/strict",
+		"plugin:solid/typescript",
 		"prettier",
 	],
 	parser: "@typescript-eslint/parser",
-	plugins: ["@typescript-eslint", "prettier"],
+	plugins: ["@typescript-eslint", "prettier", "solid"],
 	root: true,
 	env: {
 		browser: true,

@@ -1,5 +1,5 @@
 import { Frame, Component } from "./timeline"
-import * as MP4 from "../../common/mp4"
+import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 
 export class Renderer {

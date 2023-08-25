@@ -8,3 +8,7 @@ export function asError(e: any): Error {
 		return new Error(String(e))
 	}
 }
+
+export function isError(e: any): e is Error {
+	return e instanceof Error
+}

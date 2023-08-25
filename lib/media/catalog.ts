@@ -1,3 +1,7 @@
+import { Connection } from "../transport"
+import { Reader } from "../transport/stream"
+import { asError } from "../common/error"
+
 // JSON encoded catalog
 export class Catalog {
 	tracks = new Array<Track>()
@@ -19,6 +23,36 @@ export class Catalog {
 
 		return catalog
 	}
+
+	static async fetch(connection: Connection, namespace: string): Promise<Catalog> {
+		let raw: Uint8Array
+
+		const subscribe = await connection.subscribe(namespace, ".catalog")
+		try {
+			const segment = await subscribe.data()
+			if (!segment) throw new Error("no catalog data")
+
+			const { header, stream } = segment
+
+			if (header.sequence !== 0n) {
+				throw new Error("TODO delta updates not supported")
+			}
+
+			const reader = new Reader(stream)
+			raw = await reader.readAll()
+
+			await subscribe.close() // we done
+		} catch (e) {
+			const err = asError(e)
+
+			// Close the subscription after we're done.
+			await subscribe.close(1n, err.message)
+
+			throw err
+		}
+
+		return Catalog.decode(raw)
+	}
 }
 
 export function isCatalog(catalog: any): catalog is Catalog {
@@ -34,8 +68,8 @@ export interface Track {
 
 export interface Mp4Track extends Track {
 	container: "mp4"
-	init: string
-	data: string
+	init_track: string
+	data_track: string
 }
 
 export interface AudioTrack extends Track {
@@ -63,8 +97,8 @@ export function isTrack(track: any): track is Track {
 
 export function isMp4Track(track: any): track is Mp4Track {
 	if (track.container !== "mp4") return false
-	if (typeof track.init !== "string") return false
-	if (typeof track.data !== "string") return false
+	if (typeof track.init_track !== "string") return false
+	if (typeof track.data_track !== "string") return false
 	if (!isTrack(track)) return false
 	return true
 }

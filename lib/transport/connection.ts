@@ -1,9 +1,9 @@
 import * as Control from "./control"
 import { Objects } from "./object"
+import { asError } from "../common/error"
 
-import { Announce } from "./announce"
-import { Subscribe } from "./subscribe"
-import { Client } from "./client"
+import { Publisher } from "./publisher"
+import { Subscriber } from "./subscriber"
 
 export class Connection {
 	// The established WebTransport session.
@@ -15,38 +15,55 @@ export class Connection {
 	// Use to receive/send objects.
 	#objects: Objects
 
-	// The client used to create this connection.
-	readonly client: Client
+	// Module for contributing tracks.
+	#publisher: Publisher
 
-	// Module for announcing tracks.
-	readonly announce: Announce
+	// Module for distributing tracks.
+	#subscriber: Subscriber
 
-	// Module for subscribing to tracks
-	readonly subscribe: Subscribe
+	// Async work running in the background
+	#running: Promise<void>
 
-	constructor(client: Client, quic: WebTransport, control: Control.Stream, objects: Objects) {
+	constructor(quic: WebTransport, control: Control.Stream, objects: Objects) {
 		this.#quic = quic
 		this.#control = control
 		this.#objects = objects
 
-		this.client = client
-		this.subscribe = new Subscribe(this.#control, this.#objects)
-		this.announce = new Announce(this.#control, this.subscribe)
+		this.#publisher = new Publisher(this.#control, this.#objects)
+		this.#subscriber = new Subscriber(this.#control, this.#objects)
+
+		this.#running = this.#run()
 	}
 
 	close(code = 0, reason = "") {
 		this.#quic.close({ closeCode: code, reason })
 	}
 
-	async run() {
-		return Promise.all([this.#runControl(), this.#runObjects()])
+	async #run(): Promise<void> {
+		await Promise.all([this.#runControl(), this.#runObjects()])
+	}
+
+	announce(namespace: string) {
+		return this.#publisher.announce(namespace)
+	}
+
+	announced() {
+		return this.#subscriber.announced()
+	}
+
+	subscribe(namespace: string, track: string) {
+		return this.#subscriber.subscribe(namespace, track)
+	}
+
+	subscribed() {
+		return this.#publisher.subscribed()
 	}
 
 	async #runControl() {
 		// Receive messages until the connection is closed.
 		for (;;) {
 			const msg = await this.#control.recv()
-			await this.#receive(msg)
+			await this.#recv(msg)
 		}
 	}
 
@@ -55,24 +72,33 @@ export class Connection {
 			const obj = await this.#objects.recv()
 			if (!obj) break
 
-			await this.subscribe.onData(obj.header, obj.stream)
+			await this.#subscriber.recvObject(obj.header, obj.stream)
 		}
 	}
 
-	async #receive(msg: Control.Message) {
+	async #recv(msg: Control.Message) {
 		switch (msg.type) {
 			case Control.Type.Announce:
-				return this.announce.onAnnounce(msg)
+				return this.#subscriber.recvAnnounce(msg)
 			case Control.Type.AnnounceOk:
-				return this.announce.onOk(msg)
+				return this.#publisher.recvAnnounceOk(msg)
 			case Control.Type.AnnounceError:
-				return this.announce.onError(msg)
+				return this.#publisher.recvAnnounceError(msg)
 			case Control.Type.Subscribe:
-				return this.announce.onSubscribe(msg)
+				return this.#publisher.recvSubscribe(msg)
 			case Control.Type.SubscribeOk:
-				return this.subscribe.onOk(msg)
+				return this.#subscriber.recvSubscribeOk(msg)
 			case Control.Type.SubscribeError:
-				return this.subscribe.onError(msg)
+				return this.#subscriber.recvSubscribeError(msg)
+		}
+	}
+
+	async closed(): Promise<Error> {
+		try {
+			await this.#running
+			return new Error("closed")
+		} catch (e) {
+			return asError(e)
 		}
 	}
 }

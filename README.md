@@ -16,7 +16,7 @@ The library is released periodically and available on NPM.
 There's no documentation until the API settles down.
 
 ```bash
-npm install --save @kixelated/moq
+npm install @kixelated/moq
 ```
 
 ### Web
