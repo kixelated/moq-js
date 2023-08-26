@@ -2,9 +2,9 @@ import { ErrorBoundary } from "solid-js"
 import { render } from "solid-js/web"
 import { A, Route, Router, Routes } from "@solidjs/router"
 
-import { Watch, Listings } from "./watch"
+import { Watch } from "./watch"
+import { Listings } from "./listing"
 import { Publish } from "./publish"
-import { Connect } from "./connection"
 
 // Import the icons using this trick so Parcel can rewrite the URLs.
 const icons = {
@@ -51,15 +51,13 @@ function Main() {
 							</div>
 						)}
 					>
-						<Connect>
-							<Routes>
-								<Route path="/" component={Home} />
-								<Route path="/watch" component={Listings} />
-								<Route path="/watch/*name" component={Watch} />
-								<Route path="/publish" component={Publish} />
-								<Route path="/*all" element={<p>404 Not found</p>} />
-							</Routes>
-						</Connect>
+						<Routes>
+							<Route path="/" component={Home} />
+							<Route path="/watch" component={Listings} />
+							<Route path="/watch/*name" component={Watch} />
+							<Route path="/publish" component={Publish} />
+							<Route path="/*all" element={<p>404 Not found</p>} />
+						</Routes>
 					</ErrorBoundary>
 				</div>
 				<div class="flex-grow" />

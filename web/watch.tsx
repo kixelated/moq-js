@@ -1,32 +1,53 @@
 import { Player } from "@kixelated/moq/playback"
-import { Connection } from "@kixelated/moq/transport"
-import { useParams } from "@solidjs/router"
+import { Client, Connection } from "@kixelated/moq/transport"
+import { Catalog } from "@kixelated/moq/media"
 
-import { For, createEffect, Show, Switch, Match } from "solid-js"
-import {
-	AudioCatalogTrack,
-	Catalog,
-	VideoCatalogTrack,
-	isAudioCatalogTrack,
-	isVideoCatalogTrack,
-} from "@kixelated/moq/media"
-import { A } from "@solidjs/router"
-import { createFetch, createRunner } from "./common"
-import { useConnection } from "./connection"
+import { createEffect, onCleanup, Show } from "solid-js"
+import { useParams, useSearchParams } from "@solidjs/router"
+
+import { createRunner } from "./common"
+import { Listing } from "./listing"
 
 export function Watch() {
-	const params = useParams() // TODO can we type this better
+	const params = useParams<{ name: string }>()
+	const [query] = useSearchParams<{ server?: string }>()
+
 	const namespace = params.name
+	const server = query.server ?? process.env.RELAY_HOST
+
+	const connection = createRunner<Connection, string>(async (setConnection, server) => {
+		const url = `https://${server}`
+
+		// Special case localhost to fetch the TLS fingerprint from the server.
+		// TODO remove this when WebTransport correctly supports self-signed certificates
+		const fingerprint = server.startsWith("localhost") ? url + "/fingerprint" : undefined
+
+		const client = new Client({
+			url: `https://${server}`,
+			fingerprint,
+			role: "subscriber",
+		})
+
+		const connection = await client.connect()
+		setConnection(connection)
+
+		throw await connection.closed()
+	}, server)
+
+	createEffect(() => {
+		// Close the connection when the component is unmounted.
+		onCleanup(() => connection()?.close())
+	})
 
 	const player = createRunner<Player, Connection>(async (ready, connection) => {
 		// TODO move the catalog fetch into the player
-		const catalog = await Catalog.fetch(connection, params.name)
+		const catalog = await Catalog.fetch(connection, namespace)
 		const player = new Player({ connection, namespace, catalog })
 
 		ready(player)
 
 		throw await player.closed()
-	}, useConnection())
+	}, connection)
 
 	// Render the canvas when the DOM is inserted
 	let canvas: HTMLCanvasElement
@@ -46,91 +67,9 @@ export function Watch() {
 					{player.error()!.name}: {player.error()!.message}
 				</div>
 			</Show>
-			<Listing name={params.name} catalog={player()?.catalog} />
+			<Listing server={server} name={params.name} catalog={player()?.catalog} />
 			<canvas ref={canvas!} class="rounded-md" />
 		</>
-	)
-}
-
-export function Listings() {
-	const broadcasts = createRunner<string[], Connection>(async (set, connection) => {
-		let [announced, next] = connection.announced().value()
-		set(announced.map((a) => a.namespace))
-
-		while (next) {
-			;[announced, next] = await next
-			set(announced.map((a) => a.namespace))
-		}
-	}, useConnection())
-
-	return (
-		<>
-			<p class="p-4">
-				Watch a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
-			</p>
-
-			<header class="mt-6 border-b-2 border-green-600 pl-3 text-xl">Broadcasts</header>
-			<For
-				each={broadcasts()}
-				fallback={
-					<p class="p-4">
-						No live broadcasts. Somebody should <A href="/publish">PUBLISH</A>.
-					</p>
-				}
-			>
-				{(broadcast) => {
-					const catalog = createFetch(async (connection) => {
-						return await Catalog.fetch(connection, broadcast)
-					}, useConnection())
-
-					return <Listing name={broadcast} catalog={catalog()} />
-				}}
-			</For>
-		</>
-	)
-}
-
-export function Listing(props: { name: string; catalog?: Catalog }) {
-	function audioTrack(track: AudioCatalogTrack) {
-		return (
-			<>
-				audio: {track.codec} {track.sample_rate}Hz {track.channel_count}ch
-				<Show when={track.bit_rate}> {Math.round(track.bit_rate! / 1000) + "kb/s"}</Show>
-			</>
-		)
-	}
-
-	function videoTrack(track: VideoCatalogTrack) {
-		return (
-			<>
-				video: {track.codec} {track.width}x{track.height}
-				<Show when={track.bit_rate}> {(track.bit_rate! / 1000000).toFixed(1) + " mb/s"}</Show>
-			</>
-		)
-	}
-
-	return (
-		<div class="p-4">
-			<A href={"/watch/" + props.name} class="text-xl">
-				{props.name.replace(/\//, " / ")}
-			</A>
-			<div class="ml-4 text-xs italic text-gray-300">
-				<For each={props.catalog?.tracks}>
-					{(track) => (
-						<p>
-							<Switch fallback="unknown track">
-								<Match when={isVideoCatalogTrack(track)}>
-									{videoTrack(track as VideoCatalogTrack)}
-								</Match>
-								<Match when={isAudioCatalogTrack(track)}>
-									{audioTrack(track as AudioCatalogTrack)}
-								</Match>
-							</Switch>
-						</p>
-					)}
-				</For>
-			</div>
-		</div>
 	)
 }
 

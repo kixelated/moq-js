@@ -237,6 +237,10 @@ export class Broadcast {
 		return this.config.name
 	}
 
+	close() {
+		// TODO implement publish close
+	}
+
 	// Returns the error message when the connection is closed
 	async closed(): Promise<Error> {
 		try {

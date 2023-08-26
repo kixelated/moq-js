@@ -66,10 +66,11 @@ export function createFetch<T, S>(
 	return result
 }
 
-export interface Runner<T> {
+export interface Runner<T, S> {
 	(): T | undefined
 	running: Accessor<boolean>
 	error: Accessor<Error | undefined>
+	start: (s: S) => void
 }
 
 // Another take on createResource, this time for long-lived async functions.
@@ -78,7 +79,7 @@ export interface Runner<T> {
 export function createRunner<T, S>(
 	f: (set: Setter<T | undefined>, source: S) => Promise<void>,
 	source?: S | false | null | (() => S | undefined | false | null),
-): Runner<T> {
+): Runner<T, S> {
 	const [running, setRunning] = createSignal(false)
 	const [value, setValue] = createSignal<T | undefined>()
 	const [error, setError] = createSignal<Error | undefined>()
@@ -109,9 +110,10 @@ export function createRunner<T, S>(
 		if (s) start(s)
 	})
 
-	const result = value as Runner<T>
+	const result = value as Runner<T, S>
 	result.running = running
 	result.error = error
+	result.start = start
 	return result
 }
 
