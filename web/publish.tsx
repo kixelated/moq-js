@@ -5,8 +5,8 @@ import { SetStoreFunction, Store, createStore } from "solid-js/store"
 import { useSearchParams } from "@solidjs/router"
 
 import { Listing } from "./listing"
-import { createFetch, createRunner } from "./common"
-import { Client, Connection } from "@kixelated/moq/transport"
+import { createFetch } from "./common"
+import { connect } from "./connect"
 
 interface GeneralConfig {
 	server: string
@@ -121,24 +121,11 @@ export function Publish() {
 	const [audio, setAudio] = createStore<AudioConfig>(AUDIO_DEFAULT)
 	const [video, setVideo] = createStore<VideoConfig>(VIDEO_DEFAULT)
 
-	const connection = createRunner<Connection, string>(async (setConnection, server) => {
-		const url = `https://${server}`
+	// TODO make a replacement for store that uses accessors instead of magic.
+	const server = createMemo(() => general.server || process.env.RELAY_HOST)
 
-		// Special case localhost to fetch the TLS fingerprint from the server.
-		// TODO remove this when WebTransport correctly supports self-signed certificates
-		const fingerprint = server.startsWith("localhost") ? url + "/fingerprint" : undefined
-
-		const client = new Client({
-			url,
-			fingerprint,
-			role: "subscriber",
-		})
-
-		const connection = await client.connect()
-		setConnection(connection)
-
-		throw await connection.closed()
-	})
+	// eslint-disable-next-line solid/reactivity
+	const [connection, connectionError] = connect(server, "publisher")
 
 	// Start loading the selected media device.
 	const media = createFetch(async () => {
@@ -179,16 +166,8 @@ export function Publish() {
 	const broadcastClosed = createFetch((b) => b?.closed(), broadcast)
 
 	createEffect(() => {
-		// Attach the preview to the broadcast when it's ready.
-		broadcast()?.attach(preview)
-
 		// Close the broadcast when the component is unmounted.
 		onCleanup(() => broadcast()?.close())
-	})
-
-	createEffect(() => {
-		// Close the connection when the component is unmounted.
-		onCleanup(() => connection()?.close())
 	})
 
 	// Fetch the list of devices.
@@ -200,14 +179,12 @@ export function Publish() {
 
 	const start = (e: Event) => {
 		e.preventDefault()
-
-		connection.start(general.server || process.env.RELAY_HOST)
-		media.fetch(undefined)
+		media.fetch(true)
 	}
 
 	// Return a single error when something fails, in order of importance
 	const error = createMemo(() => {
-		return connection.error() ?? media.error() ?? broadcastClosed()
+		return connectionError() ?? media.error() ?? broadcastClosed()
 	})
 
 	// Report errors to terminal too so we'll get stack traces
@@ -227,7 +204,12 @@ export function Publish() {
 
 	return (
 		<>
-			<p class="p-3">
+			<Show when={error()}>
+				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
+					{error()!.name}: {error()!.message}
+				</div>
+			</Show>
+			<p class="p-4">
 				<Switch>
 					<Match when={broadcast()}>
 						You've made a <b class="text-green-500">PUBLIC</b> broadcast. Don't abuse it pls.
@@ -237,13 +219,8 @@ export function Publish() {
 					</Match>
 				</Switch>
 			</p>
-			<Show when={error()}>
-				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
-					{error()!.name}: {error()!.message}
-				</div>
-			</Show>
 			<Show when={broadcast()}>
-				<header class="mt-6 border-b-2 border-green-600 pl-3 text-xl">Preview</header>
+				<header class="mt-6 border-b-2 border-green-600 pl-4 text-xl">Preview</header>
 				<Listing server={general.server} name={broadcast()!.name} catalog={broadcast()!.catalog} />
 				<video ref={preview!} autoplay muted class="rounded-md" />
 			</Show>
@@ -256,13 +233,14 @@ export function Publish() {
 
 				<button
 					class="col-start-2 rounded-md bg-green-600 p-2 font-semibold shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+					classList={{ "bg-red-600": !!error(), "hover:bg-red-500": !!error() }}
 					type="submit"
 					onClick={start}
 				>
 					<Switch fallback="Go Live">
 						<Match when={error()}>Error</Match>
 						<Match when={broadcast()}>Live</Match>
-						<Match when={connection.running()}>Starting</Match>
+						<Match when={!connection()}>Connecting</Match>
 					</Switch>
 				</button>
 				<a onClick={toggleAdvanced} class="p-2 text-center">
@@ -280,10 +258,13 @@ function General(props: {
 	setConfig: SetStoreFunction<GeneralConfig>
 	advanced: boolean
 }) {
+	// Only set the server config when focus is lost, so we don't spam reconnects.
+	const [server, setServer] = createSignal("")
+
 	return (
 		<>
 			<Show when={props.advanced}>
-				<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-3 text-xl">General</header>
+				<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-4 text-xl">General</header>
 
 				<label for="server" class="col-start-1 p-2">
 					Server
@@ -293,8 +274,9 @@ function General(props: {
 					name="server"
 					placeholder={process.env.RELAY_HOST}
 					class="col-span-2 rounded-md border-0 bg-slate-700 text-sm shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-600"
-					value={props.config.server}
-					onInput={(e) => props.setConfig({ server: e.target.value })}
+					value={server()}
+					onInput={(e) => setServer(e.target.value)}
+					onFocusOut={(e) => props.setConfig({ server: server() })}
 				/>
 
 				<label for="name" class="col-start-1 p-2">
@@ -392,7 +374,7 @@ function Video(props: {
 
 	return (
 		<>
-			<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-3 text-xl">Video</header>
+			<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-4 text-xl">Video</header>
 
 			<label class="col-start-1 p-2">Input</label>
 			<select
@@ -509,7 +491,7 @@ function Audio(props: {
 }) {
 	return (
 		<>
-			<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-3 text-xl">Audio</header>
+			<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-4 text-xl">Audio</header>
 
 			<label class="col-start-1 p-2">Input</label>
 			<select

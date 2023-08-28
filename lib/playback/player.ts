@@ -14,12 +14,16 @@ export type Timeline = Message.Timeline
 export interface PlayerConfig {
 	connection: Connection
 	namespace: string
-	catalog: Catalog // TODO optional; fetch if not provided
+
+	canvas: HTMLCanvasElement
 }
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
 	#port: Port
+
+	// The video canvas
+	#canvas: OffscreenCanvas
 
 	// The audio context, which must be created on the main thread.
 	#context?: Context
@@ -27,17 +31,20 @@ export class Player {
 	// A periodically updated timeline
 	#timeline = new Watch<Timeline | undefined>(undefined)
 
+	#catalog: Promise<Catalog>
 	#running: Promise<void>
 
 	readonly connection: Connection
 	readonly namespace: string
-	readonly catalog: Catalog
 
 	constructor(config: PlayerConfig) {
 		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
+
+		this.#canvas = config.canvas.transferControlToOffscreen()
 		this.connection = config.connection
 		this.namespace = config.namespace
-		this.catalog = config.catalog
+
+		this.#catalog = Catalog.fetch(this.connection, this.namespace)
 
 		// Async work
 		this.#running = this.#run()
@@ -47,14 +54,48 @@ export class Player {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
 
-		for (const track of this.catalog.tracks) {
+		const catalog = await this.#catalog
+
+		let sampleRate: number | undefined
+		let channels: number | undefined
+
+		for (const track of catalog.tracks) {
 			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
 			}
 
 			inits.add(track.init_track)
 			tracks.push(track)
+
+			if (isAudioTrack(track)) {
+				if (sampleRate && track.sample_rate !== sampleRate) {
+					throw new Error(`TODO multiple audio tracks with different sample rates`)
+				}
+
+				sampleRate = track.sample_rate
+				channels = Math.max(track.channel_count, channels ?? 0)
+			}
 		}
+
+		const config: Message.Config = {}
+
+		// Only configure audio is we have an audio track
+		if (sampleRate && channels) {
+			config.audio = {
+				channels: channels,
+				sampleRate: sampleRate,
+				ring: new RingShared(2, sampleRate / 20), // 50ms
+			}
+
+			this.#context = new Context(config.audio)
+		}
+
+		// TODO only send the canvas if we have a video track
+		config.video = {
+			canvas: this.#canvas,
+		}
+
+		this.#port.sendConfig(config) // send to the worker
 
 		// Call #runInit on each unique init track
 		// TODO do this in parallel with #runTrack to remove a round trip
@@ -110,43 +151,6 @@ export class Player {
 		}
 	}
 
-	// Attach to the given canvas element
-	attach(canvas: HTMLCanvasElement) {
-		let sampleRate: number | undefined
-		let channels: number | undefined
-
-		for (const track of this.catalog.tracks) {
-			if (!isAudioTrack(track)) continue
-
-			if (sampleRate && track.sample_rate !== sampleRate) {
-				throw new Error(`TODO multiple audio tracks with different sample rates`)
-			}
-
-			sampleRate = track.sample_rate
-			channels = Math.max(track.channel_count, channels ?? 0)
-		}
-
-		const config: Message.Config = {}
-
-		// Only configure audio is we have an audio track
-		if (sampleRate && channels) {
-			config.audio = {
-				channels: channels,
-				sampleRate: sampleRate,
-				ring: new RingShared(2, sampleRate / 20), // 50ms
-			}
-
-			this.#context = new Context(config.audio)
-		}
-
-		// TODO only send the canvas if we have a video track
-		config.video = {
-			canvas: canvas.transferControlToOffscreen(),
-		}
-
-		this.#port.sendConfig(config) // send to the worker
-	}
-
 	#onMessage(msg: Message.FromWorker) {
 		if (msg.timeline) {
 			this.#timeline.update(msg.timeline)
@@ -164,6 +168,10 @@ export class Player {
 		} catch (e) {
 			return asError(e)
 		}
+	}
+
+	async catalog(): Promise<Catalog> {
+		return this.#catalog
 	}
 
 	/*

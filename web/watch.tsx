@@ -1,74 +1,59 @@
 import { Player } from "@kixelated/moq/playback"
-import { Client, Connection } from "@kixelated/moq/transport"
-import { Catalog } from "@kixelated/moq/media"
+import { Connection } from "@kixelated/moq/transport"
 
-import { createEffect, onCleanup, Show } from "solid-js"
+import { createEffect, Show, createMemo, createSignal } from "solid-js"
 import { useParams, useSearchParams } from "@solidjs/router"
 
-import { createRunner } from "./common"
+import { createFetch, createPack, createSource } from "./common"
 import { Listing } from "./listing"
+import { connect } from "./connect"
 
 export function Watch() {
 	const params = useParams<{ name: string }>()
 	const [query] = useSearchParams<{ server?: string }>()
 
+	const server = query.server || process.env.RELAY_HOST
 	const namespace = params.name
-	const server = query.server ?? process.env.RELAY_HOST
 
-	const connection = createRunner<Connection, string>(async (setConnection, server) => {
-		const url = `https://${server}`
-
-		// Special case localhost to fetch the TLS fingerprint from the server.
-		// TODO remove this when WebTransport correctly supports self-signed certificates
-		const fingerprint = server.startsWith("localhost") ? url + "/fingerprint" : undefined
-
-		const client = new Client({
-			url: `https://${server}`,
-			fingerprint,
-			role: "subscriber",
-		})
-
-		const connection = await client.connect()
-		setConnection(connection)
-
-		throw await connection.closed()
-	}, server)
-
-	createEffect(() => {
-		// Close the connection when the component is unmounted.
-		onCleanup(() => connection()?.close())
-	})
-
-	const player = createRunner<Player, Connection>(async (ready, connection) => {
-		// TODO move the catalog fetch into the player
-		const catalog = await Catalog.fetch(connection, namespace)
-		const player = new Player({ connection, namespace, catalog })
-
-		ready(player)
-
-		throw await player.closed()
-	}, connection)
+	// Connect to the given server immediately.
+	const [connection, connectionError] = connect(server, "subscriber")
 
 	// Render the canvas when the DOM is inserted
-	let canvas: HTMLCanvasElement
-	createEffect(() => player()?.attach(canvas))
+	const [canvas, setCanvas] = createSignal<HTMLCanvasElement | undefined>()
+
+	// Create the player when the arguments are non-null.
+	const player = createSource((args: { connection: Connection; canvas: HTMLCanvasElement }) => {
+		return new Player({ namespace, ...args })
+	}, createPack({ connection, canvas }))
+
+	const playerError = createFetch((player) => player.closed(), player)
+
+	// Fetch the catalog when the player is running.
+	const catalog = createFetch((player) => player.catalog(), player)
+
+	const error = createMemo(() => connectionError() || playerError() || catalog.error())
 
 	// Report errors to terminal too so we'll get stack traces
 	createEffect(() => {
-		if (player.error()) console.error(player.error())
+		if (error()) console.error(error())
 	})
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
-			<Show when={player.error()}>
+			<Show when={error()}>
 				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
-					{player.error()!.name}: {player.error()!.message}
+					{error()!.name}: {error()!.message}
 				</div>
 			</Show>
-			<Listing server={server} name={params.name} catalog={player()?.catalog} />
-			<canvas ref={canvas!} class="rounded-md" />
+
+			<p class="p-4">
+				This is a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
+			</p>
+
+			<canvas height="0" ref={setCanvas} class="rounded-md" />
+			<Listing server={server} name={namespace} catalog={catalog()} />
 		</>
 	)
 }

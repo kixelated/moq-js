@@ -12,7 +12,8 @@ const icons = {
 	watch: new URL("./img/watch.svg", import.meta.url),
 	publish: new URL("./img/publish.svg", import.meta.url),
 	explain: new URL("./img/explain.svg", import.meta.url),
-	source: new URL("./img/source.svg", import.meta.url),
+	github: new URL("./img/github.svg", import.meta.url),
+	discord: new URL("./img/discord.svg", import.meta.url),
 }
 
 function Home() {
@@ -39,7 +40,10 @@ function Main() {
 							<img src={icons.explain.toString()} width="120" alt="Explain" />
 						</A>
 						<a href="https://github.com/kixelated/moq-js">
-							<img src={icons.source.toString()} width="120" alt="Source" />
+							<img src={icons.github.toString()} width="120" alt="Github" />
+						</a>
+						<a href="https://discord.gg/FCYF3p99mr">
+							<img src={icons.discord.toString()} width="120" alt="Discord" />
 						</a>
 					</div>
 				</nav>

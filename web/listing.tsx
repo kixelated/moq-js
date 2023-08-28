@@ -1,6 +1,4 @@
-import { Client, Connection } from "@kixelated/moq/transport"
-
-import { For, Show, Switch, Match, createMemo, createEffect, onCleanup } from "solid-js"
+import { For, Show, Switch, Match, createMemo, createSignal } from "solid-js"
 import {
 	AudioCatalogTrack,
 	Catalog,
@@ -9,63 +7,45 @@ import {
 	isVideoCatalogTrack,
 } from "@kixelated/moq/media"
 import { A, useSearchParams } from "@solidjs/router"
-import { createFetch, createRunner } from "./common"
+import { createFetch } from "./common"
+import { connect } from "./connect"
 
 export function Listings() {
 	const [params] = useSearchParams<{ server?: string }>()
-	const server = params.server ?? process.env.RELAY_HOST
+	const server = params.server || process.env.RELAY_HOST
 
-	const connection = createRunner<Connection, string>(async (setConnection, server) => {
-		const url = `https://${server}`
+	const [connection, connectionError] = connect(server, "subscriber")
+	const [announced, setAnnounced] = createSignal<string[]>()
 
-		// Special case localhost to fetch the TLS fingerprint from the server.
-		// TODO remove this when WebTransport correctly supports self-signed certificates
-		const fingerprint = server.startsWith("localhost") ? url + "/fingerprint" : undefined
+	const fetch = createFetch(async (connection) => {
+		setAnnounced([])
 
-		const client = new Client({
-			url: `https://${server}`,
-			fingerprint,
-			role: "subscriber",
-		})
-
-		const connection = await client.connect()
-		setConnection(connection)
-
-		throw await connection.closed()
-	}, server) // connect on page load
-
-	createEffect(() => {
-		// Close the connection when the component is unmounted.
-		onCleanup(() => connection()?.close())
-	})
-
-	const broadcasts = createRunner<string[], Connection>(async (set, connection) => {
 		let [announced, next] = connection.announced().value()
-		set(announced.map((a) => a.namespace))
+		setAnnounced(announced.map((a) => a.namespace))
 
 		while (next) {
 			;[announced, next] = await next
-			set(announced.map((a) => a.namespace))
+			setAnnounced(announced.map((a) => a.namespace))
 		}
 	}, connection)
 
-	const error = createMemo(() => connection.error() || broadcasts.error())
+	const error = createMemo(() => connectionError() || fetch.error())
 
 	return (
 		<>
-			<p class="p-3">
-				Watch a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
-			</p>
-
 			<Show when={error()}>
 				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
 					{error()!.name}: {error()!.message}
 				</div>
 			</Show>
 
-			<header class="mt-6 border-b-2 border-green-600 pl-3 text-xl">Public</header>
+			<p class="p-4">
+				Watch a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
+			</p>
+
+			<header class="mt-6 border-b-2 border-green-600 pl-4 text-xl">Public</header>
 			<For
-				each={broadcasts()}
+				each={announced()}
 				fallback={
 					<p class="p-4">
 						No live broadcasts. Somebody should <A href="/publish">PUBLISH</A>.
@@ -119,7 +99,7 @@ export function Listings() {
 	</form>
 */
 
-export function Listing(props: { server: string; name: string; catalog?: Catalog }) {
+export function Listing(props: { server?: string; name: string; catalog?: Catalog }) {
 	function audioTrack(track: AudioCatalogTrack) {
 		return (
 			<>
@@ -150,20 +130,22 @@ export function Listing(props: { server: string; name: string; catalog?: Catalog
 				{props.name}
 			</A>
 			<div class="ml-4 text-xs italic text-gray-300">
-				<For each={props.catalog?.tracks}>
-					{(track) => (
-						<p>
-							<Switch fallback="unknown track">
-								<Match when={isVideoCatalogTrack(track)}>
-									{videoTrack(track as VideoCatalogTrack)}
-								</Match>
-								<Match when={isAudioCatalogTrack(track)}>
-									{audioTrack(track as AudioCatalogTrack)}
-								</Match>
-							</Switch>
-						</p>
-					)}
-				</For>
+				<Show when={props.catalog} fallback="loading...">
+					<For each={props.catalog?.tracks}>
+						{(track) => (
+							<p>
+								<Switch fallback="unknown track">
+									<Match when={isVideoCatalogTrack(track)}>
+										{videoTrack(track as VideoCatalogTrack)}
+									</Match>
+									<Match when={isAudioCatalogTrack(track)}>
+										{audioTrack(track as AudioCatalogTrack)}
+									</Match>
+								</Switch>
+							</p>
+						)}
+					</For>
+				</Show>
 			</div>
 		</div>
 	)
