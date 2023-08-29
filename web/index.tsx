@@ -6,6 +6,7 @@ import { Watch } from "./watch"
 import { Listings } from "./listing"
 import { Publish } from "./publish"
 import { Home } from "./home"
+import { Github } from "./github"
 
 // Import the icons using this trick so Parcel can rewrite the URLs.
 const icons = {
@@ -36,9 +37,9 @@ function Main() {
 						<A href="/explain">
 							<img src={icons.explain.toString()} width="120" alt="Explain" />
 						</A>
-						<a href="https://github.com/kixelated/moq-js">
+						<A href="/github">
 							<img src={icons.github.toString()} width="120" alt="Github" />
-						</a>
+						</A>
 						<a href="https://discord.gg/FCYF3p99mr">
 							<img src={icons.discord.toString()} width="120" alt="Discord" />
 						</a>
@@ -49,6 +50,8 @@ function Main() {
 						fallback={(err: Error) => (
 							<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
 								Uncaught Error: {err.name}: {err.message}
+								<br />
+								{err.stack}
 							</div>
 						)}
 					>
@@ -57,6 +60,7 @@ function Main() {
 							<Route path="/watch" component={Listings} />
 							<Route path="/watch/*name" component={Watch} />
 							<Route path="/publish" component={Publish} />
+							<Route path="/github" component={Github} />
 							<Route path="/*all" element={<p>404 Not found</p>} />
 						</Routes>
 					</ErrorBoundary>

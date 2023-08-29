@@ -28,6 +28,7 @@
 		"@parcel/validator-typescript": "^2.9.2",
 		"@tailwindcss/forms": "^0.5.3",
 		"@types/audioworklet": "^0.0.50",
+		"@types/caniuse-lite": "^1.0.1",
 		"@types/dom-mediacapture-transform": "^0.1.6",
 		"@types/dom-webcodecs": "^0.1.8",
 		"@types/parcel-env": "^0.0.1",
@@ -49,8 +50,8 @@
 		"typescript": "^5.1.6"
 	},
 	"dependencies": {
-		"@solid-primitives/storage": "^2.1.1",
 		"@solidjs/router": "^0.8.3",
+		"caniuse-lite": "^1.0.30001524",
 		"solid-js": "^1.7.7"
 	}
 }

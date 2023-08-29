@@ -1,8 +1,8 @@
 {
 	"include": ["."],
 	"compilerOptions": {
-		"target": "es2022",
-		"module": "es2022",
+		"target": "esnext",
+		"module": "esnext",
 		"moduleResolution": "node",
 		"rootDir": ".",
 		"noEmit": true,
@@ -15,7 +15,7 @@
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
 		"typeRoots": ["../lib/types", "../node_modules/@types"],
-		"lib": ["es2022"],
+		"lib": ["esnext"],
 		"types": ["web", "parcel-env", "dom-webcodecs", "dom-mediacapture-transform"]
 	}
 }
