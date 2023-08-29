@@ -5,6 +5,7 @@ import { A, Route, Router, Routes } from "@solidjs/router"
 import { Watch } from "./watch"
 import { Listings } from "./listing"
 import { Publish } from "./publish"
+import { Home } from "./home"
 
 // Import the icons using this trick so Parcel can rewrite the URLs.
 const icons = {
@@ -14,10 +15,6 @@ const icons = {
 	explain: new URL("./img/explain.svg", import.meta.url),
 	github: new URL("./img/github.svg", import.meta.url),
 	discord: new URL("./img/discord.svg", import.meta.url),
-}
-
-function Home() {
-	return "UNDER CONTRSTRUCTION"
 }
 
 function Main() {

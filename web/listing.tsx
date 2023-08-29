@@ -40,10 +40,10 @@ export function Listings() {
 			</Show>
 
 			<p class="p-4">
-				Watch a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
+				Watch a <strong>PUBLIC</strong> broadcast. Report any abuse pls.
 			</p>
 
-			<header class="mt-6 border-b-2 border-green-600 pl-4 text-xl">Public</header>
+			<header>Public</header>
 			<For
 				each={announced()}
 				fallback={

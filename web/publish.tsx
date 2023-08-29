@@ -212,15 +212,15 @@ export function Publish() {
 			<p class="p-4">
 				<Switch>
 					<Match when={broadcast()}>
-						You've made a <b class="text-green-500">PUBLIC</b> broadcast. Don't abuse it pls.
+						You've made a <strong>PUBLIC</strong> broadcast. Don't abuse it pls.
 					</Match>
 					<Match when={!broadcast()}>
-						Make a <b class="text-green-500">PUBLIC</b> broadcast. Don't abuse it pls.
+						Make a <strong>PUBLIC</strong> broadcast. Don't abuse it pls.
 					</Match>
 				</Switch>
 			</p>
 			<Show when={broadcast()}>
-				<header class="mt-6 border-b-2 border-green-600 pl-4 text-xl">Preview</header>
+				<header>Preview</header>
 				<Listing server={general.server} name={broadcast()!.name} catalog={broadcast()!.catalog} />
 				<video ref={preview!} autoplay muted class="rounded-md" />
 			</Show>
@@ -264,7 +264,7 @@ function General(props: {
 	return (
 		<>
 			<Show when={props.advanced}>
-				<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-4 text-xl">General</header>
+				<header class="col-span-3">General</header>
 
 				<label for="server" class="col-start-1 p-2">
 					Server
@@ -276,7 +276,7 @@ function General(props: {
 					class="col-span-2 rounded-md border-0 bg-slate-700 text-sm shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-600"
 					value={server()}
 					onInput={(e) => setServer(e.target.value)}
-					onFocusOut={(e) => props.setConfig({ server: server() })}
+					onFocusOut={(e) => props.setConfig({ server: e.target.value })}
 				/>
 
 				<label for="name" class="col-start-1 p-2">
@@ -374,7 +374,7 @@ function Video(props: {
 
 	return (
 		<>
-			<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-4 text-xl">Video</header>
+			<header class="col-span-3">Video</header>
 
 			<label class="col-start-1 p-2">Input</label>
 			<select
@@ -491,7 +491,7 @@ function Audio(props: {
 }) {
 	return (
 		<>
-			<header class="col-span-3 mt-6 border-b-2 border-green-600 pl-4 text-xl">Audio</header>
+			<header class="col-span-3">Audio</header>
 
 			<label class="col-start-1 p-2">Input</label>
 			<select

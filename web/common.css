@@ -6,6 +6,14 @@ a {
 	@apply font-bold text-green-500 hover:cursor-pointer hover:text-green-600;
 }
 
+strong {
+	@apply font-bold text-green-500;
+}
+
+header {
+	@apply mb-3 mt-6 border-b-2 border-green-600 pl-3 text-xl;
+}
+
 html {
 	@apply bg-slate-900 text-slate-100;
 }

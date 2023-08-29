@@ -49,7 +49,7 @@ export function Watch() {
 			</Show>
 
 			<p class="p-4">
-				This is a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
+				This is a <strong>PUBLIC</strong> broadcast. Report any abuse pls.
 			</p>
 
 			<canvas height="0" ref={setCanvas} class="rounded-md" />
