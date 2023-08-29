@@ -1,4 +1,4 @@
-import { Accessor, Setter, batch, createEffect, createSignal, untrack } from "solid-js"
+import { Accessor, batch, createEffect, createMemo, createSignal, untrack } from "solid-js"
 
 export interface Fetch<S, T> {
 	(): T | undefined
@@ -66,55 +66,46 @@ export function createFetch<T, S>(
 	return result
 }
 
-export interface Runner<T> {
-	(): T | undefined
-	running: Accessor<boolean>
-	error: Accessor<Error | undefined>
+export function isCallable<T>(value: any): value is () => T {
+	return typeof value === "function"
 }
 
-// Another take on createResource, this time for long-lived async functions.
-// Call .start() to start the runner, which can then call set() to update the value as many times as it wants.
-// The value will be unset when the runner finishes, and the error will be set if it throws.
-export function createRunner<T, S>(
-	f: (set: Setter<T | undefined>, source: S) => Promise<void>,
-	source?: S | false | null | (() => S | undefined | false | null),
-): Runner<T> {
-	const [running, setRunning] = createSignal(false)
-	const [value, setValue] = createSignal<T | undefined>()
-	const [error, setError] = createSignal<Error | undefined>()
+// An object where all values are Accessors.
+type AccessorItems<T> = {
+	[K in keyof T]: () => T[K]
+}
 
-	const start = (s: S) => {
-		untrack(() => {
-			if (running()) return
+// An object where none of the values are nullable.
+type NonNullableItems<T> = {
+	[K in keyof T]: NonNullable<T[K]>
+}
 
-			batch(() => {
-				setRunning(true)
-				setValue(undefined)
-				setError(undefined)
-			})
+// Convert an object of accessors into an accessor of an object, only if all accessors are truthy.
+export function createPack<T>(items: AccessorItems<T>): Accessor<NonNullableItems<T> | undefined> {
+	const result = createMemo(() => {
+		const result: Partial<NonNullableItems<T>> = {}
 
-			f(setValue, s)
-				.catch(setError) // sets to error
-				.finally(() => {
-					batch(() => {
-						setRunning(false)
-						setValue(undefined)
-					})
-				})
-		})
-	}
+		for (const key in items) {
+			const value = items[key as keyof T]()
+			if (!value) return undefined
 
-	createEffect(() => {
-		const s = isCallable(source) ? source() : source
-		if (s) start(s)
+			result[key as keyof T] = value
+		}
+
+		return result as NonNullableItems<T>
 	})
 
-	const result = value as Runner<T>
-	result.running = running
-	result.error = error
 	return result
 }
 
-function isCallable<T>(value: any): value is () => T {
-	return typeof value === "function"
+export function createSource<S, T>(
+	f: (v: NonNullable<S>) => T,
+	source: Accessor<S | undefined>,
+): Accessor<T | undefined> {
+	const result = createMemo(() => {
+		const value = source()
+		if (value) return f(value)
+	})
+
+	return result
 }

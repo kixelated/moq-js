@@ -130,7 +130,7 @@ export class SubscribeSend {
 		this.track = track
 	}
 
-	async close(code = 0n, reason = "") {
+	async close(_code = 0n, _reason = "") {
 		// TODO implement unsubscribe
 		// await this.#inner.sendReset(code, reason)
 	}

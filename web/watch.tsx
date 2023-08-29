@@ -1,136 +1,60 @@
 import { Player } from "@kixelated/moq/playback"
 import { Connection } from "@kixelated/moq/transport"
-import { useParams } from "@solidjs/router"
 
-import { For, createEffect, Show, Switch, Match } from "solid-js"
-import {
-	AudioCatalogTrack,
-	Catalog,
-	VideoCatalogTrack,
-	isAudioCatalogTrack,
-	isVideoCatalogTrack,
-} from "@kixelated/moq/media"
-import { A } from "@solidjs/router"
-import { createFetch, createRunner } from "./common"
-import { useConnection } from "./connection"
+import { createEffect, Show, createMemo, createSignal } from "solid-js"
+import { useParams, useSearchParams } from "@solidjs/router"
+
+import { createFetch, createPack, createSource } from "./common"
+import { Listing } from "./listing"
+import { connect } from "./connect"
 
 export function Watch() {
-	const params = useParams() // TODO can we type this better
+	const params = useParams<{ name: string }>()
+	const [query] = useSearchParams<{ server?: string }>()
+
+	const server = query.server || process.env.RELAY_HOST
 	const namespace = params.name
 
-	const player = createRunner<Player, Connection>(async (ready, connection) => {
-		// TODO move the catalog fetch into the player
-		const catalog = await Catalog.fetch(connection, params.name)
-		const player = new Player({ connection, namespace, catalog })
-
-		ready(player)
-
-		throw await player.closed()
-	}, useConnection())
+	// Connect to the given server immediately.
+	const [connection, connectionError] = connect(server, "subscriber")
 
 	// Render the canvas when the DOM is inserted
-	let canvas: HTMLCanvasElement
-	createEffect(() => player()?.attach(canvas))
+	const [canvas, setCanvas] = createSignal<HTMLCanvasElement | undefined>()
+
+	// Create the player when the arguments are non-null.
+	const player = createSource((args: { connection: Connection; canvas: HTMLCanvasElement }) => {
+		return new Player({ namespace, ...args })
+	}, createPack({ connection, canvas }))
+
+	const playerError = createFetch((player) => player.closed(), player)
+
+	// Fetch the catalog when the player is running.
+	const catalog = createFetch((player) => player.catalog(), player)
+
+	const error = createMemo(() => connectionError() || playerError() || catalog.error())
 
 	// Report errors to terminal too so we'll get stack traces
 	createEffect(() => {
-		if (player.error()) console.error(player.error())
+		if (error()) console.error(error())
 	})
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
-			<Show when={player.error()}>
+			<Show when={error()}>
 				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
-					{player.error()!.name}: {player.error()!.message}
+					{error()!.name}: {error()!.message}
 				</div>
 			</Show>
-			<Listing name={params.name} catalog={player()?.catalog} />
-			<canvas ref={canvas!} class="rounded-md" />
-		</>
-	)
-}
 
-export function Listings() {
-	const broadcasts = createRunner<string[], Connection>(async (set, connection) => {
-		let [announced, next] = connection.announced().value()
-		set(announced.map((a) => a.namespace))
-
-		while (next) {
-			;[announced, next] = await next
-			set(announced.map((a) => a.namespace))
-		}
-	}, useConnection())
-
-	return (
-		<>
 			<p class="p-4">
-				Watch a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
+				This is a <b class="text-green-500">PUBLIC</b> broadcast. Report any abuse pls.
 			</p>
 
-			<header class="mt-6 border-b-2 border-green-600 pl-3 text-xl">Broadcasts</header>
-			<For
-				each={broadcasts()}
-				fallback={
-					<p class="p-4">
-						No live broadcasts. Somebody should <A href="/publish">PUBLISH</A>.
-					</p>
-				}
-			>
-				{(broadcast) => {
-					const catalog = createFetch(async (connection) => {
-						return await Catalog.fetch(connection, broadcast)
-					}, useConnection())
-
-					return <Listing name={broadcast} catalog={catalog()} />
-				}}
-			</For>
+			<canvas height="0" ref={setCanvas} class="rounded-md" />
+			<Listing server={server} name={namespace} catalog={catalog()} />
 		</>
-	)
-}
-
-export function Listing(props: { name: string; catalog?: Catalog }) {
-	function audioTrack(track: AudioCatalogTrack) {
-		return (
-			<>
-				audio: {track.codec} {track.sample_rate}Hz {track.channel_count}ch
-				<Show when={track.bit_rate}> {Math.round(track.bit_rate! / 1000) + "kb/s"}</Show>
-			</>
-		)
-	}
-
-	function videoTrack(track: VideoCatalogTrack) {
-		return (
-			<>
-				video: {track.codec} {track.width}x{track.height}
-				<Show when={track.bit_rate}> {(track.bit_rate! / 1000000).toFixed(1) + " mb/s"}</Show>
-			</>
-		)
-	}
-
-	return (
-		<div class="p-4">
-			<A href={"/watch/" + props.name} class="text-xl">
-				{props.name.replace(/\//, " / ")}
-			</A>
-			<div class="ml-4 text-xs italic text-gray-300">
-				<For each={props.catalog?.tracks}>
-					{(track) => (
-						<p>
-							<Switch fallback="unknown track">
-								<Match when={isVideoCatalogTrack(track)}>
-									{videoTrack(track as VideoCatalogTrack)}
-								</Match>
-								<Match when={isAudioCatalogTrack(track)}>
-									{audioTrack(track as AudioCatalogTrack)}
-								</Match>
-							</Switch>
-						</p>
-					)}
-				</For>
-			</div>
-		</div>
 	)
 }
 
