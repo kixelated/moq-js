@@ -126,9 +126,9 @@ export function Listing(props: { server?: string; name: string; catalog?: Catalo
 
 	return (
 		<div class="p-4">
-			<A href={watchUrl()} class="text-xl">
+			<a href={watchUrl()} class="text-xl" target="_blank">
 				{props.name}
-			</A>
+			</a>
 			<div class="ml-4 text-xs italic text-gray-300">
 				<Show when={props.catalog} fallback="loading...">
 					<For each={props.catalog?.tracks}>
