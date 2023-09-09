@@ -24,10 +24,10 @@ export class Catalog {
 		return catalog
 	}
 
-	static async fetch(connection: Connection, namespace: string): Promise<Catalog> {
+	static async fetch(connection: Connection): Promise<Catalog> {
 		let raw: Uint8Array
 
-		const subscribe = await connection.subscribe(namespace, ".catalog")
+		const subscribe = await connection.subscribe("", ".catalog")
 		try {
 			const segment = await subscribe.data()
 			if (!segment) throw new Error("no catalog data")
@@ -61,7 +61,6 @@ export function isCatalog(catalog: any): catalog is Catalog {
 }
 
 export interface Track {
-	namespace: string
 	kind: string
 	container: string
 }
@@ -91,7 +90,8 @@ export interface VideoTrack extends Track {
 }
 
 export function isTrack(track: any): track is Track {
-	if (typeof track.namespace !== "string") return false
+	if (typeof track.kind !== "string") return false
+	if (typeof track.container !== "string") return false
 	return true
 }
 
