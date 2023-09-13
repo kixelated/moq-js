@@ -144,9 +144,9 @@ export class Broadcast {
 		await subscriber.ack()
 
 		const stream = await subscriber.data({
-			group: 0n,
 			sequence: 0n,
-			send_order: 0, // TODO Highest priority
+			priority: 0, // TODO Highest priority
+			expires: 0, // never expires
 		})
 
 		const writer = stream.getWriter()
@@ -174,9 +174,9 @@ export class Broadcast {
 
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
-			group: 0n,
 			sequence: 0n,
-			send_order: 0, // TODO
+			priority: 0, // TODO
+			expires: 0, // Never expires
 		})
 
 		const writer = stream.getWriter()
@@ -219,9 +219,9 @@ export class Broadcast {
 	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
-			group: BigInt(segment.id),
-			sequence: 0n,
-			send_order: 0, // TODO
+			sequence: BigInt(segment.id),
+			priority: 0, // TODO
+			expires: 30, // TODO configurable
 		})
 
 		// Pipe the segment to the stream.

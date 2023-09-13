@@ -31,7 +31,7 @@ export class Publisher {
 		this.#announce.set(namespace, announce)
 
 		await this.#control.send({
-			type: Control.Type.Announce,
+			kind: Control.Msg.Announce,
 			namespace,
 		})
 
@@ -52,7 +52,7 @@ export class Publisher {
 		announce.onOk()
 	}
 
-	recvAnnounceError(msg: Control.AnnounceError) {
+	recvAnnounceReset(msg: Control.AnnounceReset) {
 		const announce = this.#announce.get(msg.namespace)
 		if (!announce) {
 			// TODO debug this
@@ -72,7 +72,7 @@ export class Publisher {
 		this.#subscribe.set(msg.id, subscribe)
 		await this.#subscribeQueue.push(subscribe)
 
-		await this.#control.send({ type: Control.Type.SubscribeOk, id: msg.id })
+		await this.#control.send({ kind: Control.Msg.SubscribeOk, id: msg.id })
 	}
 }
 
@@ -158,7 +158,7 @@ export class SubscribeRecv {
 		this.#state = "ack"
 
 		// Send the control message.
-		return this.#control.send({ type: Control.Type.SubscribeOk, id: this.#id })
+		return this.#control.send({ kind: Control.Msg.SubscribeOk, id: this.#id })
 	}
 
 	// Close the subscription with an error.
@@ -166,11 +166,11 @@ export class SubscribeRecv {
 		if (this.#state === "closed") return
 		this.#state = "closed"
 
-		return this.#control.send({ type: Control.Type.SubscribeError, id: this.#id, code, reason })
+		return this.#control.send({ kind: Control.Msg.SubscribeReset, id: this.#id, code, reason })
 	}
 
 	// Create a writable data stream
-	async data(header: { group: bigint; sequence: bigint; send_order: number }) {
+	async data(header: { sequence: bigint; priority: number; expires: number }) {
 		return this.#objects.send({ track: this.#id, ...header })
 	}
 }

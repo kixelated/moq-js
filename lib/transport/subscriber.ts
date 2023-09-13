@@ -31,7 +31,7 @@ export class Subscriber {
 			throw new Error(`duplicate announce for namespace: ${msg.namespace}`)
 		}
 
-		await this.#control.send({ type: Control.Type.AnnounceOk, namespace: msg.namespace })
+		await this.#control.send({ kind: Control.Msg.AnnounceOk, namespace: msg.namespace })
 
 		const announce = new AnnounceRecv(this.#control, msg.namespace)
 		this.#announce.set(msg.namespace, announce)
@@ -46,7 +46,7 @@ export class Subscriber {
 		this.#subscribe.set(id, subscribe)
 
 		await this.#control.send({
-			type: Control.Type.Subscribe,
+			kind: Control.Msg.Subscribe,
 			id,
 			namespace,
 			name: track,
@@ -64,7 +64,7 @@ export class Subscriber {
 		subscribe.onOk()
 	}
 
-	async recvSubscribeError(msg: Control.SubscribeError) {
+	async recvSubscribeReset(msg: Control.SubscribeReset) {
 		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
 			throw new Error(`subscribe error for unknown id: ${msg.id}`)
@@ -102,14 +102,14 @@ export class AnnounceRecv {
 		this.#state = "ack"
 
 		// Send the control message.
-		return this.#control.send({ type: Control.Type.AnnounceOk, namespace: this.namespace })
+		return this.#control.send({ kind: Control.Msg.AnnounceOk, namespace: this.namespace })
 	}
 
 	async close(code = 0n, reason = "") {
 		if (this.#state === "closed") return
 		this.#state = "closed"
 
-		return this.#control.send({ type: Control.Type.AnnounceError, namespace: this.namespace, code, reason })
+		return this.#control.send({ kind: Control.Msg.AnnounceReset, namespace: this.namespace, code, reason })
 	}
 }
 

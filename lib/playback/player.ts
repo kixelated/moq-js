@@ -111,10 +111,6 @@ export class Player {
 			const init = await sub.data()
 			if (!init) throw new Error("no init data")
 
-			if (init.header.sequence !== 0n) {
-				throw new Error("TODO multiple objects per init not supported")
-			}
-
 			this.#port.sendInit({
 				name: name,
 				stream: init.stream,
@@ -134,10 +130,6 @@ export class Player {
 			for (;;) {
 				const segment = await sub.data()
 				if (!segment) break
-
-				if (segment.header.sequence !== 0n) {
-					throw new Error("TODO multiple objects per segment not supported")
-				}
 
 				this.#port.sendSegment({
 					init: track.init_track,
