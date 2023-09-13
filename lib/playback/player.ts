@@ -13,8 +13,6 @@ export type Timeline = Message.Timeline
 
 export interface PlayerConfig {
 	connection: Connection
-	namespace: string
-
 	canvas: HTMLCanvasElement
 }
 
@@ -35,16 +33,14 @@ export class Player {
 	#running: Promise<void>
 
 	readonly connection: Connection
-	readonly namespace: string
 
 	constructor(config: PlayerConfig) {
 		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
 
 		this.#canvas = config.canvas.transferControlToOffscreen()
 		this.connection = config.connection
-		this.namespace = config.namespace
 
-		this.#catalog = Catalog.fetch(this.connection, this.namespace)
+		this.#catalog = Catalog.fetch(this.connection)
 
 		// Async work
 		this.#running = this.#run()
@@ -106,7 +102,7 @@ export class Player {
 	}
 
 	async #runInit(name: string) {
-		const sub = await this.connection.subscribe(this.namespace, name)
+		const sub = await this.connection.subscribe("", name)
 		try {
 			const init = await sub.data()
 			if (!init) throw new Error("no init data")
@@ -125,7 +121,7 @@ export class Player {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		const sub = await this.connection.subscribe(this.namespace, track.data_track)
+		const sub = await this.connection.subscribe("", track.data_track)
 		try {
 			for (;;) {
 				const segment = await sub.data()

@@ -11,7 +11,7 @@ import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 export interface BroadcastConfig {
 	connection: Connection
 	media: MediaStream
-	name: string // name of the broadcast
+	name: string
 
 	audio: Audio.EncoderConfig
 	video: Video.EncoderConfig
@@ -46,7 +46,6 @@ export class Broadcast {
 
 			const mp4Catalog: Mp4Track = {
 				container: "mp4",
-				namespace: config.name,
 				kind: media.kind,
 				init_track: `${track.name}.mp4`,
 				data_track: `${track.name}.m4s`,
@@ -87,34 +86,20 @@ export class Broadcast {
 	}
 
 	async #run() {
-		// Announce the namespace and wait for an explicit OK.
-		const announce = await this.connection.announce(this.config.name)
-		await announce.ok()
+		for (;;) {
+			const subscriber = await this.connection.subscribed()
+			if (!subscriber) break
 
-		try {
-			for (;;) {
-				const subscriber = await this.connection.subscribed()
-				if (!subscriber) break
-
-				// Run an async task to serve each subscription.
-				this.#serveSubscribe(subscriber).catch((e) => {
-					const err = asError(e)
-					console.warn("failed to serve subscribe", err)
-				})
-			}
-		} catch (e) {
-			const err = asError(e)
-			await announce.close(1n, `error serving broadcast: ${err.message}`)
+			// Run an async task to serve each subscription.
+			this.#serveSubscribe(subscriber).catch((e) => {
+				const err = asError(e)
+				console.warn("failed to serve subscribe", err)
+			})
 		}
 	}
 
 	async #serveSubscribe(subscriber: SubscribeRecv) {
 		try {
-			if (subscriber.namespace != this.config.name) {
-				// Don't reuse connections if you get this error; we don't demultiplex them.
-				throw new Error(`unknown namespace: ${subscriber.namespace}`)
-			}
-
 			const [base, ext] = splitExt(subscriber.track)
 			if (ext === "catalog") {
 				await this.#serveCatalog(subscriber, base)
@@ -231,10 +216,6 @@ export class Broadcast {
 	// Attach the captured video stream to the given video element.
 	attach(video: HTMLVideoElement) {
 		video.srcObject = this.config.media
-	}
-
-	get name() {
-		return this.config.name
 	}
 
 	close() {
