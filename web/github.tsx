@@ -2,9 +2,9 @@ import * as caniuse from "caniuse-lite"
 import { For } from "solid-js"
 
 export function Github() {
-	const features = ["webtransport", "webcodecs", "audio-api", "sharedarraybuffer"].map((id) =>
-		caniuse.feature(caniuse.features[id]),
-	)
+	const features = ["webtransport", "webcodecs", "audio-api", "sharedarraybuffer"].map((id) => {
+		return { id, ...caniuse.feature(caniuse.features[id]) }
+	})
 	const agents = ["chrome", "edge", "firefox", "safari", "ios_saf", "android"].map((id) => {
 		const agent = caniuse.agents[id]!
 
@@ -22,7 +22,7 @@ export function Github() {
 	const latest = agents.reduce((a, b) => (a.latest > b.latest ? a : b)).latest
 
 	return (
-		<div class="flex flex-col items-center gap-3 p-3">
+		<div class="flex flex-col items-center gap-3">
 			<div>So you want some source code huh? That's cool.</div>
 
 			<header>Native</header>
@@ -117,14 +117,16 @@ export function Github() {
 				<div class="col-span-2" />
 				<For each={agents}>
 					{(agent) => {
-						return <div class="p-2 text-center">{agent.browser}</div>
+						return <div class="px-2 py-1 text-center ">{agent.browser}</div>
 					}}
 				</For>
 				<For each={features}>
 					{(feature) => {
 						return (
 							<>
-								<div class="col-span-2 col-start-1 p-2 text-right">{feature.title}</div>
+								<div class="col-span-2 col-start-1 px-2 py-1 text-right">
+									<a href={"https://caniuse.com/" + feature.id}>{feature.title}</a>
+								</div>
 								<For each={agents}>
 									{(agent) => {
 										const versions = feature.stats[agent.id]
@@ -144,8 +146,10 @@ export function Github() {
 													"bg-red-600": no,
 													"bg-yellow-600": maybe,
 												}}
-												class="h-full w-full"
-											/>
+												class="h-full w-full px-2 py-1 text-center text-sm text-white/80 "
+											>
+												{yes ? "yes" : no ? "no" : "maybe"}
+											</div>
 										)
 									}}
 								</For>
