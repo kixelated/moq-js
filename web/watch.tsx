@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from "@solidjs/router"
 import { createFetch, createPack, createSource } from "./common"
 import { Listing } from "./listing"
 import { connect } from "./connect"
+import { Notice } from "./issues"
 
 export function Watch() {
 	const params = useParams<{ name: string }>()
@@ -42,15 +43,13 @@ export function Watch() {
 	// TODO shrink it if needed via CSS
 	return (
 		<>
+			<Notice />
+
 			<Show when={error()}>
 				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
 					{error()!.name}: {error()!.message}
 				</div>
 			</Show>
-
-			<p class="p-4">
-				This is a <strong>PUBLIC</strong> broadcast. Report any abuse pls.
-			</p>
 
 			<canvas height="0" ref={setCanvas} class="rounded-md" />
 			<Listing server={server} name={namespace} catalog={catalog()} />

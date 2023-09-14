@@ -7,6 +7,8 @@ import { Listings } from "./listing"
 import { Publish } from "./publish"
 import { Home } from "./home"
 import { Github } from "./github"
+import { Issues } from "./issues"
+import { Explain } from "./explain"
 
 // Import the icons using this trick so Parcel can rewrite the URLs.
 const icons = {
@@ -61,6 +63,8 @@ function Main() {
 							<Route path="/watch/*name" component={Watch} />
 							<Route path="/publish" component={Publish} />
 							<Route path="/github" component={Github} />
+							<Route path="/issues" component={Issues} />
+							<Route path="/explain" component={Explain} />
 							<Route path="/*all" element={<p>404 Not found</p>} />
 						</Routes>
 					</ErrorBoundary>
