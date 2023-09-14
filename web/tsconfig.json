@@ -16,6 +16,6 @@
 		"jsxImportSource": "solid-js",
 		"typeRoots": ["../lib/types", "../node_modules/@types"],
 		"lib": ["esnext"],
-		"types": ["web", "parcel-env", "dom-webcodecs", "dom-mediacapture-transform", "solid-jsx/types"]
+		"types": ["web", "parcel-env", "dom-webcodecs", "dom-mediacapture-transform"]
 	}
 }
