@@ -1,26 +1,6 @@
-import * as caniuse from "caniuse-lite"
-import { For } from "solid-js"
+import { A } from "@solidjs/router"
 
 export function Github() {
-	const features = ["webtransport", "webcodecs", "audio-api", "sharedarraybuffer"].map((id) => {
-		return { id, ...caniuse.feature(caniuse.features[id]) }
-	})
-	const agents = ["chrome", "edge", "firefox", "safari", "ios_saf", "android"].map((id) => {
-		const agent = caniuse.agents[id]!
-
-		// Get the date of the latest release:
-		const latest =
-			Object.values(agent.release_date).reduce((a, b) => {
-				if (!a) return b
-				if (!b) return a
-				return a > b ? a : b
-			}) ?? 0
-
-		return { id, latest, ...caniuse.agents[id] }
-	})
-
-	const latest = agents.reduce((a, b) => (a.latest > b.latest ? a : b)).latest
-
 	return (
 		<div class="flex flex-col items-center gap-3">
 			<div>So you want some source code huh? That's cool.</div>
@@ -106,57 +86,7 @@ export function Github() {
 			</div>
 			<div>
 				This project is using a lot of new web APIs. Chrome support is guaranteed but other browsers are still
-				catching up.
-			</div>
-			<div>
-				Here is a non-compreshensive list of required features from the{" "}
-				<a href="https://caniuse.com/">caniuse</a> database, based on the latest version of each browser as of:{" "}
-				{new Date(1000 * latest).toDateString()}
-			</div>
-			<div class="grid grid-cols-8 items-center">
-				<div class="col-span-2" />
-				<For each={agents}>
-					{(agent) => {
-						return <div class="px-2 py-1 text-center ">{agent.browser}</div>
-					}}
-				</For>
-				<For each={features}>
-					{(feature) => {
-						return (
-							<>
-								<div class="col-span-2 col-start-1 px-2 py-1 text-right">
-									<a href={"https://caniuse.com/" + feature.id}>{feature.title}</a>
-								</div>
-								<For each={agents}>
-									{(agent) => {
-										const versions = feature.stats[agent.id]
-										const latest = Object.keys(versions).reduce((a, b) =>
-											versions[a] > versions[b] ? a : b,
-										)
-
-										const supported = versions[latest]
-										const yes = supported.startsWith("y")
-										const no = supported.startsWith("n")
-										const maybe = !yes && !no
-
-										return (
-											<div
-												classList={{
-													"bg-green-600": yes,
-													"bg-red-600": no,
-													"bg-yellow-600": maybe,
-												}}
-												class="h-full w-full px-2 py-1 text-center text-sm text-white/80 "
-											>
-												{yes ? "yes" : no ? "no" : "maybe"}
-											</div>
-										)
-									}}
-								</For>
-							</>
-						)
-					}}
-				</For>
+				catching up. See <A href="/issues">issues</A> for more details.
 			</div>
 
 			<header>Licensing</header>

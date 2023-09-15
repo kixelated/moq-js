@@ -7,6 +7,7 @@ import { useSearchParams } from "@solidjs/router"
 import { Listing } from "./listing"
 import { createFetch } from "./common"
 import { Client } from "@kixelated/moq/transport"
+import { Notice } from "./issues"
 
 interface GeneralConfig {
 	server: string
@@ -208,21 +209,12 @@ export function Publish() {
 
 	return (
 		<>
+			<Notice />
 			<Show when={error()}>
 				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
 					{error()!.name}: {error()!.message}
 				</div>
 			</Show>
-			<p class="p-4">
-				<Switch>
-					<Match when={broadcast()}>
-						You've made a <strong>PUBLIC</strong> broadcast. Don't abuse it pls.
-					</Match>
-					<Match when={!broadcast()}>
-						Make a <strong>PUBLIC</strong> broadcast. Don't abuse it pls.
-					</Match>
-				</Switch>
-			</p>
 			<Show when={broadcast()}>
 				<header>Preview</header>
 				<Listing server={general.server} name={broadcast()!.config.name} catalog={broadcast()!.catalog} />
