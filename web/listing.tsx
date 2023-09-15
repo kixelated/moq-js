@@ -16,8 +16,11 @@ export function Listings() {
 			</p>
 
 			<header>Public</header>
-			<p class="p-4">
-				TODO list broadcasts here. In the meantime, <A href="/publish">PUBLISH</A> and the resulting link.
+			<p class="p-2">
+				Public broadcasts will be listed here; we're <A href="/issues">busy</A> setting up the CDN.
+			</p>
+			<p class="p-2">
+				In the meantime, <A href="/publish">PUBLISH</A> and share the resulting link.
 			</p>
 		</>
 	)
