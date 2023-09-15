@@ -104,6 +104,12 @@ export function Issues() {
 				it involves synchronization.
 			</div>
 			<div>
+				The current player has no synchronization or buffer, which means that frames are rendered as soon as
+				they are received over the network. This is meant to demonstate the lower latency bound of the protocol.
+				We'll need to add a configurable buffer for use-cases where quality and smooth playback is more
+				important than latency.
+			</div>
+			<div>
 				Additionally, there's no built-in controls. Even something as trivial as changing the volume requires
 				building a WebAudio filter as opposed to relying on the &lt;video&gt; tag. I'm not a front-end developer
 				(no flame pls) and would love any contributions on this front.
