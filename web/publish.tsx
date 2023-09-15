@@ -6,7 +6,7 @@ import { useSearchParams } from "@solidjs/router"
 
 import { Listing } from "./listing"
 import { createFetch } from "./common"
-import { connect } from "./connect"
+import { Client } from "@kixelated/moq/transport"
 import { Notice } from "./issues"
 
 interface GeneralConfig {
@@ -122,17 +122,11 @@ export function Publish() {
 	const [audio, setAudio] = createStore<AudioConfig>(AUDIO_DEFAULT)
 	const [video, setVideo] = createStore<VideoConfig>(VIDEO_DEFAULT)
 
-	// TODO make a replacement for store that uses accessors instead of magic.
-	const server = createMemo(() => general.server || process.env.RELAY_HOST)
-
-	// eslint-disable-next-line solid/reactivity
-	const [connection, connectionError] = connect(server, "publisher")
-
 	// Start loading the selected media device.
-	const media = createFetch(async () => {
+	const broadcast = createFetch(async () => {
 		const width = Math.ceil((video.height * 16) / 9)
 
-		return await window.navigator.mediaDevices.getUserMedia({
+		const mediaPromise = window.navigator.mediaDevices.getUserMedia({
 			audio: {
 				sampleRate: { ideal: audio.sampleRate },
 				channelCount: { max: 2, ideal: 2 },
@@ -146,25 +140,35 @@ export function Publish() {
 				deviceId: video.deviceId,
 			},
 		})
-	})
 
-	const broadcast = createMemo(() => {
-		const m = media()
-		const c = connection()
-		if (!m || !c) return
-
+		const server = general.server || process.env.RELAY_HOST
 		const name = general.name != "" ? general.name : crypto.randomUUID()
 
+		const url = `https://${server}/${name}`
+
+		// Special case localhost to fetch the TLS fingerprint from the server.
+		// TODO remove this when WebTransport correctly supports self-signed certificates
+		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
+
+		const client = new Client({
+			url,
+			fingerprint,
+			role: "publisher",
+		})
+
+		const connection = await client.connect()
+		const media = await mediaPromise
+
 		return new Broadcast({
-			connection: c,
-			media: m,
+			connection,
+			media,
 			name,
 			audio: { codec: "opus", bitrate: 128_000 },
 			video: { codec: video.codec, bitrate: video.bitrate },
 		})
 	})
 
-	const broadcastClosed = createFetch((b) => b?.closed(), broadcast)
+	const broadcastClosed = createFetch((b) => b.closed(), broadcast)
 
 	createEffect(() => {
 		// Close the broadcast when the component is unmounted.
@@ -180,12 +184,12 @@ export function Publish() {
 
 	const start = (e: Event) => {
 		e.preventDefault()
-		media.fetch(true)
+		broadcast.fetch(true)
 	}
 
 	// Return a single error when something fails, in order of importance
 	const error = createMemo(() => {
-		return connectionError() ?? media.error() ?? broadcastClosed()
+		return broadcast.error() ?? broadcastClosed()
 	})
 
 	// Report errors to terminal too so we'll get stack traces
@@ -213,7 +217,7 @@ export function Publish() {
 			</Show>
 			<Show when={broadcast()}>
 				<header>Preview</header>
-				<Listing server={general.server} name={broadcast()!.name} catalog={broadcast()!.catalog} />
+				<Listing server={general.server} name={broadcast()!.config.name} catalog={broadcast()!.catalog} />
 				<video ref={preview!} autoplay muted class="rounded-md" />
 			</Show>
 			<form class="grid grid-cols-3 items-center gap-3 text-sm">
@@ -231,8 +235,8 @@ export function Publish() {
 				>
 					<Switch fallback="Go Live">
 						<Match when={error()}>Error</Match>
+						<Match when={broadcast.loading()}>Connecting</Match>
 						<Match when={broadcast()}>Live</Match>
-						<Match when={!connection()}>Connecting</Match>
 					</Switch>
 				</button>
 				<a onClick={toggleAdvanced} class="p-2 text-center">

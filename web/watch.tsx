@@ -1,12 +1,11 @@
 import { Player } from "@kixelated/moq/playback"
-import { Connection } from "@kixelated/moq/transport"
+import { Client } from "@kixelated/moq/transport"
 
 import { createEffect, Show, createMemo, createSignal } from "solid-js"
 import { useParams, useSearchParams } from "@solidjs/router"
 
-import { createFetch, createPack, createSource } from "./common"
+import { createFetch } from "./common"
 import { Listing } from "./listing"
-import { connect } from "./connect"
 import { Notice } from "./issues"
 
 export function Watch() {
@@ -14,25 +13,36 @@ export function Watch() {
 	const [query] = useSearchParams<{ server?: string }>()
 
 	const server = query.server || process.env.RELAY_HOST
-	const namespace = params.name
-
-	// Connect to the given server immediately.
-	const [connection, connectionError] = connect(server, "subscriber")
+	const name = params.name
 
 	// Render the canvas when the DOM is inserted
 	const [canvas, setCanvas] = createSignal<HTMLCanvasElement | undefined>()
 
-	// Create the player when the arguments are non-null.
-	const player = createSource((args: { connection: Connection; canvas: HTMLCanvasElement }) => {
-		return new Player({ namespace, ...args })
-	}, createPack({ connection, canvas }))
+	// Create the player as soon as the canvas is in the DOM.
+	const player = createFetch(async (canvas: HTMLCanvasElement) => {
+		const url = `https://${server}/${name}`
 
-	const playerError = createFetch((player) => player.closed(), player)
+		// Special case localhost to fetch the TLS fingerprint from the server.
+		// TODO remove this when WebTransport correctly supports self-signed certificates
+		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
+
+		const client = new Client({
+			url,
+			fingerprint,
+			role: "subscriber",
+		})
+
+		const connection = await client.connect()
+
+		return new Player({ connection, canvas })
+	}, canvas)
+
+	const playerClosed = createFetch((player) => player.closed(), player)
 
 	// Fetch the catalog when the player is running.
 	const catalog = createFetch((player) => player.catalog(), player)
 
-	const error = createMemo(() => connectionError() || playerError() || catalog.error())
+	const error = createMemo(() => player.error() || playerClosed() || catalog.error())
 
 	// Report errors to terminal too so we'll get stack traces
 	createEffect(() => {
@@ -52,7 +62,7 @@ export function Watch() {
 			</Show>
 
 			<canvas height="0" ref={setCanvas} class="rounded-md" />
-			<Listing server={server} name={namespace} catalog={catalog()} />
+			<Listing server={server} name={name} catalog={catalog()} />
 		</>
 	)
 }

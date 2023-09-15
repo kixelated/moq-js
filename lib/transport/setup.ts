@@ -5,6 +5,7 @@ export type Role = "publisher" | "subscriber" | "both"
 
 export enum Version {
 	DRAFT_00 = 0xff00,
+	KIXEL_00 = 0xbad00,
 }
 
 // NOTE: These are forked from moq-transport-00.
@@ -15,7 +16,6 @@ export enum Version {
 export interface Client {
 	versions: Version[]
 	role: Role
-	path?: string // not used with WebTransport
 }
 
 export interface Server {
@@ -53,12 +53,10 @@ export class Decoder {
 		}
 
 		const role = await this.role()
-		const path = (await this.r.string()) || undefined
 
 		return {
 			versions,
 			role,
-			path,
 		}
 	}
 
@@ -104,7 +102,6 @@ export class Encoder {
 		}
 
 		await this.role(c.role)
-		await this.w.string(c.path ?? "")
 	}
 
 	async server(s: Server) {

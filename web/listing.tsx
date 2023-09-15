@@ -1,4 +1,4 @@
-import { For, Show, Switch, Match, createMemo, createSignal } from "solid-js"
+import { For, Show, Switch, Match } from "solid-js"
 import {
 	AudioCatalogTrack,
 	Catalog,
@@ -6,60 +6,22 @@ import {
 	isAudioCatalogTrack,
 	isVideoCatalogTrack,
 } from "@kixelated/moq/media"
-import { A, useSearchParams } from "@solidjs/router"
-import { createFetch } from "./common"
-import { connect } from "./connect"
+import { A } from "@solidjs/router"
 
 export function Listings() {
-	const [params] = useSearchParams<{ server?: string }>()
-	const server = params.server || process.env.RELAY_HOST
-
-	const [connection, connectionError] = connect(server, "subscriber")
-	const [announced, setAnnounced] = createSignal<string[]>()
-
-	const fetch = createFetch(async (connection) => {
-		setAnnounced([])
-
-		let [announced, next] = connection.announced().value()
-		setAnnounced(announced.map((a) => a.namespace))
-
-		while (next) {
-			;[announced, next] = await next
-			setAnnounced(announced.map((a) => a.namespace))
-		}
-	}, connection)
-
-	const error = createMemo(() => connectionError() || fetch.error())
-
 	return (
 		<>
-			<Show when={error()}>
-				<div class="rounded-md bg-red-600 px-4 py-2 font-bold">
-					{error()!.name}: {error()!.message}
-				</div>
-			</Show>
-
 			<p class="p-4">
 				Watch a <strong>PUBLIC</strong> broadcast. Report any abuse pls.
 			</p>
 
 			<header>Public</header>
-			<For
-				each={announced()}
-				fallback={
-					<p class="p-4">
-						No live broadcasts. Somebody should <A href="/publish">PUBLISH</A>.
-					</p>
-				}
-			>
-				{(broadcast) => {
-					const catalog = createFetch(async (connection) => {
-						return await Catalog.fetch(connection, broadcast)
-					}, connection)
-
-					return <Listing server={server} name={broadcast} catalog={catalog()} />
-				}}
-			</For>
+			<p class="p-2">
+				Public broadcasts will be listed here; we're <A href="/issues">busy</A> setting up the CDN.
+			</p>
+			<p class="p-2">
+				In the meantime, <A href="/publish">PUBLISH</A> and share the resulting link.
+			</p>
 		</>
 	)
 }

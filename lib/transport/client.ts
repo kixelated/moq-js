@@ -47,7 +47,7 @@ export class Client {
 		const setup = new Setup.Stream(reader, writer)
 
 		// Send the setup message.
-		await setup.send.client({ versions: [Setup.Version.DRAFT_00], role: this.config.role })
+		await setup.send.client({ versions: [Setup.Version.KIXEL_00], role: this.config.role })
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
