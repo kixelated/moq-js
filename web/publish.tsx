@@ -122,16 +122,38 @@ export function Publish() {
 	const [audio, setAudio] = createStore<AudioConfig>(AUDIO_DEFAULT)
 	const [video, setVideo] = createStore<VideoConfig>(VIDEO_DEFAULT)
 
-	// Start loading the selected media device.
-	const broadcast = createFetch(async () => {
+	const getScreenTrack = async (): Promise<MediaStreamTrack> => {
+		// TODO: Screen sharing resolution may be different than the video resolution.
 		const width = Math.ceil((video.height * 16) / 9)
+		const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+			video: {
+				aspectRatio: { ideal: 16 / 9 },
+				width: { ideal: width, max: width },
+				height: { ideal: video.height, max: video.height },
+				frameRate: { ideal: video.fps, max: video.fps },
+			},
+			audio: false,
+		})
+		const videoTrack = mediaStream.getVideoTracks()[0]
+		return videoTrack
+	}
 
-		const mediaPromise = window.navigator.mediaDevices.getUserMedia({
+	const getAudioTrack = async (): Promise<MediaStreamTrack> => {
+		const mediaStream = await navigator.mediaDevices.getUserMedia({
 			audio: {
 				sampleRate: { ideal: audio.sampleRate },
 				channelCount: { max: 2, ideal: 2 },
 				deviceId: audio.deviceId,
 			},
+			video: false,
+		})
+		return mediaStream.getAudioTracks()[0]
+	}
+
+	const getVideoTrack = async (): Promise<MediaStreamTrack> => {
+		const width = Math.ceil((video.height * 16) / 9)
+		const mediaStream = await window.navigator.mediaDevices.getUserMedia({
+			audio: false,
 			video: {
 				aspectRatio: { ideal: 16 / 9 },
 				width: { ideal: width, max: width },
@@ -140,7 +162,24 @@ export function Publish() {
 				deviceId: video.deviceId,
 			},
 		})
+		return mediaStream.getVideoTracks()[0]
+	}
 
+	const getMediaStream = async (): Promise<MediaStream> => {
+		const mediaStream: MediaStream = new MediaStream()
+
+		if (video.deviceId == "screensharing") {
+			mediaStream.addTrack(await getScreenTrack())
+		} else {
+			mediaStream.addTrack(await getVideoTrack())
+		}
+		// add audio track
+		mediaStream.addTrack(await getAudioTrack())
+		return mediaStream
+	}
+
+	// Start loading the selected media device.
+	const broadcast = createFetch(async () => {
 		const server = general.server || process.env.RELAY_HOST
 		const name = general.name != "" ? general.name : crypto.randomUUID()
 
@@ -157,7 +196,7 @@ export function Publish() {
 		})
 
 		const connection = await client.connect()
-		const media = await mediaPromise
+		const media = await getMediaStream()
 
 		return new Broadcast({
 			connection,
@@ -378,6 +417,9 @@ function Video(props: {
 				class="col-span-2 rounded-md border-0 bg-slate-700 text-sm shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-600"
 				onInput={(e) => props.setConfig({ deviceId: e.target.value })}
 			>
+				<option value="" selected={props.config.deviceId === ""}>
+					Default
+				</option>
 				<For each={[...props.devices]}>
 					{(device) => {
 						return (
@@ -387,6 +429,9 @@ function Video(props: {
 						)
 					}}
 				</For>
+				<option value="screensharing" selected={props.config.deviceId === "screensharing"}>
+					Screen Sharing
+				</option>
 			</select>
 
 			<Show when={props.advanced}>
