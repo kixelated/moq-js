@@ -44,6 +44,7 @@ export function Home() {
 				including some of your <i>favorite</i> protocols like HTTP, TLS, and DNS. It's still early in
 				development and everything is subject to change, so get involved!
 			</div>
+			<div>This is not an official IETF website. The IETF does not endorse this website or its contents.</div>
 			<footer class="flex flex-row items-center gap-6">
 				<img src={icons.ietf.toString()} alt="IETF" class="h-12" />
 				<img src={icons.quic.toString()} alt="QUIC" class="h-12" />
