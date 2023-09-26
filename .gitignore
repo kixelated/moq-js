@@ -1,6 +1,4 @@
 dist/
 node_modules/
-.parcel-cache/
 .DS_Store
 tsconfig.tsbuildinfo
-**/.terraform

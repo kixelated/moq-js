@@ -28,8 +28,10 @@ export class Track {
 		this.#container = new Container()
 
 		if (isAudioTrack(media)) {
+			if (!config.audio) throw new Error("no audio config")
 			this.#encoder = new Audio.Encoder(media, config.audio)
 		} else if (isVideoTrack(media)) {
+			if (!config.video) throw new Error("no video config")
 			this.#encoder = new Video.Encoder(media, config.video)
 		} else {
 			throw new Error(`unknown track type: ${media.kind}`)

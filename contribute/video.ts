@@ -1,15 +1,10 @@
 import { isVideoTrackSettings } from "../common/settings"
 
-export const EncoderCodecs = [
+const SUPPORTED = [
 	"avc1", // H.264
 	"hev1", // HEVC (aka h.265)
-	// "av01", // AV1
+	// "av01", // TDOO support AV1
 ]
-
-export interface EncoderConfig {
-	codec: string
-	bitrate: number
-}
 
 export interface EncoderSupported {
 	codecs: string[]
@@ -32,7 +27,7 @@ export class Encoder {
 	// Output
 	frames: ReadableStream<VideoDecoderConfig | EncodedVideoChunk>
 
-	constructor(input: MediaStreamVideoTrack, config: EncoderConfig) {
+	constructor(input: MediaStreamVideoTrack, config: VideoEncoderConfig) {
 		const settings = input.getSettings()
 		if (!isVideoTrackSettings(settings)) {
 			throw new Error("expected video track")
@@ -61,7 +56,7 @@ export class Encoder {
 	static async isSupported(config: VideoEncoderConfig) {
 		// Check if we support a specific codec family
 		const short = config.codec.substring(0, 4)
-		if (!EncoderCodecs.includes(short)) return false
+		if (!SUPPORTED.includes(short)) return false
 
 		// Default to hardware encoding
 		config.hardwareAcceleration ??= "prefer-hardware"

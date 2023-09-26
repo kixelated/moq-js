@@ -4,17 +4,14 @@ import { Segment } from "./segment"
 import { Track } from "./track"
 import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../media/catalog"
 
-import * as Audio from "./audio"
-import * as Video from "./video"
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
 	connection: Connection
 	media: MediaStream
-	name: string
 
-	audio: Audio.EncoderConfig
-	video: Video.EncoderConfig
+	audio?: AudioEncoderConfig
+	video?: VideoEncoderConfig
 }
 
 export interface BroadcastConfigTrack {
@@ -52,6 +49,10 @@ export class Broadcast {
 			}
 
 			if (isVideoTrackSettings(settings)) {
+				if (!config.video) {
+					throw new Error("no video configuration provided")
+				}
+
 				const videoCatalog: VideoTrack = {
 					...mp4Catalog,
 					kind: "video",
@@ -64,6 +65,10 @@ export class Broadcast {
 
 				catalog = videoCatalog
 			} else if (isAudioTrackSettings(settings)) {
+				if (!config.audio) {
+					throw new Error("no audio configuration provided")
+				}
+
 				const audioCatalog: AudioTrack = {
 					...mp4Catalog,
 					kind: "audio",

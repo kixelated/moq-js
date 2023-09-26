@@ -1,17 +1,10 @@
 import { isAudioTrackSettings } from "../common/settings"
 
-export const EncoderCodecs = [
-	"mp4a.40.2", // AAC
+const SUPPORTED = [
+	// TODO support AAC
+	// "mp4a"
+	"Opus",
 ]
-
-export interface EncoderConfig {
-	codec: string
-	bitrate: number
-}
-
-export interface EncoderSupported {
-	codecs: string[]
-}
 
 export class Encoder {
 	#encoder!: AudioEncoder
@@ -22,7 +15,7 @@ export class Encoder {
 
 	frames: ReadableStream<AudioDecoderConfig | EncodedAudioChunk>
 
-	constructor(input: MediaStreamAudioTrack, config: EncoderConfig) {
+	constructor(input: MediaStreamAudioTrack, config: AudioEncoderConfig) {
 		const settings = input.getSettings()
 		if (!isAudioTrackSettings(settings)) {
 			throw new Error("expected audio track")
@@ -87,7 +80,7 @@ export class Encoder {
 	static async isSupported(config: AudioEncoderConfig) {
 		// Check if we support a specific codec family
 		const short = config.codec.substring(0, 4)
-		if (!EncoderCodecs.includes(short)) return false
+		if (!SUPPORTED.includes(short)) return false
 
 		const res = await AudioEncoder.isConfigSupported(config)
 		return !!res.supported

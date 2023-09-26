@@ -5,7 +5,6 @@ module.exports = {
 		"plugin:@typescript-eslint/recommended",
 		"plugin:@typescript-eslint/recommended-requiring-type-checking",
 		"plugin:@typescript-eslint/strict",
-		"plugin:solid/typescript",
 		"prettier",
 	],
 	parser: "@typescript-eslint/parser",
@@ -16,7 +15,7 @@ module.exports = {
 		es2022: true,
 		worker: true,
 	},
-	ignorePatterns: ["dist", "node_modules", "tailwind.config.js", ".eslintrc.cjs"],
+	ignorePatterns: ["dist", "node_modules", ".eslintrc.cjs"],
 	rules: {
 		// Allow the ! operator because typescript can't always figure out when something is not undefined
 		"@typescript-eslint/no-non-null-assertion": "off",
