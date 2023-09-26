@@ -14,7 +14,7 @@
 		"test": "tsc -b lib web",
 		"release": "npm run release -w lib",
 		"serve": "parcel serve --https --cert cert/localhost.crt --key cert/localhost.key --port 4444 --open",
-		"cert": "mkcert --install && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1",
+		"cert": "mkcert --install && rm -rf ./cert && mkdir cert && mkcert -ecdsa -cert-file cert/localhost.crt -key-file cert/localhost.key localhost 127.0.0.1 ::1",
 		"clean": "rm -r ./.parcel-cache/ ./dist/"
 	},
 	"workspaces": [
