@@ -11,31 +11,17 @@ export class Encoder {
 	#encoderConfig: AudioEncoderConfig
 	#decoderConfig?: AudioDecoderConfig
 
-	#encode: TransformStream<AudioData, AudioDecoderConfig | EncodedAudioChunk>
+	frames: TransformStream<AudioData, AudioDecoderConfig | EncodedAudioChunk>
 
-	frames: ReadableStream<AudioDecoderConfig | EncodedAudioChunk>
+	constructor(config: AudioEncoderConfig) {
+		this.#encoderConfig = config
+		console.log(config)
 
-	constructor(input: MediaStreamAudioTrack, config: AudioEncoderConfig) {
-		const settings = input.getSettings()
-		if (!isAudioTrackSettings(settings)) {
-			throw new Error("expected audio track")
-		}
-
-		this.#encoderConfig = {
-			codec: config.codec,
-			bitrate: config.bitrate,
-			sampleRate: settings.sampleRate,
-			numberOfChannels: settings.channelCount,
-		}
-
-		this.#encode = new TransformStream({
+		this.frames = new TransformStream({
 			start: this.#start.bind(this),
 			transform: this.#transform.bind(this),
 			flush: this.#flush.bind(this),
 		})
-
-		const reader = new MediaStreamTrackProcessor({ track: input }).readable
-		this.frames = reader.pipeThrough(this.#encode)
 	}
 
 	#start(controller: TransformStreamDefaultController<AudioDecoderConfig | EncodedAudioChunk>) {

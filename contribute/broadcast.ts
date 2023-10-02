@@ -56,7 +56,7 @@ export class Broadcast {
 				const videoCatalog: VideoTrack = {
 					...mp4Catalog,
 					kind: "video",
-					codec: track.config.codec,
+					codec: config.video.codec,
 					width: settings.width,
 					height: settings.height,
 					frame_rate: settings.frameRate,
@@ -72,7 +72,7 @@ export class Broadcast {
 				const audioCatalog: AudioTrack = {
 					...mp4Catalog,
 					kind: "audio",
-					codec: track.config.codec,
+					codec: config.audio.codec,
 					sample_rate: settings.sampleRate,
 					sample_size: settings.sampleSize,
 					channel_count: settings.channelCount,

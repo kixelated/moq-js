@@ -18,42 +18,52 @@ export class Track {
 	#error?: Error
 	#notify = new Notify()
 
-	#container = new Container()
-	#encoder: Audio.Encoder | Video.Encoder
-
 	constructor(media: MediaStreamTrack, config: BroadcastConfig) {
 		// TODO allow multiple tracks of the same kind
 		this.name = media.kind
 
-		this.#container = new Container()
+		let source: ReadableStream<AudioData | VideoFrame>
 
+		// We need
 		if (isAudioTrack(media)) {
 			if (!config.audio) throw new Error("no audio config")
-			this.#encoder = new Audio.Encoder(media, config.audio)
+			this.#runAudio(media, config.audio) // async
 		} else if (isVideoTrack(media)) {
 			if (!config.video) throw new Error("no video config")
-			this.#encoder = new Video.Encoder(media, config.video)
+			this.#runVideo(media, config.video) // async
 		} else {
 			throw new Error(`unknown track type: ${media.kind}`)
 		}
-
-		// Async function that closes on exit
-		this.#run().catch((e) => console.error("uncaught", e))
 	}
 
-	async #run() {
-		// Encode the output into CMAF fragments
-		const chunks = this.#encoder.frames.pipeThrough(this.#container.encode)
+	async #runAudio(track: MediaStreamAudioTrack, config: AudioEncoderConfig) {
+		const source = new MediaStreamTrackProcessor({ track })
+		const encoder = new Audio.Encoder(config)
+		const container = new Container()
 
 		// Split the container at keyframe boundaries
-		const writer = new WritableStream({
+		const segments = new WritableStream({
 			write: (chunk) => this.#write(chunk),
 			close: () => this.#close(),
 			abort: (e) => this.#abort(e),
 		})
 
-		// Keep running until the encoder is closed
-		return chunks.pipeTo(writer)
+		return source.readable.pipeThrough(encoder.frames).pipeThrough(container.encode).pipeTo(segments)
+	}
+
+	async #runVideo(track: MediaStreamVideoTrack, config: VideoEncoderConfig) {
+		const source = new MediaStreamTrackProcessor({ track })
+		const encoder = new Video.Encoder(config)
+		const container = new Container()
+
+		// Split the container at keyframe boundaries
+		const segments = new WritableStream({
+			write: (chunk) => this.#write(chunk),
+			close: () => this.#close(),
+			abort: (e) => this.#abort(e),
+		})
+
+		return source.readable.pipeThrough(encoder.frames).pipeThrough(container.encode).pipeTo(segments)
 	}
 
 	async #write(chunk: Chunk) {
@@ -154,10 +164,6 @@ export class Track {
 				}
 			},
 		})
-	}
-
-	get config() {
-		return this.#encoder.config
 	}
 }
 
