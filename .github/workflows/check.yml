@@ -10,9 +10,7 @@ jobs:
 
         steps:
             - uses: actions/checkout@v3
-
-            - name: install
-              run: pnpm install
+            - uses: actions/setup-node@v3
 
             - name: build
               run: pnpm -r build
