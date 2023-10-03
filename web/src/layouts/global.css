@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	a {
+		@apply font-bold hover:cursor-pointer hover:text-green-600;
+	}
+}
+
+@layer components {
+	/* see https://tailwindcss.com/docs/typography-plugin */
+	.markdown {
+		@apply prose prose-lg lg:prose-xl;
+		@apply prose-moq;
+		@apply prose-headings:underline prose-headings:decoration-green-500 prose-headings:decoration-2 prose-headings:underline-offset-4;
+		@apply prose-a:no-underline;
+		@apply prose-th:no-underline;
+		@apply prose-h1:mb-8 prose-h1:mt-12;
+		@apply prose-li:my-1;
+	}
+
+	.tagline {
+		@apply my-12 text-center text-2xl font-bold text-white underline decoration-green-500 decoration-2 underline-offset-4 md:text-3xl;
+	}
+
+	button,
+	.form-button {
+		@apply rounded-md border-0 bg-slate-700 font-bold shadow-sm hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2;
+		@apply px-12 py-4 text-2xl;
+	}
+
+	input,
+	select,
+	input[type="text"],
+	.form-input,
+	.form-select {
+		@apply rounded-md border-0 bg-slate-700 px-4 py-2 text-xl text-slate-100 shadow-sm focus:ring-1 focus:ring-inset focus:ring-green-600;
+	}
+}

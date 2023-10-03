@@ -1,10 +1,9 @@
 {
 	"recommendations": [
+		"astro-build.astro-vscode",
 		"ms-vscode.vscode-typescript-next",
 		"EditorConfig.EditorConfig",
 		"dbaeumer.vscode-eslint",
 		"esbenp.prettier-vscode",
-		"HashiCorp.terraform",
-		"bradlc.vscode-tailwindcss"
-	]
+	],
 }

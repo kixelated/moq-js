@@ -10,15 +10,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v3
+            - uses: actions/setup-node@v3
 
-            - name: install
-              run: npm install
-
-            - name: build
-              run: npm run build
-
-            - name: lint
-              run: npm run lint
-
-            - name: test
-              run: npm run test
+            - run: npm ci
+            - run: npm run build
+            - run: npm run lint

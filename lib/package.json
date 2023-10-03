@@ -1,18 +1,20 @@
 {
 	"name": "@kixelated/moq",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"description": "Media over QUIC library",
 	"license": "(MIT OR Apache-2.0)",
 	"repository": "github:kixelated/moq-js",
 	"scripts": {
 		"build": "tsc -b . && cp README.md package.json ../LICENSE* ./dist",
-		"release": "npm run build && npm publish ./dist"
+		"release": "npm run build && npm publish ./dist",
+		"lint": "eslint .",
+		"fmt": "prettier --write ."
 	},
 	"devDependencies": {
 		"@types/audioworklet": "^0.0.50",
 		"@types/dom-mediacapture-transform": "^0.1.6",
 		"@types/dom-webcodecs": "^0.1.8",
-		"@types/web": "^0.0.113",
+		"@typescript/lib-dom": "npm:@types/web@^0.0.115",
 		"@typescript-eslint/eslint-plugin": "^6.4.0",
 		"@typescript-eslint/parser": "^6.4.0",
 		"eslint": "^8.47.0",

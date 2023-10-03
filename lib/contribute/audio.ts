@@ -1,48 +1,25 @@
-import { isAudioTrackSettings } from "../common/settings"
-
-export const EncoderCodecs = [
-	"mp4a.40.2", // AAC
+const SUPPORTED = [
+	// TODO support AAC
+	// "mp4a"
+	"Opus",
 ]
-
-export interface EncoderConfig {
-	codec: string
-	bitrate: number
-}
-
-export interface EncoderSupported {
-	codecs: string[]
-}
 
 export class Encoder {
 	#encoder!: AudioEncoder
 	#encoderConfig: AudioEncoderConfig
 	#decoderConfig?: AudioDecoderConfig
 
-	#encode: TransformStream<AudioData, AudioDecoderConfig | EncodedAudioChunk>
+	frames: TransformStream<AudioData, AudioDecoderConfig | EncodedAudioChunk>
 
-	frames: ReadableStream<AudioDecoderConfig | EncodedAudioChunk>
+	constructor(config: AudioEncoderConfig) {
+		this.#encoderConfig = config
+		console.log(config)
 
-	constructor(input: MediaStreamAudioTrack, config: EncoderConfig) {
-		const settings = input.getSettings()
-		if (!isAudioTrackSettings(settings)) {
-			throw new Error("expected audio track")
-		}
-
-		this.#encoderConfig = {
-			codec: config.codec,
-			bitrate: config.bitrate,
-			sampleRate: settings.sampleRate,
-			numberOfChannels: settings.channelCount,
-		}
-
-		this.#encode = new TransformStream({
+		this.frames = new TransformStream({
 			start: this.#start.bind(this),
 			transform: this.#transform.bind(this),
 			flush: this.#flush.bind(this),
 		})
-
-		const reader = new MediaStreamTrackProcessor({ track: input }).readable
-		this.frames = reader.pipeThrough(this.#encode)
 	}
 
 	#start(controller: TransformStreamDefaultController<AudioDecoderConfig | EncodedAudioChunk>) {
@@ -87,7 +64,7 @@ export class Encoder {
 	static async isSupported(config: AudioEncoderConfig) {
 		// Check if we support a specific codec family
 		const short = config.codec.substring(0, 4)
-		if (!EncoderCodecs.includes(short)) return false
+		if (!SUPPORTED.includes(short)) return false
 
 		const res = await AudioEncoder.isConfigSupported(config)
 		return !!res.supported

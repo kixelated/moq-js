@@ -1,7 +1,21 @@
-dist/
-node_modules/
-.parcel-cache/
-.DS_Store
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# NPM
+**/node_modules/**
+
+# Build output
+dist
+
+# Just in case somebody runs the wrong command
+yarn.lock
+pnpm-lock.yaml
 tsconfig.tsbuildinfo
-**/.terraform
+
+# Mac shit
+.DS_Store
+
+# No longer used but just in case
 cert/

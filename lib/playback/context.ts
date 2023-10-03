@@ -16,7 +16,7 @@ export class Context {
 
 	private async load(config: Message.ConfigAudio): Promise<AudioWorkletNode> {
 		// Load the worklet source code.
-		const url = new URL("./worklet/index", import.meta.url)
+		const url = new URL("./worklet/index.ts", import.meta.url)
 		await this.context.audioWorklet.addModule(url)
 
 		const volume = this.context.createGain()

@@ -1,15 +1,8 @@
-import { isVideoTrackSettings } from "../common/settings"
-
-export const EncoderCodecs = [
+const SUPPORTED = [
 	"avc1", // H.264
 	"hev1", // HEVC (aka h.265)
-	// "av01", // AV1
+	// "av01", // TDOO support AV1
 ]
-
-export interface EncoderConfig {
-	codec: string
-	bitrate: number
-}
 
 export interface EncoderSupported {
 	codecs: string[]
@@ -27,41 +20,25 @@ export class Encoder {
 	#keyframeCounter = 0
 
 	// Converts raw rames to encoded frames.
-	#encode: TransformStream<VideoFrame, VideoDecoderConfig | EncodedVideoChunk>
+	frames: TransformStream<VideoFrame, VideoDecoderConfig | EncodedVideoChunk>
 
-	// Output
-	frames: ReadableStream<VideoDecoderConfig | EncodedVideoChunk>
+	constructor(config: VideoEncoderConfig) {
+		config.bitrateMode ??= "constant"
+		config.latencyMode ??= "realtime"
 
-	constructor(input: MediaStreamVideoTrack, config: EncoderConfig) {
-		const settings = input.getSettings()
-		if (!isVideoTrackSettings(settings)) {
-			throw new Error("expected video track")
-		}
+		this.#encoderConfig = config
 
-		this.#encoderConfig = {
-			codec: config.codec,
-			framerate: settings.frameRate,
-			width: settings.width,
-			height: settings.height,
-			bitrate: config.bitrate,
-			bitrateMode: "constant", // TODO configurable
-			latencyMode: "realtime", // TODO configurable
-		}
-
-		this.#encode = new TransformStream({
+		this.frames = new TransformStream({
 			start: this.#start.bind(this),
 			transform: this.#transform.bind(this),
 			flush: this.#flush.bind(this),
 		})
-
-		const reader = new MediaStreamTrackProcessor({ track: input }).readable
-		this.frames = reader.pipeThrough(this.#encode)
 	}
 
 	static async isSupported(config: VideoEncoderConfig) {
 		// Check if we support a specific codec family
 		const short = config.codec.substring(0, 4)
-		if (!EncoderCodecs.includes(short)) return false
+		if (!SUPPORTED.includes(short)) return false
 
 		// Default to hardware encoding
 		config.hardwareAcceleration ??= "prefer-hardware"

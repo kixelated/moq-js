@@ -2,11 +2,10 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"type": "chrome",
+			"command": "./node_modules/.bin/astro dev",
+			"name": "Development server",
 			"request": "launch",
-			"name": "Launch Chrome against localhost",
-			"url": "https://localhost:4444",
-			"webRoot": "${workspaceFolder}"
+			"type": "node-terminal"
 		}
 	]
 }
