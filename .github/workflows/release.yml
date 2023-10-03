@@ -9,6 +9,11 @@ on:
     push:
         branches: ["main"]
 
+env:
+    REGISTRY: us-central1-docker.pkg.dev
+    IMAGE: quic-video/deploy/moq-js:latest
+    SERVICE: web
+
 jobs:
     build:
         runs-on: ubuntu-latest
@@ -31,23 +36,23 @@ jobs:
               uses: depot/setup-action@v1
 
             # Log in to GCP
-            - id: "auth"
-              name: "Authenticate to Google Cloud"
-              uses: "google-github-actions/auth@v1"
+            - id: auth
+              name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v1
               with:
-                  token_format: "access_token"
+                  token_format: access_token
                   credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
             # This example uses the docker login action
-            - uses: "docker/login-action@v1"
+            - uses: docker/login-action@v1
               with:
-                  registry: "us-central1-docker.pkg.dev"
-                  username: "oauth2accesstoken"
-                  password: "${{ steps.auth.outputs.access_token }}"
+                  registry: ${{ env.REGISTRY }}
+                  username: oauth2accesstoken
+                  password: ${{ steps.auth.outputs.access_token }}
 
             # This example runs "docker login" directly to Artifact Registry.
             - run: |-
-                  echo '${{ steps.auth.outputs.access_token }}' | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+                  echo '${{ steps.auth.outputs.access_token }}' | docker login -u oauth2accesstoken --password-stdin https://${{ENV.REGISTRY}}
 
             # Build and push Docker image with Depot
             - name: Build and push Docker image
@@ -56,4 +61,11 @@ jobs:
                   project: hppp3x0qjc
                   context: .
                   push: true
-                  tags: us-central1-docker.pkg.dev/quic-video/deploy/moq-js:latest
+                  tags: ${{env.REGISTRY}}/${{env.IMAGE}}
+
+            # Deploy to cloud run
+            - name: Update Cloud Run
+              uses: google-github-actions/deploy-cloudrun@v1
+              with:
+                  service: ${{env.SERVICE}}
+                  image: ${{env.REGISTRY}}/${{env.IMAGE}}
