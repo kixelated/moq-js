@@ -15,6 +15,5 @@ jobs:
               with:
                   run_install: true
 
-            - run: pnpm ci
             - run: pnpm build
             - run: pnpm lint
