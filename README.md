@@ -12,25 +12,18 @@ You'll either need to run a local server using [moq-rs](https://github.com/kixel
 
 Join the [Discord](https://discord.gg/FCYF3p99mr) for updates and discussion.
 
-## Usage
-
-The library is released periodically and available on NPM.
-There's no documentation until the API settles down.
-
-```bash
-npm install @kixelated/moq
-```
-
-## Development
-Install node dependencies using `pnpm`:
+## Setup
+Install the dependencies with `pnpm`:
 
 ```bash
 pnpm install
 ```
 
-Build to the `dist` folder:
+## Development
+Run the development web server:
+
 ```bash
-pnpm build
+pnpm dev --open
 ```
 
 ## License

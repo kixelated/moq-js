@@ -1,0 +1,17 @@
+---
+export const prerender = false
+const { server } = Astro.params
+
+import Issues from "@/components/issues.astro"
+import Client from "@/components/publish.tsx"
+import Layout from "@/layouts/global.astro"
+---
+
+<Layout>
+	<Issues />
+
+	<p>
+		Publish a <strong>PUBLIC</strong> broadcast to {server}.
+	</p>
+	<Client server={server} client:load />
+</Layout>

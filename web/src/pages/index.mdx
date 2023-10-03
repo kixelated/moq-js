@@ -1,0 +1,57 @@
+---
+layout: "@/layouts/global.astro"
+---
+
+<center>
+	<img src="img/logo-full.svg" className="h-32" />
+</center>
+
+**Media over QUIC** is new live media protocol powered by [QUIC](https://quicwg.org/):
+a super-charged TCP/UDP replacement designed for [HTTP/3](https://en.wikipedia.org/wiki/HTTP/3).
+It's being developed by the [IETF](https://www.ietf.org/) as a new standard.
+
+<p class="tagline">This is a proof-of-concept demo</p>
+
+Everything is a work in progress, but some features include:
+
+-   Web support via [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport) and [WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API)
+-   CDN support via [MoqTransport](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/).
+-   Native support with ffmpeg and OBS plugins. **(in development)**
+
+<p class="tagline">Try it out! [Watch](/watch) or [Publish](/publish) a broadcast</p>
+
+This website is a fully [open source](/source).
+The native components are in [Rust](https://github.com/kixelated/moq-rs) and the web components are in [Typescript](https://github.com/kixelated/moq-js).
+Get in touch if you're interested in contributing, sponsoring, or just want more information!
+
+<p class="tagline">Visit [Github](/source) or join [Discord](https://discord.gg/FCYF3p99mr)</p>
+
+We are designing a protocol that is simple and yet flexible enough to support the wide range of use-cases:
+from ultra-low latency to ultra-high quality, 1 viewer to 1 million viewers, and everything in
+between. It's possible by evaluating the entire ecosystem and breaking the problem into layers:
+
+-   **QUIC**: Responsible for networking.
+-   **MoqTransport**: Responsible for CDN support (caching and fanout).
+-   **Warp**: Responsible for media encoding.
+
+MoQ is still very early in development and many features are missing.
+Everything is liable to change, especially if you get involved!
+
+<p class="tagline">Check out the current [Issues](/issues) and **Roadmap**</p>
+
+The protocol is being developed by the
+[IETF MoQ working group](https://datatracker.ietf.org/group/moq/about/). The
+[IETF](https://www.ietf.org/) is an open organization that develops Internet standards, including
+some of your _favorite_ protocols like HTTP, TLS, and DNS.
+
+**Note:** This is not an official IETF website, nor does the MoQ working group endorse this website.
+We are active participants, but the standard is being produced by many individuals from many companies.
+
+<center>
+	<a href="https://ietf.org">
+		<img src="img/ietf.svg" className="m-4 inline h-12" />
+	</a>
+	<a href="https://quicwg.org/">
+		<img src="img/quic.svg" className="m-4 inline h-12" />
+	</a>
+</center>

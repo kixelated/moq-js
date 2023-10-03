@@ -1,0 +1,14 @@
+---
+import Issues from "@/components/issues.astro"
+import Client from "@/components/publish.tsx"
+import Layout from "@/layouts/global.astro"
+---
+
+<Layout>
+	<Issues />
+
+	<p>
+		Publish a <strong>PUBLIC</strong> broadcast. Pls don't abuse.
+	</p>
+	<Client client:load />
+</Layout>

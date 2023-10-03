@@ -1,0 +1,41 @@
+---
+import "./global.css"
+---
+
+<!doctype html>
+<html lang="en" class="bg-slate-900 text-slate-100">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Astro description" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Media over QUIC</title>
+	</head>
+	<body>
+		<div class="flex flex-col md:flex-row gap-8 md:p-8 p-4">
+			<nav class="flex flex-row items-center md:flex-col md:w-72 md:gap-12 gap-4 w-full">
+				<a href="/" class="w-1/2 md:w-auto">
+					<img src="/img/logo-small.svg" class="w-52" alt="Media over QUIC" />
+				</a>
+				<div class="flex flex-row flex-wrap items-center justify-center gap-4 w-1/2">
+					<a href="/watch">
+						<img src="/img/watch.svg" class="w-28" alt="Watch" />
+					</a>
+					<a href="/publish">
+						<img src="/img/publish.svg" class="w-28" alt="Publish" />
+					</a>
+					<a href="/source">
+						<img src="/img/source.svg" class="w-28" alt="Source" />
+					</a>
+					<a href="https://discord.gg/FCYF3p99mr">
+						<img src="/img/discord.svg" class="w-28" alt="Discord" />
+					</a>
+				</div>
+			</nav>
+			<article class="markdown">
+				<slot />
+			</article>
+		</div>
+	</body>
+</html>

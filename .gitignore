@@ -1,4 +1,15 @@
-dist/
-node_modules/
-.DS_Store
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# NPM
+**/node_modules/**
+
+# Build output
+dist
+
+# Just in case somebody runs the wrong command
+package-lock.json
+yarn.lock
 tsconfig.tsbuildinfo
