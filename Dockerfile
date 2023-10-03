@@ -18,4 +18,5 @@ FROM base
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=build /app/web/dist /app/web/dist
 
+ENV HOST="0.0.0.0"
 CMD [ "node", "./web/dist/server/entry.mjs" ]
