@@ -13,3 +13,6 @@ dist
 package-lock.json
 yarn.lock
 tsconfig.tsbuildinfo
+
+# Mac shit
+.DS_Store
