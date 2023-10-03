@@ -10,5 +10,6 @@
 		"build": "pnpm -r build",
 		"lint": "pnpm -r lint",
 		"fmt": "pnpm -r fmt"
-	}
+	},
+	"packageManager": "pnpm@8.7.6"
   }
