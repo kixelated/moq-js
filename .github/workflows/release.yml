@@ -62,10 +62,3 @@ jobs:
                   context: .
                   push: true
                   tags: ${{env.REGISTRY}}/${{env.IMAGE}}
-
-            # Deploy to cloud run
-            - name: Update Cloud Run
-              uses: google-github-actions/deploy-cloudrun@v1
-              with:
-                  service: ${{env.SERVICE}}
-                  image: ${{env.REGISTRY}}/${{env.IMAGE}}
