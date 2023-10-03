@@ -1,4 +1,5 @@
 import * as Message from "./worker/message"
+import MediaWorker from "./worker?worker"
 
 export type Callback = (e: Message.FromWorker) => void
 
@@ -10,16 +11,10 @@ export class Port {
 	#callback: Callback
 
 	constructor(callback: Callback) {
-		const url = new URL("worker/index.ts", import.meta.url)
-
 		this.#callback = callback
 
 		// TODO does this block the main thread? If so, make this async
-		this.#worker = new Worker(url, {
-			type: "module",
-			name: "media",
-		})
-
+		this.#worker = new MediaWorker({ format: "es" })
 		this.#worker.addEventListener("message", this.on.bind(this))
 	}
 
