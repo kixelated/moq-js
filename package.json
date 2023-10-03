@@ -1,10 +1,10 @@
 {
-	"nameweb": "moq-js",
+	"name": "moq-js",
+	"private": true,
 	"workspaces": [
 		"lib",
 		"web"
 	],
-	"private": true,
 	"scripts": {
 		"dev": "pnpm --filter web dev",
 		"build": "pnpm -r build",

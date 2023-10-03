@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 
 # Mac shit
 .DS_Store
+
+# No longer used but just in case
+cert/
