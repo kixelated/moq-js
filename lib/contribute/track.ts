@@ -22,15 +22,13 @@ export class Track {
 		// TODO allow multiple tracks of the same kind
 		this.name = media.kind
 
-		let source: ReadableStream<AudioData | VideoFrame>
-
-		// We need
+		// We need to split based on type because Typescript is hard
 		if (isAudioTrack(media)) {
 			if (!config.audio) throw new Error("no audio config")
-			this.#runAudio(media, config.audio) // async
+			this.#runAudio(media, config.audio).catch((err) => this.#close(err))
 		} else if (isVideoTrack(media)) {
 			if (!config.video) throw new Error("no video config")
-			this.#runVideo(media, config.video) // async
+			this.#runVideo(media, config.video).catch((err) => this.#close(err))
 		} else {
 			throw new Error(`unknown track type: ${media.kind}`)
 		}
@@ -45,7 +43,7 @@ export class Track {
 		const segments = new WritableStream({
 			write: (chunk) => this.#write(chunk),
 			close: () => this.#close(),
-			abort: (e) => this.#abort(e),
+			abort: (e) => this.#close(e),
 		})
 
 		return source.readable.pipeThrough(encoder.frames).pipeThrough(container.encode).pipeTo(segments)
@@ -60,7 +58,7 @@ export class Track {
 		const segments = new WritableStream({
 			write: (chunk) => this.#write(chunk),
 			close: () => this.#close(),
-			abort: (e) => this.#abort(e),
+			abort: (e) => this.#close(e),
 		})
 
 		return source.readable.pipeThrough(encoder.frames).pipeThrough(container.encode).pipeTo(segments)
@@ -110,12 +108,9 @@ export class Track {
 		writer.releaseLock()
 	}
 
-	async #abort(e: Error) {
+	async #close(e?: Error) {
 		this.#error = e
-		await this.#close()
-	}
 
-	async #close() {
 		const current = this.#segments.at(-1)
 		if (current) {
 			await current.input.close()

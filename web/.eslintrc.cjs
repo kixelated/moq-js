@@ -9,6 +9,7 @@ module.exports = {
 		"plugin:astro/recommended",
 		"plugin:solid/typescript",
 		"plugin:jsx-a11y/recommended",
+		"plugin:astro/jsx-a11y-recommended",
 		"plugin:prettier/recommended",
 	],
 	root: true,
@@ -32,7 +33,7 @@ module.exports = {
 			},
 		],
 		// Make formatting errors into warnings
-		"prettier/prettier": 1
+		"prettier/prettier": 1,
 	},
 	parserOptions: {
 		project: true,

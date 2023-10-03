@@ -1,5 +1,3 @@
-import { isVideoTrackSettings } from "../common/settings"
-
 const SUPPORTED = [
 	"avc1", // H.264
 	"hev1", // HEVC (aka h.265)

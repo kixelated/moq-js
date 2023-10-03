@@ -1,5 +1,3 @@
-import { isAudioTrackSettings } from "../common/settings"
-
 const SUPPORTED = [
 	// TODO support AAC
 	// "mp4a"
