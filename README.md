@@ -13,6 +13,7 @@ You'll either need to run a local server using [moq-rs](https://github.com/kixel
 Join the [Discord](https://discord.gg/FCYF3p99mr) for updates and discussion.
 
 ## Setup
+
 Install the dependencies with `pnpm`:
 
 ```bash
@@ -20,10 +21,11 @@ pnpm install
 ```
 
 ## Development
+
 Run the development web server:
 
 ```bash
-pnpm dev --open
+pnpm dev
 ```
 
 ## License

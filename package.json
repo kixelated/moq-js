@@ -1,8 +1,8 @@
 {
 	"nameweb": "moq-js",
 	"workspaces": [
-	  "lib",
-	  "web"
+		"lib",
+		"web"
 	],
 	"private": true,
 	"scripts": {
@@ -11,5 +11,5 @@
 		"lint": "pnpm -r lint",
 		"fmt": "pnpm -r fmt"
 	},
-	"packageManager": "pnpm@8.7.6"
-  }
+	"packageManager": "pnpm@8.8.0"
+}

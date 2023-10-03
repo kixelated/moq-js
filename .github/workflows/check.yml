@@ -13,10 +13,8 @@ jobs:
             - uses: actions/setup-node@v3
             - uses: pnpm/action-setup@v2
               with:
-                run_install: true
+                  run_install: true
 
-            - name: build
-              run: pnpm -r build
-
-            - name: lint
-              run: pnpm -r lint
+            - run: pnpm ci
+            - run: pnpm build
+            - run: pnpm lint

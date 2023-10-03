@@ -1,9 +1,6 @@
 {
 	"extends": "../tsconfig.json",
 	"include": ["."],
-	"compilerOptions": {
-		"types": ["web"]
-	},
 	"references": [
 		{
 			"path": "../common"

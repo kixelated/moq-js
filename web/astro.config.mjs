@@ -18,7 +18,7 @@ export default defineConfig({
 	],
 	// Renders any non-static pages using node
 	adapter: nodejs({
-		mode: "middleware",
+		mode: "standalone",
 	}),
 	// Default to static rendering, but allow server rendering per-page
 	output: "hybrid",
