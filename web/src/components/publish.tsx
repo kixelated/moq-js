@@ -1,17 +1,7 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
 import { Client, Connection } from "@kixelated/moq/transport"
 
-import {
-	createSignal,
-	createEffect,
-	onCleanup,
-	createMemo,
-	Show,
-	For,
-	createSelector,
-	Switch,
-	Match,
-} from "solid-js"
+import { createSignal, createEffect, onCleanup, createMemo, Show, For, createSelector, Switch, Match } from "solid-js"
 
 import Fail from "./fail"
 
@@ -230,23 +220,13 @@ export default function Publish(props: { server?: string }) {
 
 				<Show when={videoTrack()}>
 					{(track) => (
-						<Video
-							setError={setError}
-							setConfig={setVideo}
-							track={track()}
-							advanced={advanced()}
-						/>
+						<Video setError={setError} setConfig={setVideo} track={track()} advanced={advanced()} />
 					)}
 				</Show>
 
 				<Show when={audioTrack()}>
 					{(track) => (
-						<Audio
-							setError={setError}
-							setConfig={setAudio}
-							track={track()}
-							advanced={advanced()}
-						/>
+						<Audio setError={setError} setConfig={setAudio} track={track()} advanced={advanced()} />
 					)}
 				</Show>
 
@@ -305,9 +285,7 @@ function Connect(props: {
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
-		const fingerprint = server.startsWith("localhost")
-			? `https://${server}/fingerprint`
-			: undefined
+		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
 		const client = new Client({
 			url,
@@ -348,10 +326,7 @@ function Connect(props: {
 	)
 }
 
-function Device(props: {
-	setError: (err: Error) => void
-	setDevice: (input: MediaStream) => void
-}) {
+function Device(props: { setError: (err: Error) => void; setDevice: (input: MediaStream) => void }) {
 	const [mode, setMode] = createSignal<"user" | "display" | "none">("none")
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
 
@@ -613,11 +588,7 @@ function Video(props: {
 					<div class="flex flex-wrap items-center gap-8">
 						<label>
 							Codec
-							<select
-								name="codec"
-								class="block w-64"
-								onInput={(e) => setCodec(e.target.value)}
-							>
+							<select name="codec" class="block w-64" onInput={(e) => setCodec(e.target.value)}>
 								<For each={supportedCodecNames()}>
 									{(value) => (
 										<option value={value} selected={value === codec()}>
@@ -630,11 +601,7 @@ function Video(props: {
 
 						<label>
 							Profile
-							<select
-								name="profile"
-								class="block w-64"
-								onInput={(e) => setProfile(e.target.value)}
-							>
+							<select name="profile" class="block w-64" onInput={(e) => setProfile(e.target.value)}>
 								<For each={supportedCodecProfiles()}>
 									{(value) => (
 										<option value={value} selected={value === profile()}>
@@ -664,11 +631,7 @@ function Video(props: {
 
 						<label>
 							Frame Rate
-							<select
-								name="fps"
-								class="block w-64"
-								onInput={(e) => setFps(parseInt(e.target.value))}
-							>
+							<select name="fps" class="block w-64" onInput={(e) => setFps(parseInt(e.target.value))}>
 								<For each={supportedFps()}>
 									{(value) => (
 										<option value={value} selected={value === fps()}>
@@ -680,10 +643,7 @@ function Video(props: {
 						</label>
 
 						<label>
-							Bitrate:{" "}
-							<span class="text-slate-400">
-								{(bitrate() / 1_000_000).toFixed(1)} Mb/s
-							</span>
+							Bitrate: <span class="text-slate-400">{(bitrate() / 1_000_000).toFixed(1)} Mb/s</span>
 							<input
 								type="range"
 								name="bitrate"
@@ -786,11 +746,7 @@ function Audio(props: {
 					<div class="flex flex-wrap items-center gap-8">
 						<label>
 							Codec
-							<select
-								class="block w-64"
-								name="codec"
-								onInput={(e) => setCodec(e.target.value)}
-							>
+							<select class="block w-64" name="codec" onInput={(e) => setCodec(e.target.value)}>
 								<For each={supported()}>
 									{(value) => (
 										<option value={value} selected={value === codec()}>
@@ -802,8 +758,7 @@ function Audio(props: {
 						</label>
 
 						<label>
-							Bitrate:{" "}
-							<span class="text-slate-300">{Math.floor(bitrate() / 1000)} Kb/s</span>
+							Bitrate: <span class="text-slate-300">{Math.floor(bitrate() / 1000)} Kb/s</span>
 							<input
 								type="range"
 								name="bitrate"
