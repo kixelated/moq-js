@@ -1,6 +1,7 @@
 import * as Control from "./control"
 import { Queue, Watch } from "../common/async"
-import { Header, Objects } from "./object"
+import { Objects } from "./object"
+import type { Header } from "./object"
 
 export class Subscriber {
 	// Use to send control messages.
