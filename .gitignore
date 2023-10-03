@@ -10,8 +10,8 @@ npm-debug.log*
 dist
 
 # Just in case somebody runs the wrong command
-package-lock.json
 yarn.lock
+pnpm-lock.yaml
 tsconfig.tsbuildinfo
 
 # Mac shit

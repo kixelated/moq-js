@@ -13,6 +13,6 @@
 	"editor.defaultFormatter": "esbenp.prettier-vscode",
 	"search.exclude": {
 		// Avoid polluting search results with lockfile content
-		"pnpm-lock.yaml": true,
-	  },
+		"package-lock.json": true
+	}
 }

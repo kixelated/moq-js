@@ -14,10 +14,10 @@ Join the [Discord](https://discord.gg/FCYF3p99mr) for updates and discussion.
 
 ## Setup
 
-Install the dependencies with `pnpm`:
+Install the dependencies with `npm`:
 
 ```bash
-pnpm install
+npm install
 ```
 
 ## Development
@@ -25,7 +25,7 @@ pnpm install
 Run the development web server:
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 ## License

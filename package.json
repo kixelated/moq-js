@@ -6,10 +6,9 @@
 		"web"
 	],
 	"scripts": {
-		"dev": "pnpm --filter web dev",
-		"build": "pnpm -r build",
-		"lint": "pnpm -r lint",
-		"fmt": "pnpm -r fmt"
-	},
-	"packageManager": "pnpm@8.8.0"
+		"dev": "npm run dev --workspace web",
+		"build": "npm run build --workspaces",
+		"lint": "npm run lint --workspaces",
+		"fmt": "npm run fmt --workspaces"
+	}
 }

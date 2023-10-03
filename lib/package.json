@@ -6,7 +6,7 @@
 	"repository": "github:kixelated/moq-js",
 	"scripts": {
 		"build": "tsc -b . && cp README.md package.json ../LICENSE* ./dist",
-		"release": "pnpm build && pnpm publish ./dist",
+		"release": "npm run build && npm publish ./dist",
 		"lint": "eslint .",
 		"fmt": "prettier --write ."
 	},
