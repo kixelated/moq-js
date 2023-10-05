@@ -1,7 +1,16 @@
 ---
 import "./global.css"
 
-let {title, frontmatter} = Astro.props
+// NOTE: This is magically used as the type for Astro.props
+interface Props {
+	title: string
+
+	frontmatter: {
+		title: string
+	}
+}
+
+let { title, frontmatter } = Astro.props
 if (frontmatter && frontmatter.title) title = frontmatter.title
 ---
 
