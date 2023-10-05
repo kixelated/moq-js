@@ -159,6 +159,6 @@ export class SubscribeSend {
 
 	// Receive the next a readable data stream
 	async data() {
-		return this.#data.next()
+		return await this.#data.next()
 	}
 }

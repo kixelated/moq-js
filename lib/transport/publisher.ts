@@ -40,7 +40,7 @@ export class Publisher {
 
 	// Receive the next new subscription
 	async subscribed() {
-		return this.#subscribeQueue.next()
+		return await this.#subscribeQueue.next()
 	}
 
 	recvAnnounceOk(msg: Control.AnnounceOk) {
