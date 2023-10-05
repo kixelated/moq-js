@@ -1,5 +1,17 @@
 ---
 import "./global.css"
+
+// NOTE: This is magically used as the type for Astro.props
+interface Props {
+	title: string
+
+	frontmatter: {
+		title: string
+	}
+}
+
+let { title, frontmatter } = Astro.props
+if (frontmatter && frontmatter.title) title = frontmatter.title
 ---
 
 <!doctype html>
@@ -13,7 +25,7 @@ import "./global.css"
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Media over QUIC</title>
+		<title>{title ? `${title} - ` : ""}Media over QUIC</title>
 	</head>
 	<body>
 		<div class="flex flex-col md:flex-row gap-8 md:p-8 p-4">
