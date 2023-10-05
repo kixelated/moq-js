@@ -329,27 +329,14 @@ function Connect(props: {
 function Device(props: { setError: (err: Error) => void; setDevice: (input: MediaStream) => void }) {
 	const [mode, setMode] = createSignal<"user" | "display" | "none">("none")
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
+	const [videoDeviceId, setVideoDeviceId] = createSignal<string>("")
+	const [audioDeviceId, setAudioDeviceId] = createSignal<string>("")
 
 	let preview: HTMLVideoElement | undefined // undefined until mount
 
 	const loadUser = function () {
 		setMode("user")
-
-		navigator.mediaDevices
-			.getUserMedia({
-				audio: {
-					channelCount: {
-						ideal: 2,
-						max: 2,
-					},
-					sampleRate: { ideal: 48_000 },
-				},
-				video: {
-					aspectRatio: { ideal: 16 / 9 },
-					height: { ideal: DEFAULT_HEIGHT, max: SUPPORTED_HEIGHT.at(-1) },
-					frameRate: { ideal: DEFAULT_FPS, max: SUPPORTED_FPS.at(-1) },
-				},
-			})
+		mediaDevices()
 			.then(setDevice)
 			.catch(props.setError)
 			.catch(() => setMode("none"))
@@ -376,6 +363,45 @@ function Device(props: { setError: (err: Error) => void; setDevice: (input: Medi
 			.then(setDevice)
 			.catch(props.setError)
 			.catch(() => setMode("none"))
+	}
+
+	const mediaDevices = () => {
+		return navigator.mediaDevices.getUserMedia({
+			audio:
+				audioDeviceId() === "disabled"
+					? false
+					: {
+							channelCount: {
+								ideal: 2,
+								max: 2,
+							},
+							sampleRate: { ideal: 48_000 },
+							deviceId: audioDeviceId(),
+					  },
+			video:
+				videoDeviceId() === "disabled"
+					? false
+					: {
+							aspectRatio: { ideal: 16 / 9 },
+							height: { ideal: DEFAULT_HEIGHT, max: SUPPORTED_HEIGHT.at(-1) },
+							frameRate: { ideal: DEFAULT_FPS, max: SUPPORTED_FPS.at(-1) },
+							deviceId: videoDeviceId(),
+					  },
+		})
+	}
+
+	const updateDeviceInput = function (videoDevId: string, audioDevId: string) {
+		setVideoDeviceId(videoDevId)
+		setAudioDeviceId(audioDevId)
+		mediaDevices()
+			.then(setDevice)
+			.catch(props.setError)
+			.catch(() => setMode("none"))
+	}
+
+	const deviceInputError = function (err: Error) {
+		props.setError(err)
+		setMode("none")
 	}
 
 	// Preview the input source.
@@ -425,10 +451,93 @@ function Device(props: { setError: (err: Error) => void; setDevice: (input: Medi
 			>
 				Window
 			</button>
+
+			<Show when={mode() === "user"}>
+				<DeviceList
+					onChange={updateDeviceInput}
+					onError={deviceInputError}
+					videoDeviceId={videoDeviceId()}
+					audioDeviceId={audioDeviceId()}
+				/>
+			</Show>
+
 			<Show when={device()}>
 				<video autoplay muted class="rounded-md" ref={preview} />
 			</Show>
 		</>
+	)
+}
+
+function DeviceList(props: {
+	videoDeviceId: string
+	audioDeviceId: string
+	onChange: (videoDeviceId: string, audioDeviceId: string) => void
+	onError: (err: Error) => void
+}) {
+	const [devices, setDevices] = createSignal<MediaDeviceInfo[]>([])
+
+	createEffect(() => {
+		navigator.mediaDevices.enumerateDevices().then(setDevices).catch(props.onError)
+	})
+
+	const changeVideoDeviceId = function (videoDeviceId: string) {
+		props.onChange(videoDeviceId, props.audioDeviceId)
+	}
+
+	const changeAudioDeviceId = function (audioDeviceId: string) {
+		props.onChange(props.videoDeviceId, audioDeviceId)
+	}
+
+	return (
+		<div class="my-8 flex flex-wrap items-center gap-8">
+			<label>
+				Video Input
+				<select name="video-input" class="block w-64" onInput={(e) => changeVideoDeviceId(e.target.value)}>
+					<For each={[...devices().filter((d) => d.kind === "videoinput")]}>
+						{(device, i) => {
+							return (
+								<option
+									value={device.deviceId}
+									selected={
+										(props.videoDeviceId === "" && i() === 0) ||
+										props.videoDeviceId === device.deviceId
+									}
+								>
+									{device.label}
+								</option>
+							)
+						}}
+					</For>
+					<option value="disabled" selected={props.videoDeviceId === "disabled"}>
+						Disabled
+					</option>
+				</select>
+			</label>
+
+			<label>
+				Audio Input
+				<select name="audio-input" class="block w-64" onInput={(e) => changeAudioDeviceId(e.target.value)}>
+					<For each={[...devices().filter((d) => d.kind === "audioinput")]}>
+						{(device, i) => {
+							return (
+								<option
+									value={device.deviceId}
+									selected={
+										(props.videoDeviceId === "" && i() === 0) ||
+										props.audioDeviceId === device.deviceId
+									}
+								>
+									{device.label}
+								</option>
+							)
+						}}
+					</For>
+					<option value="disabled" selected={props.audioDeviceId === "disabled"}>
+						Disabled
+					</option>
+				</select>
+			</label>
+		</div>
 	)
 }
 
@@ -463,7 +572,6 @@ function Video(props: {
 	})
 
 	// Default values
-	const [enabled, setEnabled] = createSignal(true)
 	const [height, setHeight] = createSignal(0) // use track default
 	const [fps, setFps] = createSignal(0) // use fps default
 	const [bitrate, setBitrate] = createSignal(2_000_000)
@@ -539,8 +647,6 @@ function Video(props: {
 
 	// Update the config with a valid config
 	const config = createMemo(() => {
-		if (!enabled()) return
-
 		const available = supported()
 		if (!available) return
 
@@ -574,89 +680,77 @@ function Video(props: {
 			<Show when={props.advanced}>
 				<h2>Video</h2>
 
-				<label class="mb-4 flex items-center gap-4">
-					<span>Enabled</span>
-					<input
-						type="checkbox"
-						name="enabled"
-						checked={enabled()}
-						onInput={(e) => setEnabled(e.target.checked)}
-					/>
-				</label>
+				<div class="flex flex-wrap items-center gap-8">
+					<label>
+						Codec
+						<select name="codec" class="block w-64" onInput={(e) => setCodec(e.target.value)}>
+							<For each={supportedCodecNames()}>
+								{(value) => (
+									<option value={value} selected={value === codec()}>
+										{value}
+									</option>
+								)}
+							</For>
+						</select>
+					</label>
 
-				<Show when={enabled()}>
-					<div class="flex flex-wrap items-center gap-8">
-						<label>
-							Codec
-							<select name="codec" class="block w-64" onInput={(e) => setCodec(e.target.value)}>
-								<For each={supportedCodecNames()}>
-									{(value) => (
-										<option value={value} selected={value === codec()}>
-											{value}
-										</option>
-									)}
-								</For>
-							</select>
-						</label>
+					<label>
+						Profile
+						<select name="profile" class="block w-64" onInput={(e) => setProfile(e.target.value)}>
+							<For each={supportedCodecProfiles()}>
+								{(value) => (
+									<option value={value} selected={value === profile()}>
+										{value}
+									</option>
+								)}
+							</For>
+						</select>
+					</label>
 
-						<label>
-							Profile
-							<select name="profile" class="block w-64" onInput={(e) => setProfile(e.target.value)}>
-								<For each={supportedCodecProfiles()}>
-									{(value) => (
-										<option value={value} selected={value === profile()}>
-											{value}
-										</option>
-									)}
-								</For>
-							</select>
-						</label>
+					<label>
+						Resolution
+						<select
+							class="block w-64"
+							name="resolution"
+							onInput={(e) => setHeight(parseInt(e.target.value))}
+						>
+							<For each={supportedHeight()}>
+								{(value) => (
+									<option value={value} selected={value === height()}>
+										{width(value)} x {value}
+									</option>
+								)}
+							</For>
+						</select>
+					</label>
 
-						<label>
-							Resolution
-							<select
-								class="block w-64"
-								name="resolution"
-								onInput={(e) => setHeight(parseInt(e.target.value))}
-							>
-								<For each={supportedHeight()}>
-									{(value) => (
-										<option value={value} selected={value === height()}>
-											{width(value)} x {value}
-										</option>
-									)}
-								</For>
-							</select>
-						</label>
+					<label>
+						Frame Rate
+						<select name="fps" class="block w-64" onInput={(e) => setFps(parseInt(e.target.value))}>
+							<For each={supportedFps()}>
+								{(value) => (
+									<option value={value} selected={value === fps()}>
+										{value}fps
+									</option>
+								)}
+							</For>
+						</select>
+					</label>
 
-						<label>
-							Frame Rate
-							<select name="fps" class="block w-64" onInput={(e) => setFps(parseInt(e.target.value))}>
-								<For each={supportedFps()}>
-									{(value) => (
-										<option value={value} selected={value === fps()}>
-											{value}fps
-										</option>
-									)}
-								</For>
-							</select>
-						</label>
-
-						<label>
-							Bitrate: <span class="text-slate-400">{(bitrate() / 1_000_000).toFixed(1)} Mb/s</span>
-							<input
-								type="range"
-								name="bitrate"
-								class="block w-64"
-								min={500_000}
-								max={4_000_000}
-								step={100_000}
-								value={bitrate()}
-								onInput={(e) => setBitrate(parseInt(e.target.value))}
-							/>
-						</label>
-					</div>
-				</Show>
+					<label>
+						Bitrate: <span class="text-slate-400">{(bitrate() / 1_000_000).toFixed(1)} Mb/s</span>
+						<input
+							type="range"
+							name="bitrate"
+							class="block w-64"
+							min={500_000}
+							max={4_000_000}
+							step={100_000}
+							value={bitrate()}
+							onInput={(e) => setBitrate(parseInt(e.target.value))}
+						/>
+					</label>
+				</div>
 			</Show>
 		</>
 	)
@@ -669,7 +763,6 @@ function Audio(props: {
 	advanced: boolean
 }) {
 	// Default values
-	const [enabled, setEnabled] = createSignal(true)
 	const [codec, setCodec] = createSignal("")
 	const [bitrate, setBitrate] = createSignal(128_000)
 	const [supported, setSupported] = createSignal<string[]>([])
@@ -702,8 +795,6 @@ function Audio(props: {
 
 	// Update the config with a valid config
 	const config = createMemo(() => {
-		if (!enabled()) return
-
 		const available = supported()
 		if (!available) return
 
@@ -731,47 +822,34 @@ function Audio(props: {
 		<>
 			<Show when={props.advanced}>
 				<h2>Audio</h2>
+				<div class="flex flex-wrap items-center gap-8">
+					<label>
+						Codec
+						<select class="block w-64" name="codec" onInput={(e) => setCodec(e.target.value)}>
+							<For each={supported()}>
+								{(value) => (
+									<option value={value} selected={value === codec()}>
+										{value}
+									</option>
+								)}
+							</For>
+						</select>
+					</label>
 
-				<label class="mb-4 flex items-center gap-4">
-					<span>Enabled</span>
-					<input
-						type="checkbox"
-						name="enabled"
-						checked={enabled()}
-						onInput={(e) => setEnabled(e.target.checked)}
-					/>
-				</label>
-
-				<Show when={enabled()}>
-					<div class="flex flex-wrap items-center gap-8">
-						<label>
-							Codec
-							<select class="block w-64" name="codec" onInput={(e) => setCodec(e.target.value)}>
-								<For each={supported()}>
-									{(value) => (
-										<option value={value} selected={value === codec()}>
-											{value}
-										</option>
-									)}
-								</For>
-							</select>
-						</label>
-
-						<label>
-							Bitrate: <span class="text-slate-300">{Math.floor(bitrate() / 1000)} Kb/s</span>
-							<input
-								type="range"
-								name="bitrate"
-								class="block w-64"
-								min={64_000}
-								max={256_000}
-								step={1_000}
-								value={bitrate()}
-								onInput={(e) => setBitrate(parseInt(e.target.value))}
-							/>
-						</label>
-					</div>
-				</Show>
+					<label>
+						Bitrate: <span class="text-slate-300">{Math.floor(bitrate() / 1000)} Kb/s</span>
+						<input
+							type="range"
+							name="bitrate"
+							class="block w-64"
+							min={64_000}
+							max={256_000}
+							step={1_000}
+							value={bitrate()}
+							onInput={(e) => setBitrate(parseInt(e.target.value))}
+						/>
+					</label>
+				</div>
 			</Show>
 		</>
 	)
