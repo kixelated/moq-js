@@ -68,7 +68,12 @@ const SUPPORTED_FPS = [15, 30, 60]
 const DEFAULT_HEIGHT = 480
 const DEFAULT_FPS = 30
 
-export default function Publish(props: { server?: string }) {
+export default function Publish() {
+	// Use query params to allow overriding environment variables.
+	const urlSearchParams = new URLSearchParams(window.location.search)
+	const params = Object.fromEntries(urlSearchParams.entries())
+	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
+
 	const [connection, setConnection] = createSignal<Connection | undefined>()
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
 	const [audio, setAudio] = createSignal<AudioEncoderConfig | undefined>()
@@ -215,7 +220,7 @@ export default function Publish(props: { server?: string }) {
 					setShare={setShare}
 					setConnection={setConnection}
 					advanced={advanced()}
-					server={props.server ?? import.meta.env.PUBLIC_RELAY_HOST}
+					server={server}
 				/>
 
 				<Show when={videoTrack()}>
@@ -295,7 +300,7 @@ function Connect(props: {
 
 		let watchUrl = `/watch/${n}`
 		if (server != import.meta.env.PUBLIC_RELAY_HOST) {
-			watchUrl = `dev/${server}${watchUrl}`
+			watchUrl = `${watchUrl}?server=${server}`
 		}
 
 		client

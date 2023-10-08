@@ -5,7 +5,12 @@ import Fail from "./fail"
 
 import { createEffect, createSignal, onCleanup } from "solid-js"
 
-export default function Watch(props: { name: string; server?: string }) {
+export default function Watch(props: { name: string }) {
+	// Use query params to allow overriding environment variables.
+	const urlSearchParams = new URLSearchParams(window.location.search)
+	const params = Object.fromEntries(urlSearchParams.entries())
+	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
+
 	const [error, setError] = createSignal<Error | undefined>()
 
 	// Render the canvas when the DOM is inserted
@@ -15,7 +20,6 @@ export default function Watch(props: { name: string; server?: string }) {
 	createEffect(() => {
 		setConnection(undefined)
 
-		const server = props.server ?? import.meta.env.PUBLIC_RELAY_HOST
 		const url = `https://${server}/${props.name}`
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
