@@ -322,7 +322,7 @@ function Connect(props: {
 						type="text"
 						name="name"
 						placeholder="random"
-						class="block w-96"
+						class="broadcast block w-96"
 						onChange={(e) => setName(e.target.value)}
 					/>
 				</label>
