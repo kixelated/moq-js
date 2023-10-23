@@ -58,21 +58,7 @@ declare module "mp4box" {
 
 	export type MP4ArrayBuffer = ArrayBuffer & { fileStart: number }
 
-	export interface MP4File {
-		onMoovStart?: () => void
-		onReady?: (info: MP4Info) => void
-		onError?: (e: string) => void
-		onSamples?: (id: number, user: any, samples: Sample[]) => void
-
-		appendBuffer(data: MP4ArrayBuffer): number
-		start(): void
-		stop(): void
-		flush(): void
-
-		setExtractionOptions(id: number, user: any, options: ExtractionOptions): void
-	}
-
-	export function createFile(): MP4File
+	export function createFile(): ISOFile
 
 	export interface Sample {
 		number: number
@@ -85,7 +71,7 @@ declare module "mp4box" {
 			vpcC?: BoxParser.vpcCBox // vp9
 			av1C?: BoxParser.av1CBox // av1
 		}
-		data: ArrayBuffer
+		data: Uint8Array
 		size: number
 		alreadyRead?: number
 		duration: number
@@ -273,7 +259,7 @@ declare module "mp4box" {
 
 		init(options?: FileOptions): ISOFile
 		addTrack(options?: TrackOptions): number
-		addSample(track: number, data: ArrayBuffer, options?: SampleOptions): Sample
+		addSample(track: number, data: Uint8Array, options?: SampleOptions): Sample
 
 		createSingleSampleMoof(sample: Sample): BoxParser.moofBox
 
@@ -351,11 +337,25 @@ declare module "mp4box" {
 		static initSampleGroups(trak: any, traf: any, sbgps: any, trak_sgpds: any, traf_sgpds: any): void
 		static process_sdtp(sdtp: any, sample: any, number: any): void
 		static setSampleGroupProperties(trak: any, sample: any, sample_number: any, sample_groups_info: any): void
+
+		// TODO Expand public API; it's difficult to tell what should be public
+		onMoovStart?: () => void
+		onReady?: (info: MP4Info) => void
+		onError?: (e: string) => void
+		onSamples?: (id: number, user: any, samples: Sample[]) => void
+
+		appendBuffer(data: MP4ArrayBuffer): number
+		start(): void
+		stop(): void
+		flush(): void
+
+		setExtractionOptions(id: number, user: any, options: ExtractionOptions): void
 	}
 
 	export namespace BoxParser {
 		export class Box {
 			size?: number
+			flags?: number // Do these go here?
 			data?: Uint8Array
 
 			constructor(type?: string, size?: number)
@@ -378,7 +378,7 @@ declare module "mp4box" {
 
 		// TODO finish add types for these classes
 		export class AudioSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 
 			getChannelCount(): any
 			getSampleRate(): any
@@ -389,13 +389,13 @@ declare module "mp4box" {
 		}
 
 		export class CoLLBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class ContainerBox extends Box {
-			constructor(type: any, size: any, uuid: any)
+			constructor(type: any, size?: number, uuid?: any)
 
 			parse(stream: any): void
 			print(output: any): void
@@ -403,7 +403,7 @@ declare module "mp4box" {
 		}
 
 		export class FullBox extends Box {
-			constructor(type: any, size: any, uuid: any)
+			constructor(type: any, size?: number, uuid?: any)
 
 			parse(stream: any): void
 			parseDataAndRewind(stream: any): void
@@ -413,21 +413,21 @@ declare module "mp4box" {
 		}
 
 		export class HintSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 		}
 
 		export class MetadataSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 
 			isMetadata(): any
 		}
 
 		export class OpusSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class SampleEntry extends Box {
-			constructor(type: any, size: any, hdr_size: any, start: any)
+			constructor(type: any, size?: number, hdr_size?: number, start?: number)
 
 			getChannelCount(): any
 			getCodec(): any
@@ -457,45 +457,45 @@ declare module "mp4box" {
 		}
 
 		export class SingleItemTypeReferenceBox extends ContainerBox {
-			constructor(type: any, size: any, hdr_size: any, start: any)
+			constructor(type: any, size?: number, hdr_size?: number, start?: number)
 
 			parse(stream: any): void
 		}
 
 		export class SingleItemTypeReferenceBoxLarge {
-			constructor(type: any, size: any, hdr_size: any, start: any)
+			constructor(type: any, size?: number, hdr_size?: number, start?: number)
 
 			parse(stream: any): void
 		}
 
 		export class SmDmBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class SubtitleSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 
 			isSubtitle(): any
 		}
 
 		export class SystemSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 		}
 
 		export class TextSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 		}
 
 		export class TrackGroupTypeBox extends FullBox {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class TrackReferenceTypeBox extends ContainerBox {
-			constructor(type: any, size: any, hdr_size: any, start: any)
+			constructor(type: any, size?: number, hdr_size?: number, start?: number)
 
 			parse(stream: any): void
 
@@ -503,7 +503,7 @@ declare module "mp4box" {
 		}
 
 		export class VisualSampleEntry extends SampleEntry {
-			constructor(type: any, size: any)
+			constructor(type: any, size?: number)
 
 			getHeight(): any
 			getWidth(): any
@@ -513,142 +513,142 @@ declare module "mp4box" {
 		}
 
 		export class a1lxBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class a1opBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class alstSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class auxCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class av01SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class av1CBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class avc1SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class avc2SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class avc3SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class avc4SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class avcCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class avllSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class avssSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class btrtBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class bxmlBox extends FullBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class clapBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class clefBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class clliBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class co64Box extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class colrBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class cprtBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class cslgBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class cttsBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			unpack(samples: any): void
@@ -674,262 +674,262 @@ declare module "mp4box" {
 		}
 
 		export class dac3Box extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class dec3Box extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class dfLaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class dimmBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class dinfBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class dmaxBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class dmedBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class drefBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class drepBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class dtrtSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class edtsBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class elngBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class elstBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class emsgBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class encaSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class encmSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class encsSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class enctSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class encuSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class encvSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class enofBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class esdsBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class fielBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class freeBox extends Box {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class frmaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class ftypBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class hdlrBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class hev1SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class hinfBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class hmhdBox extends FullBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class hntiBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class hvc1SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class hvcCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class idatBox extends Box {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class iinfBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class ilocBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class imirBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class infeBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class iodsBox extends FullBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class ipcoBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class ipmaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class iproBox extends FullBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class iprpBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 			ipmas: ipmaBox[]
 		}
 
 		export class irefBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class irotBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class ispeBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class kindBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 
@@ -937,35 +937,35 @@ declare module "mp4box" {
 		}
 
 		export class levaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class lselBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class maxrBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class mdatBox extends Box {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class mdcvBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class mdhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 
@@ -973,15 +973,15 @@ declare module "mp4box" {
 		}
 
 		export class mdiaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class mecoBox extends Box {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class mehdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 
@@ -989,31 +989,31 @@ declare module "mp4box" {
 		}
 
 		export class mereBox extends FullBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class metaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class mettSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class metxSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class mfhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 
@@ -1021,49 +1021,49 @@ declare module "mp4box" {
 		}
 
 		export class mfraBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 			tfras: tfraBox[]
 		}
 
 		export class mfroBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class minfBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class moofBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 			trafs: trafBox[]
 		}
 
 		export class moovBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 			traks: trakBox[]
 			psshs: psshBox[]
 		}
 
 		export class mp4aSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class msrcTrackGroupTypeBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class mvexBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			trexs: trexBox[]
 		}
 
 		export class mvhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			print(output: any): void
@@ -1071,131 +1071,131 @@ declare module "mp4box" {
 		}
 
 		export class mvifSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class nmhdBox extends FullBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class npckBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class numpBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class padbBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class paspBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class paylBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class paytBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class pdinBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class pitmBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class pixiBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class pmaxBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class prftBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class profBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class prolSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class psshBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class rashSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class rinfBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class rollSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class saioBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class saizBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class sbgpBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 
@@ -1203,95 +1203,95 @@ declare module "mp4box" {
 		}
 
 		export class sbttSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class schiBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class schmBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class scifSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class scnmSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class sdtpBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class seigSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class sencBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class sgpdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class sidxBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class sinfBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class skipBox extends Box {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class smhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class ssixBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class stblBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			sgpds: sgpdBox[]
 			sbgps: sbgpBox[]
 		}
 
 		export class stcoBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			unpack(samples: any): void
@@ -1299,46 +1299,46 @@ declare module "mp4box" {
 		}
 
 		export class stdpBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class sthdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class stppSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class strdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class striBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class strkBox extends Box {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class stsaSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class stscBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			unpack(samples: any): void
@@ -1346,34 +1346,34 @@ declare module "mp4box" {
 		}
 
 		export class stsdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class stsgBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class stshBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class stssBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class stszBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			unpack(samples: any): void
@@ -1381,7 +1381,7 @@ declare module "mp4box" {
 		}
 
 		export class sttsBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			unpack(samples: any): void
@@ -1389,80 +1389,80 @@ declare module "mp4box" {
 		}
 
 		export class stviBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class stxtSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 			parse(stream: any): void
 		}
 
 		export class stypBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class stz2Box extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class subsBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class syncSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class taptBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class teleSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tencBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tfdtBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class tfhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class tfraBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tkhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			print(output: any): void
@@ -1470,192 +1470,202 @@ declare module "mp4box" {
 		}
 
 		export class tmaxBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tminBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class totlBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tpayBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tpylBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class trafBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 			truns: trunBox[]
 			sgpd: sgpdBox[]
 			sbgp: sbgpBox[]
 		}
 
 		export class trakBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class trefBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class trepBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class trexBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class trgrBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class trpyBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class trunBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
+
+			sample_count: number
+
+			sample_duration?: number[]
+			sample_size?: number[]
+			sample_flags?: number[]
+			sample_composition_time_offset?: number[]
+
+			data_offset?: number
+			data_offset_position?: number
 		}
 
 		export class tsasSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tsclSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tselBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class tx3gSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class txtCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class udtaBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 			kinds: kindBox[]
 		}
 
 		export class viprSampleGroupEntry extends SampleGroupEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class vmhdBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 			write(stream: any): void
 		}
 
 		export class vp08SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class vp09SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class vpcCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class vttCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class vttcBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class vvc1SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class vvcCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class vvcNSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class vvi1SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			getCodec(): any
 		}
 
 		export class vvnCBox extends ContainerBox {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
 
 		export class vvs1SampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 		}
 
 		export class wvttSampleEntry extends SampleEntry {
-			constructor(size: any)
+			constructor(size?: number)
 
 			parse(stream: any): void
 		}
@@ -1725,29 +1735,29 @@ declare module "mp4box" {
 		export function decimalToHex(d: any, padding: any): any
 		export function initialize(): void
 		export function parseHex16(stream: any): any
-		export function parseOneBox(stream: any, headerOnly: any, parentSize: any): any
+		export function parseOneBox(stream: any, headerOnly: any, parentsize?: number): any
 		export function parseUUID(stream: any): any
 
 		/* ???
 		namespace UUIDBoxes {
 			export class a2394f525a9b4f14a2446c427c648df4 {
-				constructor(size: any)
+				constructor(size?: number)
 			}
 
 			export class a5d40b30e81411ddba2f0800200c9a66 {
-				constructor(size: any)
+				constructor(size?: number)
 
 				parse(stream: any): void
 			}
 
 			export class d08a4f1810f34a82b6c832d8aba183d3 {
-				constructor(size: any)
+				constructor(size?: number)
 
 				parse(stream: any): void
 			}
 
 			export class d4807ef2ca3946958e5426cb9e46a79f {
-				constructor(size: any)
+				constructor(size?: number)
 
 				parse(stream: any): void
 			}
@@ -1763,7 +1773,7 @@ declare module "mp4box" {
 		getLength(): any
 		getPosition(): any
 		isEos(): any
-		readAnyInt(size: any, signed: any): any
+		readAnyInt(size?: number, signed?: boolean): any
 		readCString(): any
 		readInt16(): any
 		readInt16Array(length: any): any

@@ -1,9 +1,9 @@
-import { Timeline } from "./timeline"
+import { Frame, Timeline } from "./timeline"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
 
-import { Container } from "./container"
+import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 import { asError } from "../../common/error"
 
@@ -66,8 +66,21 @@ class Worker {
 		const [initFork, initClone] = init.tee()
 		this.#inits.set(msg.init, initFork)
 
-		// Create a new container that we will use to decode.
-		const container = new Container()
+		// Create a new stream that we will use to decode.
+		const container = new MP4.Parser()
+
+		// Compute the timestamp for each frame.
+		const frames = new TransformStream<[MP4.Track, MP4.Sample], Frame>({
+			transform: (input, controller) => {
+				const [track, sample] = input
+				controller.enqueue({
+					track,
+					sample,
+					// TODO don't convert to seconds for better accuracy
+					timestamp: sample.dts / track.timescale,
+				})
+			},
+		})
 
 		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
 
@@ -75,7 +88,7 @@ class Worker {
 		const segments = timeline.segments.getWriter()
 		await segments.write({
 			sequence: msg.header.sequence,
-			frames: container.decode.readable,
+			frames: frames.readable,
 		})
 		segments.releaseLock()
 

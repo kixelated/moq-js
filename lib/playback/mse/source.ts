@@ -2,14 +2,14 @@ import { Init } from "./init"
 
 // Create a SourceBuffer with convenience methods
 export class Source {
-	sourceBuffer?: SourceBuffer;
-	mediaSource: MediaSource;
-	queue: Array<SourceInit | SourceData | SourceTrim>;
-	init?: Init;
+	sourceBuffer?: SourceBuffer
+	mediaSource: MediaSource
+	queue: Array<SourceInit | SourceData | SourceTrim>
+	init?: Init
 
 	constructor(mediaSource: MediaSource) {
-		this.mediaSource = mediaSource;
-		this.queue = [];
+		this.mediaSource = mediaSource
+		this.queue = []
 	}
 
 	// (re)initialize the source using the provided init segment.
@@ -74,55 +74,48 @@ export class Source {
 
 	// Flush any queued instructions
 	flush() {
-		while (1) {
+		for (;;) {
 			// Check if the buffer is currently busy.
 			if (this.sourceBuffer && this.sourceBuffer.updating) {
-				break;
+				break
 			}
 
 			// Process the next item in the queue.
 			const next = this.queue.shift()
 			if (!next) {
-				break;
+				break
 			}
 
-			switch (next.kind) {
-			case "init":
-				this.init = next.init;
+			if (next.kind == "init") {
+				this.init = next.init
 
 				if (!this.sourceBuffer) {
 					// Create a new source buffer.
 					this.sourceBuffer = this.mediaSource.addSourceBuffer(this.init.info.mime)
 
 					// Call flush automatically after each update finishes.
-					this.sourceBuffer.addEventListener('updateend', this.flush.bind(this))
+					this.sourceBuffer.addEventListener("updateend", this.flush.bind(this))
 				} else {
 					this.sourceBuffer.changeType(next.init.info.mime)
 				}
-
-				break;
-			case "data":
+			} else if (next.kind == "data") {
 				if (!this.sourceBuffer) {
 					throw "failed to call initailize before append"
 				}
 
 				this.sourceBuffer.appendBuffer(next.data)
-
-				break;
-			case "trim":
+			} else if (next.kind == "trim") {
 				if (!this.sourceBuffer) {
 					throw "failed to call initailize before trim"
 				}
 
-				const end = this.sourceBuffer.buffered.end(this.sourceBuffer.buffered.length - 1) - next.trim;
+				const end = this.sourceBuffer.buffered.end(this.sourceBuffer.buffered.length - 1) - next.trim
 				const start = this.sourceBuffer.buffered.start(0)
 
 				if (end > start) {
 					this.sourceBuffer.remove(start, end)
 				}
-
-				break;
-			default:
+			} else {
 				throw "impossible; unknown SourceItem"
 			}
 		}
@@ -132,16 +125,16 @@ export class Source {
 interface SourceItem {}
 
 class SourceInit implements SourceItem {
-  kind!: "init";
-  init!: Init;
+	kind!: "init"
+	init!: Init
 }
 
 class SourceData implements SourceItem {
-  kind!: "data";
-  data!: Uint8Array | ArrayBuffer;
+	kind!: "data"
+	data!: Uint8Array | ArrayBuffer
 }
 
 class SourceTrim implements SourceItem {
-	kind!: "trim";
-	trim!: number;
+	kind!: "trim"
+	trim!: number
 }

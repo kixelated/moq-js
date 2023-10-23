@@ -1,14 +1,14 @@
-import { MP4New, MP4File, MP4ArrayBuffer, MP4Info } from "./mp4"
+import * as MP4 from "../../media/mp4"
 
 export class InitParser {
-	mp4box: MP4File;
-	offset: number;
+	mp4box: MP4.ISOFile
+	offset: number
 
-	raw: MP4ArrayBuffer[];
-	ready: Promise<Init>;
+	raw: MP4.ArrayBuffer[]
+	ready: Promise<Init>
 
 	constructor() {
-		this.mp4box = MP4New()
+		this.mp4box = MP4.New()
 
 		this.raw = []
 		this.offset = 0
@@ -18,7 +18,7 @@ export class InitParser {
 			this.mp4box.onError = reject
 
 			// https://github.com/gpac/mp4box.js#onreadyinfo
-			this.mp4box.onReady = (info: MP4Info) => {
+			this.mp4box.onReady = (info: MP4.Info) => {
 				if (!info.isFragmented) {
 					reject("expected a fragmented mp4")
 				}
@@ -37,11 +37,11 @@ export class InitParser {
 
 	push(data: Uint8Array) {
 		// Make a copy of the atom because mp4box only accepts an ArrayBuffer unfortunately
-		let box = new Uint8Array(data.byteLength);
+		const box = new Uint8Array(data.byteLength)
 		box.set(data)
 
 		// and for some reason we need to modify the underlying ArrayBuffer with fileStart
-		let buffer = box.buffer as MP4ArrayBuffer
+		const buffer = box.buffer as MP4.ArrayBuffer
 		buffer.fileStart = this.offset
 
 		// Parse the data
@@ -54,6 +54,6 @@ export class InitParser {
 }
 
 export interface Init {
-	raw: MP4ArrayBuffer[];
-	info: MP4Info;
+	raw: MP4.ArrayBuffer[]
+	info: MP4.Info
 }

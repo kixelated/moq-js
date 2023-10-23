@@ -32,6 +32,7 @@ export class Component {
 	#current?: Segment
 
 	frames: ReadableStream<Frame>
+
 	#segments: TransformStream<Segment, Segment>
 
 	constructor() {

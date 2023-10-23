@@ -3,9 +3,6 @@
 	"compilerOptions": {
 		"baseUrl": ".",
 		"jsx": "preserve",
-		"jsxImportSource": "solid-js",
-		"paths": {
-			"@/*": ["./src/*"]
-		}
+		"jsxImportSource": "solid-js"
 	}
 }

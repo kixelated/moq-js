@@ -9,7 +9,7 @@ export { Reader, Writer }
 
 export interface Header {
 	track: bigint
-	sequence: bigint
+	sequence: number // To make it easier, we don't use a bigint here.
 	priority: number // i32
 	expires: number // 0 means never
 	// followed by payload
@@ -50,7 +50,7 @@ export class Objects {
 		if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
 
 		const track = await r.u62()
-		const sequence = await r.u62()
+		const sequence = await r.u53()
 		const priority = await r.i32()
 		const expires = await r.u53()
 
@@ -66,7 +66,7 @@ export class Objects {
 		const w = new Writer(s)
 		await w.u8(0)
 		await w.u62(h.track)
-		await w.u62(h.sequence)
+		await w.u53(h.sequence)
 		await w.i32(h.priority)
 		await w.u53(h.expires)
 	}

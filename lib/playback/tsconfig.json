@@ -1,7 +1,7 @@
 {
 	"extends": "../tsconfig.json",
 	"include": ["."],
-	"exclude": ["./worklet"],
+	"exclude": ["./webcodecs/worklet"],
 	"compilerOptions": {
 		"types": ["dom-mediacapture-transform", "dom-webcodecs"]
 	},
@@ -15,5 +15,8 @@
 		{
 			"path": "../media"
 		}
-	]
+	],
+	"paths": {
+		"@/*": ["*"]
+	}
 }

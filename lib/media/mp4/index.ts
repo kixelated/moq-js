@@ -1,32 +1,22 @@
 // Rename some stuff so it's on brand.
-export { createFile as New, DataStream as Stream, ISOFile, BoxParser, Log } from "mp4box"
+// We need a separate file so this file can use the rename too.
+import * as MP4 from "./rename"
+export * from "./rename"
 
-export type {
-	MP4File as File,
-	MP4ArrayBuffer as ArrayBuffer,
-	MP4Info as Info,
-	MP4Track as Track,
-	MP4AudioTrack as AudioTrack,
-	MP4VideoTrack as VideoTrack,
-	Sample,
-	TrackOptions,
-	SampleOptions,
-} from "mp4box"
+export * from "./parser"
 
-import { MP4Track, MP4AudioTrack, MP4VideoTrack, BoxParser, DataStream } from "mp4box"
-
-export function isAudioTrack(track: MP4Track): track is MP4AudioTrack {
+export function isAudioTrack(track: MP4.Track): track is MP4.AudioTrack {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-	return (track as MP4AudioTrack).audio !== undefined
+	return (track as MP4.AudioTrack).audio !== undefined
 }
 
-export function isVideoTrack(track: MP4Track): track is MP4VideoTrack {
+export function isVideoTrack(track: MP4.Track): track is MP4.VideoTrack {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-	return (track as MP4VideoTrack).video !== undefined
+	return (track as MP4.VideoTrack).video !== undefined
 }
 
 // TODO contribute to mp4box
-BoxParser.dOpsBox.prototype.write = function (stream: DataStream) {
+MP4.BoxParser.dOpsBox.prototype.write = function (stream: MP4.Stream) {
 	this.size = this.ChannelMappingFamily === 0 ? 11 : 13 + this.ChannelMapping!.length
 	this.writeHeader(stream)
 

@@ -1,30 +1,25 @@
-import * as Message from "./worker/message"
-import { Port } from "./port"
+import * as Message from "./webcodecs/message"
 
-import { Context } from "./context"
 import { Connection } from "../transport/connection"
 import { Watch } from "../common/async"
-import { RingShared } from "../common/ring"
-import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
+import { Catalog, isMp4Track, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
+
+// We support two different playback implementations:
+import Webcodecs from "./webcodecs"
+import MSE from "./mse"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
 
 export interface PlayerConfig {
 	connection: Connection
-	canvas: HTMLCanvasElement
+	element: HTMLCanvasElement | HTMLVideoElement
 }
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
-	#port: Port
-
-	// The video canvas
-	#canvas: OffscreenCanvas
-
-	// The audio context, which must be created on the main thread.
-	#context?: Context
+	#inner: Webcodecs | MSE
 
 	// A periodically updated timeline
 	#timeline = new Watch<Timeline | undefined>(undefined)
@@ -35,25 +30,23 @@ export class Player {
 	readonly connection: Connection
 
 	constructor(config: PlayerConfig) {
-		this.#port = new Port(this.#onMessage.bind(this)) // TODO await an async method instead
+		if (config.element instanceof HTMLCanvasElement) {
+			this.#inner = new Webcodecs({ element: config.element })
+		} else {
+			this.#inner = new MSE({ element: config.element })
+		}
 
-		this.#canvas = config.canvas.transferControlToOffscreen()
 		this.connection = config.connection
 
 		this.#catalog = Catalog.fetch(this.connection)
 
 		// Async work
-		this.#running = this.#run()
+		this.#running = this.#catalog.then((catalog) => this.#run(catalog))
 	}
 
-	async #run() {
+	async #run(catalog: Catalog) {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
-
-		const catalog = await this.#catalog
-
-		let sampleRate: number | undefined
-		let channels: number | undefined
 
 		for (const track of catalog.tracks) {
 			if (!isMp4Track(track)) {
@@ -62,36 +55,9 @@ export class Player {
 
 			inits.add(track.init_track)
 			tracks.push(track)
-
-			if (isAudioTrack(track)) {
-				if (sampleRate && track.sample_rate !== sampleRate) {
-					throw new Error(`TODO multiple audio tracks with different sample rates`)
-				}
-
-				sampleRate = track.sample_rate
-				channels = Math.max(track.channel_count, channels ?? 0)
-			}
 		}
 
-		const config: Message.Config = {}
-
-		// Only configure audio is we have an audio track
-		if (sampleRate && channels) {
-			config.audio = {
-				channels: channels,
-				sampleRate: sampleRate,
-				ring: new RingShared(2, sampleRate / 20), // 50ms
-			}
-
-			this.#context = new Context(config.audio)
-		}
-
-		// TODO only send the canvas if we have a video track
-		config.video = {
-			canvas: this.#canvas,
-		}
-
-		this.#port.sendConfig(config) // send to the worker
+		this.#inner.start({ catalog })
 
 		// Call #runInit on each unique init track
 		// TODO do this in parallel with #runTrack to remove a round trip
@@ -107,10 +73,7 @@ export class Player {
 			const init = await sub.data()
 			if (!init) throw new Error("no init data")
 
-			this.#port.sendInit({
-				name: name,
-				stream: init.stream,
-			})
+			this.#inner.init({ stream: init.stream, name })
 		} finally {
 			await sub.close()
 		}
@@ -127,7 +90,7 @@ export class Player {
 				const segment = await sub.data()
 				if (!segment) break
 
-				this.#port.sendSegment({
+				this.#inner.segment({
 					init: track.init_track,
 					kind: track.kind,
 					header: segment.header,
@@ -164,11 +127,11 @@ export class Player {
 
 	/*
 	play() {
-		this.#port.sendPlay({ minBuffer: 0.5 }) // TODO configurable
+		this.#inner.play({ minBuffer: 0.5 }) // TODO configurable
 	}
 
 	seek(timestamp: number) {
-		this.#port.sendSeek({ timestamp })
+		this.#inner.seek({ timestamp })
 	}
 	*/
 

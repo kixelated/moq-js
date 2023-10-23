@@ -1,6 +1,5 @@
 import { Source } from "./source"
 import { Segment } from "./segment"
-import { TimeRange } from "./util"
 
 // An audio or video track that consists of multiple sequential segments.
 //
@@ -10,12 +9,12 @@ import { TimeRange } from "./util"
 // Our solution is to flush segments in decode order, buffering a single additional frame.
 // We extend the duration of the buffered frame and flush it to cover any gaps.
 export class Track {
-	source: Source;
-	segments: Segment[];
+	source: Source
+	segments: Segment[]
 
 	constructor(source: Source) {
-		this.source = source;
-		this.segments = [];
+		this.source = source
+		this.segments = []
 	}
 
 	add(segment: Segment) {
@@ -25,55 +24,12 @@ export class Track {
 		// Sort by timestamp ascending
 		// NOTE: The timestamp is in milliseconds, and we need to parse the media to get the accurate PTS/DTS.
 		this.segments.sort((a: Segment, b: Segment): number => {
-			return a.timestamp - b.timestamp
+			return a.sequence - b.sequence
 		})
 	}
 
-	buffered(): TimeRanges {
-		let ranges: TimeRange[] = []
-
-		const buffered = this.source.buffered() as TimeRanges
-		for (let i = 0; i < buffered.length; i += 1) {
-			// Convert the TimeRanges into an oject we can modify
-			ranges.push({
-				start: buffered.start(i),
-				end: buffered.end(i)
-			})
-		}
-
-		// Loop over segments and add in their ranges, merging if possible.
-		for (let segment of this.segments) {
-			const buffered = segment.buffered()
-			if (!buffered) continue;
-
-			if (ranges.length) {
-				// Try to merge with an existing range
-				const last = ranges[ranges.length-1];
-				if (buffered.start < last.start) {
-					// Network buffer is old; ignore it
-					continue
-				}
-
-				// Extend the end of the last range instead of pushing
-				if (buffered.start <= last.end && buffered.end > last.end) {
-					last.end = buffered.end
-					continue
-				}
-			}
-
-			ranges.push(buffered)
-		}
-
-		// TODO typescript
-		return {
-			length: ranges.length,
-			start: (x) => { return ranges[x].start },
-			end: (x) => { return ranges[x].end },
-		}
-	}
-
 	flush() {
-		while (1) {
+		for (;;) {
 			if (!this.segments.length) break
 
 			const first = this.segments[0]
@@ -90,8 +46,8 @@ export class Track {
 		if (this.segments.length < 2) return
 
 		while (this.segments.length > 1) {
-			const current = this.segments[0];
-			const next = this.segments[1];
+			const current = this.segments[0]
+			const next = this.segments[1]
 
 			if (next.dts === undefined || next.timescale == undefined) {
 				// No samples have been parsed for the next segment yet.
@@ -108,7 +64,7 @@ export class Track {
 			if (playhead !== undefined) {
 				// Check if the next segment has playable media now.
 				// Otherwise give the current segment more time to catch up.
-				if ((next.dts / next.timescale) > playhead) {
+				if (next.dts / next.timescale > playhead) {
 					return
 				}
 			}
