@@ -7,134 +7,76 @@ title: Issues
 
 Yeah so there's a lot of work to do.
 
-This is an early PoC and hobby project, so expect nothing to work. Check out the Github issues
-for [moq-rs](https://github.com/kixelated/moq-rs/issues) and
-[moq-js](https://github.com/kixelated/moq-js/issues) if you want to contribute or complain.
+This is an early PoC and hobby project, so expect nothing to work. This page is a summary of the major issues, updated periodically.
 
-## Browser Support
+# Web
 
-We're using some pretty new web standards so browser support is limited. Here is a
-non-compreshensive list of the required features from the [caniuse](https://caniuse.com/) database
-as of: todo
+See the [moq-js](https://github.com/kixelated/moq-js/issues) issues for a full list. There's a lot of small things that won't make it here.
 
-The only hard requirement is
-[WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport). See the following
-sections for possible alternatives for web playback and web contribution.
+#### General
 
-## Web Playback
+|                                                issue | name                        | description                                                                                                                                                                      |
+| ---------------------------------------------------: | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#54](https://github.com/kixelated/moq-js/issues/54) | WebTransport - Safari       | No Safari support yet. Webkit has expressed [public support](https://github.com/WebKit/standards-positions/issues/18#issuecomment-1495890122) so it will likely show up one day. |
+| [#55](https://github.com/kixelated/moq-js/issues/55) | WebCodecs - Firefox         | No Firefox support yet. Firefox has marked it [worth prototyping](https://github.com/mozilla/standards-positions/issues/209) but I haven't heard any updates.                    |
+| [#56](https://github.com/kixelated/moq-js/issues/56) | WebCodecs - Multiple Tracks | You can't add/remove tracks once the broadcast has started, such as to change input device or screen share.                                                                      |
+| [#13](https://github.com/kixelated/moq-js/issues/13) | WebCodecs - Codec Support   | WebCodecs supports a lot of codecs, but they need to be configured and packaged into MP4.                                                                                        |
+| [#57](https://github.com/kixelated/moq-js/issues/57) | UI - Make it Pretty         | Unfortunately, I'm not an artist.                                                                                                                                                |
 
-[WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) decoding is a breeze but
-rendering is a nightmare, as the application is responsible for everything. This includes when to
-render video frames but also when to emit audio samples, which gets very complicated quickly as it
-involves synchronization.
+#### Playback
 
-Additionally, there's no built-in controls. Even something as trivial as changing the volume
-requires building a WebAudio filter as opposed to relying on the `<video>` tag. I'm not a front-end
-developer (no flame pls) and would love any contributions on this front.
+|                                                issue | name                        | description                                                                                   |
+| ---------------------------------------------------: | --------------------------- | --------------------------------------------------------------------------------------------- |
+|   [#6](https://github.com/kixelated/moq-js/issues/6) | WebCodecs - Controls        | There are no player controls. Even a volume slider would be great.                            |
+|   [#9](https://github.com/kixelated/moq-js/issues/9) | WebCodecs - Jitter Buffer   | Received frames are rendered ASAP. The user experience could be improved with a small buffer. |
+| [#58](https://github.com/kixelated/moq-js/issues/58) | WebCodecs - Synchronization | Audio and video are rendered out-of-sync. This is surprisingly difficult to implement.        |
+| [#59](https://github.com/kixelated/moq-js/issues/59) | MSE - Player                | There's a backup MSE player for Firefox but it needs more love.                               |
 
-A much simpler rendering technology is
-[MSE](https://developer.mozilla.org/en-US/docs/Web/API/Media_Source_Extensions_API). I had a
-previous demo that used this API, but the latency is significantly higher than WebCodecs as it will
-buffer during starvation. I plan on supporting it again in the future and it works great with Media
-over QUIC as both use fMP4.
+#### Publishing
 
-## Web Contribution
+|                                                issue | name                              | description                                                                                                                                                                          |
+| ---------------------------------------------------: | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#60](https://github.com/kixelated/moq-js/issues/60) | WebTransport - Prioritization     | Media should be prioritized by the sender during congestion. Use [priority hints](https://www.w3.org/TR/webtransport/#dom-webtransportsendstreamoptions-sendorder) when implemented. |
+| [#61](https://github.com/kixelated/moq-js/issues/61) | WebTransport - Congestion Control | Reno/CUBIC (default) suffers from buffer bloat. Use [congestion control hints](https://www.w3.org/TR/webtransport/#dom-webtransport-congestioncontrol) when implemented.             |
+| [#62](https://github.com/kixelated/moq-js/issues/62) | WebCodecs - Echo Cancelation      | We need to support bidirectional broadcasts and rooms, which means echo cancellation.                                                                                                |
+| [#49](https://github.com/kixelated/moq-js/issues/49) | UI - Public Broadcasts            | We should have a way to publish and list public broadcasts.                                                                                                                          |
 
-[WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) is great for encoding in
-my relatively limited experience. We may need some more functionality to support conferencing, such
-as like echo cancellation or advanced encodings.
+# Native
 
-The main limitation is capturing sources from the browser, as the browser doesn't have the same
-flexibility as a native program like [OBS](https://obsproject.com/). I would also love to see a UI
-that allows positioning elements or doing cool effects. If you can render to a `<canvas>` then you
-can encode it with WebCodecs and transmit it with WebTransport.
+See the [moq-rs](https://github.com/kixelated/moq-rs/issues) issues for a full list. There's a lot of small things that won't make it here.
 
-Media over QUIC relies on both congestion control and prioritization to provide the best user
-experience on poor networks. The WebTransport specification does support
-[prioritization](https://www.w3.org/TR/webtransport/#dom-webtransportsendstreamoptions-sendorder)
-and
-[congestion control hints](https://www.w3.org/TR/webtransport/#dom-webtransport-congestioncontrol),
-but these are simple and have not been implemented yet. We have limited control over the browser's
-congestion control which is especially important for live media.
+#### General
 
-## Congestion Control
+|                                                  issue | name                       | description                                                                                                                                                    |
+| -----------------------------------------------------: | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   [#29](https://github.com/kixelated/moq-rs/issues/29) | Quinn - Congestion Control | Quinn experimentally supports BBR but it needs to be validated and possibly tweaked.                                                                           |
+| [#104](https://github.com/kixelated/moq-rs/issues/104) | Quinn - Tracing            | Quinn lacks the tracing required to validate the user experience. We should add [qlog](https://github.com/quinn-rs/quinn/issues/406) and other useful metrics. |
 
--   [moq-rs](https://github.com/kixelated/moq-rs) uses an experimental
-    [BBR implementation](https://docs.rs/quinn/latest/quinn/congestion/struct.Bbr.html/)
--   [moq-js](https://github.com/kixelated/moq-js) uses whatever the browser implements, which
-    defaults to [New Reno](https://datatracker.ietf.org/doc/html/draft-ietf-quic-recovery).
+#### Publishing
 
-The congestion control algorithm is extremely important for live media over the internet, as
-[bufferbloat](https://en.wikipedia.org/wiki/Bufferbloat) will cause queuing on the network.
-TCP-oriented congestion control are often compared by sustained throughput, but for live media we're
-more interested in latency, since the encoded bitrate is the limiting factor. When latency is
-critical, it's better to drop old media instead of queuing new media, and that's only possible when
-you can detect queuing via congestion control.
+|                                                  issue | name                | description                                                                                                    |
+| -----------------------------------------------------: | ------------------- | -------------------------------------------------------------------------------------------------------------- |
+|   [#63](https://github.com/kixelated/moq-rs/issues/63) | libmoq - C Bindings | Make a C library to interface with moq-rs.                                                                     |
+| [#105](https://github.com/kixelated/moq-rs/issues/105) | libmoq - OBS        | Develop an [OBS](https://obsproject.com/) plugin.                                                              |
+| [#106](https://github.com/kixelated/moq-rs/issues/106) | libmoq - ffmpeg     | Develop an [ffmpeg](https://www.ffmpeg.org/) plugin. Piping to stdin currently works but it could be improved. |
+| [#107](https://github.com/kixelated/moq-rs/issues/107) | libmoq - GStreamer  | Develop a [GStreamer](https://gstreamer.freedesktop.org/) plugin.                                              |
 
-#### Loss-based
+#### Relay
 
-Loss-based congestion control like [New Reno](https://en.wikipedia.org/wiki/TCP_congestion_control)
-(Windows default) and [CUBIC](https://en.wikipedia.org/wiki/CUBIC_TCP) (Linux default) suffer from
-bufferbloat. Your experience will vary based on the network, with some ISPs and parts of the world
-being significantly worse than others. This is also the fundamental issue with RTMP, since it relies
-on the operating system's TCP congestion control. QUIC libraries can ship their own congestion
-control allowing much faster experimentation and iteration.
+|                                                  issue | name                  | description                                                                                                                                  |
+| -----------------------------------------------------: | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#108](https://github.com/kixelated/moq-rs/issues/108) | Relay - Cache Network | The relays form a mesh network. This won't scale past a few nodes.                                                                           |
+| [#109](https://github.com/kixelated/moq-rs/issues/109) | Relay - Observability | There's no logging, metrics, or even health checks. I don't even know if the site is up.                                                     |
+| [#110](https://github.com/kixelated/moq-rs/issues/110) | Relay - Scaling       | Everything is in [terraform](https://github.com/kixelated/quic.video) but otherwise everything is manual, including the number of instances. |
+| [#111](https://github.com/kixelated/moq-rs/issues/111) | Relay - Pool Sessions | Clients establish a QUIC connection per broadcast. We should investigate reusing connections via ANNOUNCE like the specification intends.    |
 
-#### Delay-based
+# Protocol
 
-Delay-based congestion control like
-[BBR](https://www.ietf.org/proceedings/97/slides/slides-97-iccrg-bbr-congestion-control-02.pdf) and
-[COPA](https://web.mit.edu/copa/) are better, but are still designed for TCP. They're not designed
-for application-limited environments like live media where we don't fully saturate the network.
-Flooding the network with PADDING packets to occasionally saturate the network makes a big
-difference, but is experimental and not yet implemented.
+Gotta argue at the next [IETF](https://www.ietf.org/) and/or [W3C](https://www.w3.org/) meeting about these ones.
 
-#### Jitter-based
-
-Jitter-based congestion control like
-[GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02) and
-[SCReAM](https://github.com/EricssonResearch/scream) are the best\* for real-time media and see wide
-usage in WebRTC. However, the per-packet feedback required for these algorithms are not available in
-QUIC. We will need a QUIC extension in order to match WebRTC performance and latency.
-
-## Dynamic Bitrate
-
-An alternative to dropping media is to dynamically adjust the bitrate. The picture quality will
-worsen, but more frames will be delivered, which often results in a better user experience.
-
-#### 1:1
-
-In 1:1 video conferencing, the media encoding is adjusted in response to viewer feedback. A protocol
-like WebRTC will lower the media bitrate in response to minor congestion and request a new I-frame
-in response to major-congestion. No such feedback exists yet in Media over QUIC, and is complicated
-by the presence of relays.
-
-In 1:N video conferencing, the encoding is fixed, as one viewer's experience should not degrade
-everybody else's experience. The common approach is to encode multiple renditions of the broadcast
-at different bitrates, allowing the viewer to switch between them depending on their network. This
-is called [ABR](https://en.wikipedia.org/wiki/Adaptive_bitrate_streaming) in distribution circles
-and [simulcast](https://en.wikipedia.org/wiki/Simulcast) in contribution circles. This is not
-implemented yet either.
-
-## CDNs
-
-Media over QUIC is designed with relays and CDNs in mind.
-[MoqTransport](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/) is media agnostic and
-exposes only the most critical information to relay. The design should enable world-side scale while
-still supporting real-time latency budgets.
-
-...but we haven't built it yet. You're currently connecting to a single server somewhere in the US,
-so don't expect the best quality. I'm working on it now so expect this section to be updated soon.
-
-## Specification
-
-Media over QUIC is an [IETF working group](https://datatracker.ietf.org/group/moq/about/). The
-[IETF](https://www.ietf.org/) is an open organization that develops Internet standards, including
-some of your _favorite_ protocols like HTTP, TLS, and DNS.
-
-The standardization effort is slow and deliberate so don't expect an RFC for years.
-[quic.video](https://quic.video) uses a fork of the specification, allowing us to experiment with
-new features without the litigation involved in a standard.
-
-[Here's a list](https://docs.rs/moq-transport/latest/moq_transport/setup/struct.Version.html#associatedconstant.KIXEL_00)
-of the changes thus far, which we hope will be merged into the standard.
+| name                         | description                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| QUIC - Congestion Congestion | QUIC needs an extension in order to match WebRTC's transport-wide-cc.                                           |
+| Transport - Catalog          | MoQ wll use a JSON catalog to describe the available tracks, but it needs some more work.                       |
+| Transport - Containers       | MoQ supports fMP4 at the moment, but it introduces quite a bit of overhead.                                     |
+| Transport - Feedback         | There's no way to signal that a downstream is encountering congestion. This would be useful for 1:1 broadcasts. |
