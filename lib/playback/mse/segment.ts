@@ -74,7 +74,7 @@ export class Segment {
 		}
 
 		this.source.initialize(this.init)
-		this.source.append(stream.buffer as ArrayBuffer)
+		this.source.append(stream.buffer)
 
 		return this.done
 	}

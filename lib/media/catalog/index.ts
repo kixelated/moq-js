@@ -34,7 +34,7 @@ export class Catalog {
 
 			const { header, stream } = segment
 
-			if (header.sequence !== 0n) {
+			if (header.sequence !== 0) {
 				throw new Error("TODO delta updates not supported")
 			}
 

@@ -9,11 +9,16 @@ export class Parser {
 	decode: TransformStream<Uint8Array, [MP4.Track, MP4.Sample]>
 
 	constructor() {
-		this.decode = new TransformStream({
-			start: this.#start.bind(this),
-			transform: this.#transform.bind(this),
-			flush: this.#flush.bind(this),
-		})
+		this.decode = new TransformStream(
+			{
+				start: this.#start.bind(this),
+				transform: this.#transform.bind(this),
+				flush: this.#flush.bind(this),
+			},
+			// Buffer a single sample on either end
+			{ highWaterMark: 1 },
+			{ highWaterMark: 1 },
+		)
 	}
 
 	#start(controller: TransformStreamDefaultController<[MP4.Track, MP4.Sample]>) {

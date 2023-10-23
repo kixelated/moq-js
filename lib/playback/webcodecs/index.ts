@@ -71,6 +71,9 @@ export default class Player {
 		this.send({ config }, config.video.canvas)
 	}
 
+	// TODO initialize context now
+	play() {}
+
 	init(init: Init) {
 		this.send({ init }, init.stream)
 	}

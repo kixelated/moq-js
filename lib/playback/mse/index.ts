@@ -41,7 +41,7 @@ export default class Player {
 		this.#trySkip()
 	}
 
-	async #goLive() {
+	async play() {
 		const ranges = this.#element.buffered
 		if (!ranges.length) {
 			return
@@ -141,15 +141,25 @@ export default class Player {
 		const segment = new Segment(track.source, init, msg.header.sequence)
 		track.add(segment)
 
-		// TODO Make segment a WritableStream
-		const sink = new WritableStream<[MP4.Track, MP4.Sample]>({
-			write: ([_, sample]) => {
-				segment.push(sample)
-			},
-		})
-
 		const container = new MP4.Parser()
-		await msg.stream.pipeThrough(container.decode).pipeTo(sink)
+
+		// We need to reparse the init segment to work with mp4box
+		const writer = container.decode.writable.getWriter()
+		for (const raw of init.raw) {
+			// I hate this
+			await writer.write(new Uint8Array(raw))
+		}
+		writer.releaseLock()
+
+		const reader = msg.stream.pipeThrough(container.decode).getReader()
+		for (;;) {
+			const { value, done } = await reader.read()
+			if (done) break
+
+			const [_, sample] = value
+			segment.push(sample)
+			track.flush()
+		}
 
 		segment.finish()
 	}

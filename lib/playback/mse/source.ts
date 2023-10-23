@@ -109,6 +109,10 @@ export class Source {
 					throw "failed to call initailize before trim"
 				}
 
+				if (this.sourceBuffer.buffered.length == 0) {
+					break
+				}
+
 				const end = this.sourceBuffer.buffered.end(this.sourceBuffer.buffered.length - 1) - next.trim
 				const start = this.sourceBuffer.buffered.start(0)
 

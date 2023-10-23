@@ -24,7 +24,7 @@ export class Timeline {
 }
 
 interface Segment {
-	sequence: bigint
+	sequence: number
 	frames: ReadableStream<Frame>
 }
 
@@ -32,7 +32,6 @@ export class Component {
 	#current?: Segment
 
 	frames: ReadableStream<Frame>
-
 	#segments: TransformStream<Segment, Segment>
 
 	constructor() {

@@ -55,13 +55,17 @@ export default function Watch(props: { name: string }) {
 		setPlayer(undefined)
 
 		const conn = connection()
-		if (!canvas || !video) return new Error("not attached yet")
 		if (!conn) return
 
-		const element = mode() == "mse" ? video : canvas
+		const element = canvas ?? video
+		if (!element) throw new Error("no render element")
 
 		const player = new Player({ connection: conn, element })
 		setPlayer(player)
+
+		if (element instanceof HTMLVideoElement) {
+			element.addEventListener("play", () => player.play())
+		}
 
 		onCleanup(() => player.close())
 
@@ -78,8 +82,17 @@ export default function Watch(props: { name: string }) {
 	// TODO shrink it if needed via CSS
 	return (
 		<>
-			<h2>Player</h2>
+			<Fail error={error()} />
+			<Switch>
+				<Match when={mode() == "mse"}>
+					<video class="aspect-video w-full rounded-lg bg-black" autoplay controls ref={video} />
+				</Match>
+				<Match when={mode() == "webcodecs"}>
+					<canvas class="aspect-video w-full rounded-lg bg-black" ref={canvas} />
+				</Match>
+			</Switch>
 
+			<h3>Advanced</h3>
 			<button
 				classList={{
 					"bg-green-500": isMode("mse"),
@@ -92,7 +105,7 @@ export default function Watch(props: { name: string }) {
 				}}
 				class="rounded-r-none border-r-2 border-r-slate-900"
 			>
-				MSE
+				Media Source <span class="block text-xs text-gray-300">(higher latency)</span>
 			</button>
 			<button
 				classList={{
@@ -106,17 +119,8 @@ export default function Watch(props: { name: string }) {
 				}}
 				class="rounded-l-none"
 			>
-				WebCodecs
+				WebCodecs <span class="block text-xs text-gray-300">(experimental)</span>
 			</button>
-			<Fail error={error()} />
-			<Switch>
-				<Match when={mode() == "mse"}>
-					<video class="aspect-video w-full rounded-md bg-black" controls ref={video} />
-				</Match>
-				<Match when={mode() == "webcodecs"}>
-					<canvas class="aspect-video w-full rounded-md bg-black" ref={canvas} />
-				</Match>
-			</Switch>
 		</>
 	)
 }
