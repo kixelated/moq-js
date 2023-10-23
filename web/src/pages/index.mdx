@@ -10,19 +10,18 @@ layout: "@/layouts/global.astro"
 a super-charged TCP/UDP replacement designed for [HTTP/3](https://en.wikipedia.org/wiki/HTTP/3).
 It's being developed by the [IETF](https://www.ietf.org/) as a new standard.
 
-<p class="tagline">This is a proof-of-concept demo</p>
+<p class="tagline">Try it out! [Watch](/watch) or [Publish](/publish) a broadcast</p>
 
 Everything is a work in progress, but some features include:
 
 -   Web support via [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport) and [WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API)
 -   CDN support via [MoqTransport](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/).
--   Native support with ffmpeg and OBS plugins. **(in development)**
+-   Native support with ffmpeg and OBS plugins. [(in development)](/issues)
 
-<p class="tagline">Try it out! [Watch](/watch) or [Publish](/publish) a broadcast</p>
+<p class="tagline">Fully [open source](/source) demo and library</p>
 
-This website is a fully [open source](/source).
 The native components are in [Rust](https://github.com/kixelated/moq-rs) and the web components are in [Typescript](https://github.com/kixelated/moq-js).
-Get in touch if you're interested in contributing, sponsoring, or just want more information!
+Check out the [issues](/issues) and in touch if you're interested in contributing, sponsoring, or just want more information!
 
 <p class="tagline">Visit [Github](/source) or join [Discord](https://discord.gg/FCYF3p99mr)</p>
 
@@ -30,9 +29,11 @@ We are designing a protocol that is simple and yet flexible enough to support th
 from ultra-low latency to ultra-high quality, 1 viewer to 1 million viewers, and everything in
 between. It's possible by evaluating the entire ecosystem and breaking the problem into layers:
 
--   **QUIC**: Responsible for networking.
--   **MoqTransport**: Responsible for CDN support (caching and fanout).
--   **Warp**: Responsible for media encoding.
+-   **QUIC**: Provides the networking: independent streams and datagrams.
+-   **WebTransport**: Provides web support for QUIC.
+-   **MoqTransport**: Designed specifically for CDNs with built-in caching and fanout.
+-   **Catalog**: Enumerates the available media tracks. For example, the codec, container, resolution, etc.
+-   **Containers**: The encoding for each track. [quic.video](https://quic.video) uses CMAF and is backwards compatible with HLS/DASH.
 
 MoQ is still very early in development and many features are missing.
 Everything is liable to change, especially if you get involved!
@@ -45,10 +46,10 @@ The protocol is being developed by the
 some of your _favorite_ protocols like HTTP, TLS, and DNS.
 
 **Note:** This is not an official IETF website, nor does the MoQ working group endorse this website.
-We are active participants, but the standard is being produced by many individuals from many companies.
+The standard is being produced by many individuals from companies such as Google, Meta, Cisco, Akamai, etc.
 
 <center>
-	<a href="https://ietf.org" alt="IETF" >
+	<a href="https://ietf.org" alt="IETF">
 		<img src="ietf.svg" className="m-4 inline h-12" alt="IETF Logo" />
 	</a>
 	<a href="https://quicwg.org/" alt="QUIC Working Group">
