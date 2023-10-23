@@ -51,7 +51,6 @@ class Worker {
 	}
 
 	#onInit(msg: Message.Init) {
-		console.log("received init", msg)
 		// NOTE: We don't buffer the init segments because I'm lazy.
 		// Instead, we fork the reader on each segment so it gets a copy of the data.
 		// This is mostly done because I'm lazy and don't want to create a promise.
@@ -59,7 +58,6 @@ class Worker {
 	}
 
 	async #onSegment(msg: Message.Segment) {
-		console.log("received segment", msg)
 		const init = this.#inits.get(msg.init)
 		if (!init) throw new Error(`unknown init track: ${msg.init}`)
 
@@ -103,5 +101,3 @@ self.addEventListener("message", (msg) => {
 function _send(msg: Message.FromWorker) {
 	postMessage(msg)
 }
-
-console.log("WORKER RUNNING")

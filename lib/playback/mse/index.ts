@@ -24,6 +24,9 @@ export default class Player {
 
 		this.#source = new MediaSource()
 		this.#element.src = URL.createObjectURL(this.#source)
+		this.#element.addEventListener("play", () => {
+			this.play().catch(console.warn)
+		})
 
 		this.#init = new Map()
 		this.#audio = new Track(new Source(this.#source))
@@ -41,6 +44,7 @@ export default class Player {
 		this.#trySkip()
 	}
 
+	// Seek to the end and then play
 	async play() {
 		const ranges = this.#element.buffered
 		if (!ranges.length) {

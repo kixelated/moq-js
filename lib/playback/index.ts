@@ -1,21 +1,21 @@
 import * as Message from "./webcodecs/message"
 
 import { Connection } from "../transport/connection"
-import { Watch } from "../common/async"
 import { Catalog, isMp4Track, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
 
 // We support two different playback implementations:
 import Webcodecs from "./webcodecs"
 import MSE from "./mse"
+import { Client } from "../transport/client"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
 
 export interface PlayerConfig {
-	connection: Connection
+	url: string
+	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	element: HTMLCanvasElement | HTMLVideoElement
-	catalog: Catalog
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -23,10 +23,10 @@ export class Player {
 	#backend: Webcodecs | MSE
 
 	// A periodically updated timeline
-	#timeline = new Watch<Timeline | undefined>(undefined)
+	//#timeline = new Watch<Timeline | undefined>(undefined)
 
-	#catalog: Catalog
 	#connection: Connection
+	#catalog: Catalog
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -34,16 +34,10 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	constructor(config: PlayerConfig) {
-		if (config.element instanceof HTMLCanvasElement) {
-			const element = config.element.transferControlToOffscreen()
-			this.#backend = new Webcodecs({ catalog: config.catalog, element })
-		} else {
-			this.#backend = new MSE({ element: config.element })
-		}
-
-		this.#connection = config.connection
-		this.#catalog = config.catalog
+	private constructor(connection: Connection, catalog: Catalog, backend: Webcodecs | MSE) {
+		this.#connection = connection
+		this.#catalog = catalog
+		this.#backend = backend
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -51,7 +45,25 @@ export class Player {
 		})
 
 		// Async work
-		this.#running = Promise.race([this.#run(), abort])
+		this.#running = Promise.race([this.#run(), abort]).catch(this.#close)
+	}
+
+	static async create(config: PlayerConfig): Promise<Player> {
+		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
+		const connection = await client.connect()
+
+		const catalog = await Catalog.fetch(connection)
+
+		let backend
+
+		if (config.element instanceof HTMLCanvasElement) {
+			const element = config.element.transferControlToOffscreen()
+			backend = new Webcodecs({ element, catalog })
+		} else {
+			backend = new MSE({ element: config.element })
+		}
+
+		return new Player(connection, catalog, backend)
 	}
 
 	async #run() {
@@ -112,7 +124,7 @@ export class Player {
 
 	#onMessage(msg: Message.FromWorker) {
 		if (msg.timeline) {
-			this.#timeline.update(msg.timeline)
+			//this.#timeline.update(msg.timeline)
 		}
 	}
 
@@ -120,7 +132,8 @@ export class Player {
 		if (err) this.#abort(err)
 		else this.#close()
 
-		await this.#backend.close()
+		if (this.#connection) this.#connection.close()
+		if (this.#backend) await this.#backend.close()
 	}
 
 	async closed(): Promise<Error | undefined> {
@@ -145,6 +158,7 @@ export class Player {
 		await this.#backend.play()
 	}
 
+	/*
 	async *timeline() {
 		for (;;) {
 			const [timeline, next] = this.#timeline.value()
@@ -154,4 +168,5 @@ export class Player {
 			await next
 		}
 	}
+	*/
 }
