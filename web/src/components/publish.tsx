@@ -776,7 +776,6 @@ function Audio(props: {
 	createEffect(() => {
 		const isSupported = async (config: AudioEncoderConfig) => {
 			const supported = await AudioEncoder.isSupported(config)
-			console.log(supported, config)
 			if (supported) return config
 		}
 
@@ -802,8 +801,6 @@ function Audio(props: {
 	const config = createMemo(() => {
 		const available = supported()
 		if (!available) return
-
-		console.log("available", available)
 
 		if (available.indexOf(codec()) != -1) {
 			// The selected codec is valid

@@ -1,6 +1,6 @@
-import { Connection } from "../transport"
-import { Reader } from "../transport/stream"
-import { asError } from "../common/error"
+import { Connection } from "../../transport"
+import { Reader } from "../../transport/stream"
+import { asError } from "../../common/error"
 
 // JSON encoded catalog
 export class Catalog {
@@ -34,7 +34,7 @@ export class Catalog {
 
 			const { header, stream } = segment
 
-			if (header.sequence !== 0n) {
+			if (header.sequence !== 0) {
 				throw new Error("TODO delta updates not supported")
 			}
 

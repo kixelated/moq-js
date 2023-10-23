@@ -1,6 +1,6 @@
 import { For, Match, Switch } from "solid-js"
-import { Catalog, isAudioCatalogTrack, isVideoCatalogTrack } from "@kixelated/moq/media"
-import type { CatalogTrack } from "@kixelated/moq/media"
+import { Catalog, isAudioTrack, isVideoTrack } from "@kixelated/moq/media/catalog"
+import type { Track } from "@kixelated/moq/media/catalog"
 
 export function Listing(props: { name: string; server?: string; catalog?: Catalog }) {
 	const watchUrl = () => {
@@ -19,7 +19,7 @@ export function Listing(props: { name: string; server?: string; catalog?: Catalo
 
 function Tracks(props: { catalog?: Catalog }) {
 	return (
-		<div class="ml-4 text-xs italic text-gray-300">
+		<div class="ml-4 text-xs italic text-gray-200">
 			<For each={props.catalog?.tracks}>
 				{(track) => (
 					<p>
@@ -35,10 +35,10 @@ function matches<S extends T, T = unknown>(e: T, predicate: (e: T) => e is S): S
 	return predicate(e) ? e : false
 }
 
-function Track(props: { track: CatalogTrack }) {
+function Track(props: { track: Track }) {
 	return (
 		<Switch fallback="unknown">
-			<Match when={matches(props.track, isVideoCatalogTrack)}>
+			<Match when={matches(props.track, isVideoTrack)}>
 				{(track) => {
 					const bitrate = track().bit_rate
 					return (
@@ -49,7 +49,7 @@ function Track(props: { track: CatalogTrack }) {
 					)
 				}}
 			</Match>
-			<Match when={matches(props.track, isAudioCatalogTrack)}>
+			<Match when={matches(props.track, isAudioTrack)}>
 				{(track) => {
 					const bitrate = track().bit_rate
 					return (

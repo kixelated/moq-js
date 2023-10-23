@@ -134,7 +134,7 @@ export class Broadcast {
 		await subscriber.ack()
 
 		const stream = await subscriber.data({
-			sequence: 0n,
+			sequence: 0,
 			priority: 0, // TODO Highest priority
 			expires: 0, // never expires
 		})
@@ -164,7 +164,7 @@ export class Broadcast {
 
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
-			sequence: 0n,
+			sequence: 0,
 			priority: 0, // TODO
 			expires: 0, // Never expires
 		})
@@ -209,7 +209,7 @@ export class Broadcast {
 	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
-			sequence: BigInt(segment.id),
+			sequence: segment.id,
 			priority: 0, // TODO
 			expires: 30, // TODO configurable
 		})

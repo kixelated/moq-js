@@ -1,19 +1,29 @@
-import * as MP4 from "../../media/mp4"
-import { Frame } from "./timeline"
+import * as MP4 from "./index"
 
-// Decode a MP4 container into individual frames.
-export class Container {
+export interface Frame {
+	track: MP4.Track // The track this frame belongs to
+	sample: MP4.Sample // The actual sample contain the frame data
+}
+
+// Decode a MP4 container into individual samples.
+export class Parser {
 	#mp4 = MP4.New()
 	#offset = 0
 
+	// TODO Parser should extend TransformStream
 	decode: TransformStream<Uint8Array, Frame>
 
 	constructor() {
-		this.decode = new TransformStream({
-			start: this.#start.bind(this),
-			transform: this.#transform.bind(this),
-			flush: this.#flush.bind(this),
-		})
+		this.decode = new TransformStream(
+			{
+				start: this.#start.bind(this),
+				transform: this.#transform.bind(this),
+				flush: this.#flush.bind(this),
+			},
+			// Buffer a single sample on either end
+			{ highWaterMark: 1 },
+			{ highWaterMark: 1 },
+		)
 	}
 
 	#start(controller: TransformStreamDefaultController<Frame>) {
@@ -30,11 +40,7 @@ export class Container {
 
 		this.#mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
 			for (const sample of samples) {
-				controller.enqueue({
-					track,
-					sample,
-					timestamp: sample.dts / track.timescale, // TODO don't convert to seconds for better accuracy
-				})
+				controller.enqueue({ track, sample })
 			}
 		}
 

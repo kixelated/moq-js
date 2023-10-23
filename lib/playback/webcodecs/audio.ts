@@ -47,7 +47,7 @@ export class Renderer {
 
 		const chunk = new EncodedAudioChunk({
 			type: frame.sample.is_sync ? "key" : "delta",
-			timestamp: frame.timestamp,
+			timestamp: frame.sample.dts / frame.track.timescale,
 			duration: frame.sample.duration,
 			data: frame.sample.data,
 		})

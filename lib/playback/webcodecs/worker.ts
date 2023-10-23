@@ -3,7 +3,7 @@ import { Timeline } from "./timeline"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
-import { Container } from "./container"
+import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 import { asError } from "../../common/error"
 
@@ -66,8 +66,8 @@ class Worker {
 		const [initFork, initClone] = init.tee()
 		this.#inits.set(msg.init, initFork)
 
-		// Create a new container that we will use to decode.
-		const container = new Container()
+		// Create a new stream that we will use to decode.
+		const container = new MP4.Parser()
 
 		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
 

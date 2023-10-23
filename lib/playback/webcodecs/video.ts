@@ -32,7 +32,9 @@ export class Renderer {
 				this.#canvas.height = frame.displayHeight
 
 				const ctx = this.#canvas.getContext("2d")
-				ctx!.drawImage(frame, 0, 0, this.#canvas.width, this.#canvas.height) // TODO respect aspect ratio
+				if (!ctx) throw new Error("failed to get canvas context")
+
+				ctx.drawImage(frame, 0, 0, frame.displayWidth, frame.displayHeight) // TODO respect aspect ratio
 				frame.close()
 			})
 		}
@@ -74,7 +76,7 @@ export class Renderer {
 		const chunk = new EncodedVideoChunk({
 			type: frame.sample.is_sync ? "key" : "delta",
 			data: frame.sample.data,
-			timestamp: frame.timestamp,
+			timestamp: frame.sample.dts / frame.track.timescale,
 		})
 
 		this.#decoder.decode(chunk)

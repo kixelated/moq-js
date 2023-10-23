@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import * as Message from "./worker/message"
+import * as Message from "./message"
 
 // This is a non-standard way of importing worklet/workers.
 // Unfortunately, it's the only option because of a Vite bug: https://github.com/vitejs/vite/issues/11823
@@ -50,5 +50,9 @@ export class Context {
 
 	async resume() {
 		await this.context.resume()
+	}
+
+	async close() {
+		await this.context.close()
 	}
 }

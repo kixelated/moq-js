@@ -13,7 +13,6 @@ export class Encoder {
 
 	constructor(config: AudioEncoderConfig) {
 		this.#encoderConfig = config
-		console.log(config)
 
 		this.frames = new TransformStream({
 			start: this.#start.bind(this),
