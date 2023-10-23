@@ -3,7 +3,7 @@ import { InitParser } from "./init"
 import { Segment } from "./segment"
 import { Track } from "./track"
 import * as MP4 from "../../media/mp4"
-import * as Message from "../message"
+import * as Message from "../backend"
 
 export interface PlayerConfig {
 	element: HTMLVideoElement
@@ -92,10 +92,6 @@ export default class Player {
 		this.#video.advance(playhead)
 	}
 
-	start(_msg: Message.Start) {
-		// noop
-	}
-
 	init(msg: Message.Init) {
 		this.#runInit(msg).catch((e) => console.warn("failed to run init", e))
 	}
@@ -156,11 +152,14 @@ export default class Player {
 			const { value, done } = await reader.read()
 			if (done) break
 
-			const [_, sample] = value
-			segment.push(sample)
+			segment.push(value.sample)
 			track.flush()
 		}
 
 		segment.finish()
+	}
+
+	close() {
+		clearInterval(this.#interval)
 	}
 }

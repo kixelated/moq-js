@@ -19,7 +19,7 @@ export function Listing(props: { name: string; server?: string; catalog?: Catalo
 
 function Tracks(props: { catalog?: Catalog }) {
 	return (
-		<div class="ml-4 text-xs italic text-gray-300">
+		<div class="ml-4 text-xs italic text-gray-200">
 			<For each={props.catalog?.tracks}>
 				{(track) => (
 					<p>

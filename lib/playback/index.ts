@@ -15,6 +15,7 @@ export type Timeline = Message.Timeline
 export interface PlayerConfig {
 	connection: Connection
 	element: HTMLCanvasElement | HTMLVideoElement
+	catalog: Catalog
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -24,31 +25,40 @@ export class Player {
 	// A periodically updated timeline
 	#timeline = new Watch<Timeline | undefined>(undefined)
 
-	#catalog: Promise<Catalog>
-	#running: Promise<void>
+	#catalog: Catalog
+	#connection: Connection
 
-	readonly connection: Connection
+	// Running is a promise that resolves when the player is closed.
+	// #close is called with no error, while #abort is called with an error.
+	#running: Promise<void>
+	#close!: () => void
+	#abort!: (err: Error) => void
 
 	constructor(config: PlayerConfig) {
 		if (config.element instanceof HTMLCanvasElement) {
-			this.#backend = new Webcodecs({ element: config.element })
+			const element = config.element.transferControlToOffscreen()
+			this.#backend = new Webcodecs({ catalog: config.catalog, element })
 		} else {
 			this.#backend = new MSE({ element: config.element })
 		}
 
-		this.connection = config.connection
+		this.#connection = config.connection
+		this.#catalog = config.catalog
 
-		this.#catalog = Catalog.fetch(this.connection)
+		const abort = new Promise<void>((resolve, reject) => {
+			this.#close = resolve
+			this.#abort = reject
+		})
 
 		// Async work
-		this.#running = this.#catalog.then((catalog) => this.#run(catalog))
+		this.#running = Promise.race([this.#run(), abort])
 	}
 
-	async #run(catalog: Catalog) {
+	async #run() {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
 
-		for (const track of catalog.tracks) {
+		for (const track of this.#catalog.tracks) {
 			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
 			}
@@ -56,8 +66,6 @@ export class Player {
 			inits.add(track.init_track)
 			tracks.push(track)
 		}
-
-		this.#backend.start({ catalog })
 
 		// Call #runInit on each unique init track
 		// TODO do this in parallel with #runTrack to remove a round trip
@@ -68,9 +76,9 @@ export class Player {
 	}
 
 	async #runInit(name: string) {
-		const sub = await this.connection.subscribe("", name)
+		const sub = await this.#connection.subscribe("", name)
 		try {
-			const init = await sub.data()
+			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
 
 			this.#backend.init({ stream: init.stream, name })
@@ -84,10 +92,10 @@ export class Player {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		const sub = await this.connection.subscribe("", track.data_track)
+		const sub = await this.#connection.subscribe("", track.data_track)
 		try {
 			for (;;) {
-				const segment = await sub.data()
+				const segment = await Promise.race([sub.data(), this.#running])
 				if (!segment) break
 
 				this.#backend.segment({
@@ -108,21 +116,19 @@ export class Player {
 		}
 	}
 
-	close() {
-		// TODO
+	async close(err?: Error) {
+		if (err) this.#abort(err)
+		else this.#close()
+
+		await this.#backend.close()
 	}
 
-	async closed(): Promise<Error> {
+	async closed(): Promise<Error | undefined> {
 		try {
 			await this.#running
-			return new Error("closed") // clean termination
 		} catch (e) {
 			return asError(e)
 		}
-	}
-
-	async catalog(): Promise<Catalog> {
-		return this.#catalog
 	}
 
 	/*

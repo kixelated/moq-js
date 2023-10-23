@@ -51,4 +51,8 @@ export class Context {
 	async resume() {
 		await this.context.resume()
 	}
+
+	async close() {
+		await this.context.close()
+	}
 }

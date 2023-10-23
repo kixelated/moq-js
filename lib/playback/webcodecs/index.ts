@@ -3,14 +3,15 @@
 import * as Message from "./message"
 import { Context } from "./context"
 
-import { Start, Segment, Init } from "../../playback/message"
+import { Segment, Init } from "../../playback/backend"
 
 import MediaWorker from "./worker?worker"
 import { RingShared } from "../../common/ring"
-import { isAudioTrack } from "../../media/catalog"
+import { Catalog, isAudioTrack } from "../../media/catalog"
 
 export interface PlayerConfig {
-	element: HTMLCanvasElement
+	element: OffscreenCanvas
+	catalog: Catalog
 }
 
 // This is a non-standard way of importing worklet/workers.
@@ -24,22 +25,16 @@ export default class Player {
 	// The audio context, which must be created on the main thread.
 	#context?: Context
 
-	#element: OffscreenCanvas
-
 	constructor(config: PlayerConfig) {
-		this.#element = config.element.transferControlToOffscreen()
-
 		// TODO does this block the main thread? If so, make this async
 		// @ts-expect-error: The Vite typing is wrong https://github.com/vitejs/vite/blob/22bd67d70a1390daae19ca33d7de162140d533d6/packages/vite/client.d.ts#L182
 		this.#worker = new MediaWorker({ format: "es" })
 		this.#worker.addEventListener("message", this.on.bind(this))
-	}
 
-	start(msg: Start) {
 		let sampleRate: number | undefined
 		let channels: number | undefined
 
-		for (const track of msg.catalog.tracks) {
+		for (const track of config.catalog.tracks) {
 			if (isAudioTrack(track)) {
 				if (sampleRate && track.sample_rate !== sampleRate) {
 					throw new Error(`TODO multiple audio tracks with different sample rates`)
@@ -50,28 +45,28 @@ export default class Player {
 			}
 		}
 
-		const config: Message.Config = {}
+		const msg: Message.Config = {}
 
 		// Only configure audio is we have an audio track
 		if (sampleRate && channels) {
-			config.audio = {
+			msg.audio = {
 				channels: channels,
 				sampleRate: sampleRate,
 				ring: new RingShared(2, sampleRate / 20), // 50ms
 			}
 
-			this.#context = new Context(config.audio)
+			this.#context = new Context(msg.audio)
 		}
 
 		// TODO only send the canvas if we have a video track
-		config.video = {
-			canvas: this.#element,
+		msg.video = {
+			canvas: config.element,
 		}
 
-		this.send({ config }, config.video.canvas)
+		this.send({ config: msg }, msg.video.canvas)
 	}
 
-	// TODO initialize context now
+	// TODO initialize context now since the user clicked
 	play() {}
 
 	init(init: Init) {
@@ -80,6 +75,11 @@ export default class Player {
 
 	segment(segment: Segment) {
 		this.send({ segment }, segment.stream)
+	}
+
+	async close() {
+		this.#worker.terminate()
+		await this.#context?.close()
 	}
 
 	// Enforce we're sending valid types to the worker

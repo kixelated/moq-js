@@ -1,7 +1,9 @@
 import { Catalog } from "../media/catalog"
 import { Header } from "../transport/object"
 
-export interface Start {
+// TODO make an interface for backends
+
+export interface Config {
 	catalog: Catalog
 }
 

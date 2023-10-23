@@ -1,14 +1,9 @@
-import * as MP4 from "../../media/mp4"
+import type { Frame } from "../../media/mp4"
+export type { Frame }
 
 export interface Range {
 	start: number
 	end: number
-}
-
-export interface Frame {
-	track: MP4.Track // The track this frame belongs to
-	sample: MP4.Sample // The actual sample contain the frame data
-	timestamp: number // The presentation timestamp of the frame
 }
 
 export class Timeline {
@@ -116,6 +111,7 @@ export class Component {
 }
 
 // Return if a type is a segment or frame
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 function isSegment(value: Segment | Frame): value is Segment {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	return (value as Segment).frames !== undefined

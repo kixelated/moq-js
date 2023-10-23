@@ -1,4 +1,4 @@
-import { Frame, Timeline } from "./timeline"
+import { Timeline } from "./timeline"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
@@ -51,6 +51,7 @@ class Worker {
 	}
 
 	#onInit(msg: Message.Init) {
+		console.log("received init", msg)
 		// NOTE: We don't buffer the init segments because I'm lazy.
 		// Instead, we fork the reader on each segment so it gets a copy of the data.
 		// This is mostly done because I'm lazy and don't want to create a promise.
@@ -58,6 +59,7 @@ class Worker {
 	}
 
 	async #onSegment(msg: Message.Segment) {
+		console.log("received segment", msg)
 		const init = this.#inits.get(msg.init)
 		if (!init) throw new Error(`unknown init track: ${msg.init}`)
 
@@ -69,26 +71,13 @@ class Worker {
 		// Create a new stream that we will use to decode.
 		const container = new MP4.Parser()
 
-		// Compute the timestamp for each frame.
-		const frames = new TransformStream<[MP4.Track, MP4.Sample], Frame>({
-			transform: (input, controller) => {
-				const [track, sample] = input
-				controller.enqueue({
-					track,
-					sample,
-					// TODO don't convert to seconds for better accuracy
-					timestamp: sample.dts / track.timescale,
-				})
-			},
-		})
-
 		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
 
 		// Add the segment to the timeline
 		const segments = timeline.segments.getWriter()
 		await segments.write({
 			sequence: msg.header.sequence,
-			frames: frames.readable,
+			frames: container.decode.readable,
 		})
 		segments.releaseLock()
 
@@ -114,3 +103,5 @@ self.addEventListener("message", (msg) => {
 function _send(msg: Message.FromWorker) {
 	postMessage(msg)
 }
+
+console.log("WORKER RUNNING")

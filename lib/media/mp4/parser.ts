@@ -1,12 +1,17 @@
 import * as MP4 from "./index"
 
+export interface Frame {
+	track: MP4.Track // The track this frame belongs to
+	sample: MP4.Sample // The actual sample contain the frame data
+}
+
 // Decode a MP4 container into individual samples.
 export class Parser {
 	#mp4 = MP4.New()
 	#offset = 0
 
 	// TODO Parser should extend TransformStream
-	decode: TransformStream<Uint8Array, [MP4.Track, MP4.Sample]>
+	decode: TransformStream<Uint8Array, Frame>
 
 	constructor() {
 		this.decode = new TransformStream(
@@ -21,7 +26,7 @@ export class Parser {
 		)
 	}
 
-	#start(controller: TransformStreamDefaultController<[MP4.Track, MP4.Sample]>) {
+	#start(controller: TransformStreamDefaultController<Frame>) {
 		this.#mp4.onError = (err) => {
 			controller.error(err)
 		}
@@ -35,7 +40,7 @@ export class Parser {
 
 		this.#mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
 			for (const sample of samples) {
-				controller.enqueue([track, sample])
+				controller.enqueue({ track, sample })
 			}
 		}
 

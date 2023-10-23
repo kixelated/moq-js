@@ -1,10 +1,11 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
 import { Client, Connection } from "@kixelated/moq/transport"
+import { Catalog } from "@kixelated/moq/media/catalog"
 
 import Fail from "./fail"
 
-import { Match, Switch, createEffect, createSelector, createSignal, onCleanup } from "solid-js"
+import { Match, Switch, createEffect, createMemo, createSelector, createSignal, onCleanup } from "solid-js"
 
 export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
@@ -12,12 +13,20 @@ export default function Watch(props: { name: string }) {
 	const params = Object.fromEntries(urlSearchParams.entries())
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
 
-	const [mode, setMode] = createSignal<"mse" | "webcodecs">("mse")
+	const defaultMode = "VideoDecoder" in window ? "webcodecs" : "mse"
+	const [mode, setMode] = createSignal(defaultMode)
 	const [error, setError] = createSignal<Error | undefined>()
 
-	// Render the canvas when the DOM is inserted
-	let canvas: HTMLCanvasElement | undefined
-	let video: HTMLVideoElement | undefined
+	// Create a canvas element outside of Signal so it doesn't get torn down.
+	const canvas = document.createElement("canvas")
+	canvas.classList.add("w-full", "rounded-lg", "aspect-video")
+
+	// Same thing for the video element.
+	const video = document.createElement("video")
+	video.classList.add("w-full", "rounded-lg", "aspect-video")
+	video.muted = true // so we can autoplay
+	video.autoplay = true
+	video.controls = true
 
 	const [connection, setConnection] = createSignal<Connection | undefined>()
 	createEffect(() => {
@@ -49,31 +58,39 @@ export default function Watch(props: { name: string }) {
 			.finally(() => setConnection(undefined))
 	})
 
-	const [_player, setPlayer] = createSignal<Player | undefined>()
-
+	const [catalog, setCatalog] = createSignal<Catalog | undefined>()
 	createEffect(() => {
-		setPlayer(undefined)
-
 		const conn = connection()
 		if (!conn) return
 
-		const element = canvas ?? video
-		if (!element) throw new Error("no render element")
+		Catalog.fetch(conn).then(setCatalog).catch(setError)
+	})
 
-		const player = new Player({ connection: conn, element })
-		setPlayer(player)
+	const player = createMemo(() => {
+		const conn = connection()
+		if (!conn) return
 
+		const cata = catalog()
+		if (!cata) return
+
+		const element = isMode("mse") ? video : canvas
+
+		const player = new Player({ connection: conn, element, catalog: cata })
 		if (element instanceof HTMLVideoElement) {
-			element.addEventListener("play", () => player.play())
+			element.addEventListener("play", () => {
+				player.play().catch(setError)
+			})
 		}
 
-		onCleanup(() => player.close())
+		return player
+	})
 
-		player
-			.closed()
-			.then(setError)
-			.catch(setError)
-			.finally(() => setPlayer(undefined))
+	createEffect(() => {
+		const p = player()
+		if (!p) return
+
+		onCleanup(() => p.close())
+		p.closed().then(setError).catch(setError)
 	})
 
 	const isMode = createSelector(mode)
@@ -84,12 +101,8 @@ export default function Watch(props: { name: string }) {
 		<>
 			<Fail error={error()} />
 			<Switch>
-				<Match when={mode() == "mse"}>
-					<video class="aspect-video w-full rounded-lg bg-black" autoplay controls ref={video} />
-				</Match>
-				<Match when={mode() == "webcodecs"}>
-					<canvas class="aspect-video w-full rounded-lg bg-black" ref={canvas} />
-				</Match>
+				<Match when={mode() == "mse"}>{video}</Match>
+				<Match when={mode() == "webcodecs"}>{canvas}</Match>
 			</Switch>
 
 			<h3>Advanced</h3>
@@ -105,7 +118,7 @@ export default function Watch(props: { name: string }) {
 				}}
 				class="rounded-r-none border-r-2 border-r-slate-900"
 			>
-				Media Source <span class="block text-xs text-gray-300">(higher latency)</span>
+				Media Source <span class="block text-xs text-gray-200">(higher latency)</span>
 			</button>
 			<button
 				classList={{
@@ -119,7 +132,7 @@ export default function Watch(props: { name: string }) {
 				}}
 				class="rounded-l-none"
 			>
-				WebCodecs <span class="block text-xs text-gray-300">(experimental)</span>
+				WebCodecs <span class="block text-xs text-gray-200">(experimental)</span>
 			</button>
 		</>
 	)
