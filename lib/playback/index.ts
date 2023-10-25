@@ -75,6 +75,11 @@ export class Player {
 				throw new Error(`expected CMAF track`)
 			}
 
+			if (isAudioTrack(track) && this.#backend instanceof MSE) {
+				// TODO temporary hack to disable audio in MSE
+				continue
+			}
+
 			inits.add(track.init_track)
 			tracks.push(track)
 		}

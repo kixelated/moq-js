@@ -73,6 +73,10 @@ export class Segment {
 			mdat.write(stream)
 		}
 
+		if (stream.buffer.byteLength == 0) {
+			return this.done
+		}
+
 		this.source.initialize(this.init)
 		this.source.append(stream.buffer)
 

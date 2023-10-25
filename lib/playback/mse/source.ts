@@ -45,6 +45,10 @@ export class Source {
 
 	// Append the segment data to the buffer.
 	append(data: Uint8Array | ArrayBuffer) {
+		if (data.byteLength == 0) {
+			throw new Error("empty append")
+		}
+
 		this.queue.push({
 			kind: "data",
 			data: data,
