@@ -74,16 +74,14 @@ export default function Publish() {
 	const params = Object.fromEntries(urlSearchParams.entries())
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
 
-	const [connection, setConnection] = createSignal<Connection | undefined>()
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
+	const [deviceLoading, setDeviceLoading] = createSignal(false)
 	const [audio, setAudio] = createSignal<AudioEncoderConfig | undefined>()
 	const [video, setVideo] = createSignal<VideoEncoderConfig | undefined>()
+	const [connection, setConnection] = createSignal<Connection | undefined>()
 	const [advanced, setAdvanced] = createSignal(false)
 	const [broadcast, setBroadcast] = createSignal<Broadcast | undefined>()
-
-	const [share, setShare] = createSignal<string>()
 	const [copied, setCopied] = createSignal<boolean>()
-
 	const [active, setActive] = createSignal<boolean>()
 	const [error, setError] = createSignal<Error | undefined>()
 
@@ -97,6 +95,28 @@ export default function Publish() {
 		const tracks = device()?.getVideoTracks()
 		if (!tracks || tracks.length == 0) return
 		return tracks[0].getSettings() as VideoTrackSettings
+	})
+
+	const id = crypto.randomUUID()
+	let watchUrl = `/watch/${id}`
+	if (server != import.meta.env.PUBLIC_RELAY_HOST) {
+		watchUrl = `${watchUrl}?server=${server}`
+	}
+
+	createEffect(() => {
+		const url = `https://${server}/${id}`
+
+		// Special case localhost to fetch the TLS fingerprint from the server.
+		// TODO remove this when WebTransport correctly supports self-signed certificates
+		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
+
+		const client = new Client({
+			url,
+			fingerprint,
+			role: "publisher",
+		})
+
+		client.connect().then(setConnection).catch(setError)
 	})
 
 	const createBroadcast = function () {
@@ -145,10 +165,7 @@ export default function Publish() {
 		if (!conn) return
 
 		onCleanup(() => conn.close())
-		conn.closed()
-			.then(setError)
-			.catch(setError)
-			.finally(() => setConnection(undefined))
+		conn.closed().then(setError, setError)
 	})
 
 	// Close the broadcast on unload or error
@@ -164,13 +181,26 @@ export default function Publish() {
 
 		// Wait until the broadcast is closed.
 		b.closed()
-			.then(setError)
-			.catch(setError)
+			.then(setError, setError)
 			.finally(() => {
 				setBroadcast(undefined)
 				setActive(false)
 			})
 	})
+
+	// The text for the submit button
+	const status = createMemo(() => {
+		if (!device()) {
+			if (deviceLoading()) return "device-loading"
+			return "device-none"
+		}
+
+		if (!active()) return "ready"
+		if (!connection()) return "connect"
+		return "live"
+	})
+
+	const isStatus = createSelector(status)
 
 	// Copy the link to the clipboard
 	const copyShare = function (event: MouseEvent) {
@@ -214,14 +244,7 @@ export default function Publish() {
 					</button>
 				</p>
 
-				<Device setError={setError} setDevice={setDevice} />
-				<Connect
-					setError={setError}
-					setShare={setShare}
-					setConnection={setConnection}
-					advanced={advanced()}
-					server={server}
-				/>
+				<Device setError={setError} setDevice={setDevice} setDeviceLoading={setDeviceLoading} />
 
 				<Show when={videoTrack()}>
 					{(track) => (
@@ -244,19 +267,30 @@ export default function Publish() {
 						type="submit"
 						onClick={(e) => {
 							e.preventDefault()
-							setActive(true)
+
+							if (isStatus("ready")) {
+								setActive(true)
+							}
 						}}
-						class="bg-green-500 text-white hover:bg-green-600"
+						classList={{
+							"bg-yellow-500": !isStatus("ready") && !isStatus("live"),
+							"hover:bg-yellow-600": !isStatus("ready") && !isStatus("live"),
+							"bg-green-500": isStatus("ready") || isStatus("live"),
+							"hover:bg-green-600": isStatus("ready") || isStatus("live"),
+						}}
+						class="text-white"
 					>
 						<Switch>
-							<Match when={broadcast()}>Live</Match>
-							<Match when={active()}>Loading</Match>
-							<Match when={!active()}>Go Live</Match>
+							<Match when={isStatus("device-none")}>Select Device</Match>
+							<Match when={isStatus("device-loading")}>Loading Device</Match>
+							<Match when={isStatus("ready")}>Go Live</Match>
+							<Match when={isStatus("connect")}>Connecting</Match>
+							<Match when={isStatus("live")}>Live</Match>
 						</Switch>
 					</button>
 
 					<Show when={broadcast()}>
-						<a href={share()} onClick={copyShare} class="form-button">
+						<a href={watchUrl} onClick={copyShare} class="form-button">
 							Share
 						</a>
 					</Show>
@@ -270,68 +304,11 @@ export default function Publish() {
 	)
 }
 
-function Connect(props: {
+function Device(props: {
 	setError: (err: Error) => void
-	setConnection: (conn: Connection | undefined) => void
-	setShare: (url: string | undefined) => void
-	advanced: boolean
-	server: string
+	setDevice: (input: MediaStream) => void
+	setDeviceLoading: (ok: boolean) => void
 }) {
-	const [name, setName] = createSignal<string>(crypto.randomUUID())
-
-	createEffect(() => {
-		props.setConnection(undefined)
-		props.setShare(undefined)
-
-		const n = name()
-		const server = props.server
-
-		const url = `https://${server}/${n}`
-
-		// Special case localhost to fetch the TLS fingerprint from the server.
-		// TODO remove this when WebTransport correctly supports self-signed certificates
-		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
-
-		const client = new Client({
-			url,
-			fingerprint,
-			role: "publisher",
-		})
-
-		let watchUrl = `/watch/${n}`
-		if (server != import.meta.env.PUBLIC_RELAY_HOST) {
-			watchUrl = `${watchUrl}?server=${server}`
-		}
-
-		client
-			.connect()
-			.then(props.setConnection)
-			// eslint-disable-next-line solid/reactivity
-			.then(() => props.setShare(watchUrl))
-			.catch(props.setError)
-	})
-
-	return (
-		<>
-			<Show when={props.advanced}>
-				<h2>General</h2>
-
-				<label>
-					Broadcast Name
-					<input
-						type="text"
-						name="name"
-						placeholder="random"
-						class="block w-96"
-						onChange={(e) => setName(e.target.value)}
-					/>
-				</label>
-			</Show>
-		</>
-	)
-}
-
-function Device(props: { setError: (err: Error) => void; setDevice: (input: MediaStream) => void }) {
 	const [mode, setMode] = createSignal<"user" | "display" | "none">("none")
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
 	const [videoDeviceId, setVideoDeviceId] = createSignal<string>("")
@@ -341,14 +318,20 @@ function Device(props: { setError: (err: Error) => void; setDevice: (input: Medi
 
 	const loadUser = function () {
 		setMode("user")
+		setDevice(undefined)
+		props.setDeviceLoading(true)
+
 		mediaDevices()
 			.then(setDevice)
 			.catch(props.setError)
 			.catch(() => setMode("none"))
+			.finally(() => props.setDeviceLoading(false))
 	}
 
 	const loadDisplay = function () {
 		setMode("display")
+		setDevice(undefined)
+		props.setDeviceLoading(true)
 
 		navigator.mediaDevices
 			.getDisplayMedia({
@@ -368,6 +351,7 @@ function Device(props: { setError: (err: Error) => void; setDevice: (input: Medi
 			.then(setDevice)
 			.catch(props.setError)
 			.catch(() => setMode("none"))
+			.finally(() => props.setDeviceLoading(false))
 	}
 
 	const mediaDevices = () => {
