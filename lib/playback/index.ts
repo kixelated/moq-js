@@ -1,7 +1,7 @@
 import * as Message from "./webcodecs/message"
 
 import { Connection } from "../transport/connection"
-import { Catalog, isMp4Track, Mp4Track } from "../media/catalog"
+import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
 
 // We support two different playback implementations:
