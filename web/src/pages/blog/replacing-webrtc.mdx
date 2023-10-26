@@ -30,7 +30,7 @@ Google released WebRTC in 2011 as a way of fixing a very specific problem:
 
 Back then, the web was a very different place.
 Flash was the only way to do live media and it was a _mess_.
-HTML5 video was was primarily for pre-recorded content.
+HTML5 video was primarily for pre-recorded content.
 It personally took me until 2015 to write a [HTML5 player for Twitch](https://reddit.com/r/Twitch/comments/3hqfkw/the_csgo_client_embeds_the_twitch_html5_player/) using [MSE](https://developer.mozilla.org/en-US/docs/Web/API/Media_Source_Extensions_API), and we're still talking 10+ seconds of latency.
 
 Transmitting video over the internet in real-time is difficult.
@@ -58,7 +58,7 @@ Throw a [Javascript API](https://www.w3.org/TR/webtransport/) on top of these an
 
 <figure>
 	![WebRTC protocols and layers](/blog/replacing-webrtc/layers.png)
-	<figcaption>[Source](https://hpbn.co/webrtc/) Thats a lot of protocols layered on top of each other.</figcaption>
+	<figcaption>[Source](https://hpbn.co/webrtc/) That's a lot of protocols layered on top of each other.</figcaption>
 </figure>
 
 ## Why not WebRTC?
@@ -82,9 +82,9 @@ My last project at Twitch was to reduce latency by replacing HLS with WebRTC for
 This seems like a no-brainer at first, but it quickly turned into [death by a thousand cuts](https://docs.google.com/document/d/1OTnJunbpSJchdj8XI3GU9Fo-RUUFBqLO1AhlaKk5Alo/edit?usp=sharing).
 And the user experience was just terrible; Twitch doesn't need the same aggressive latency as Google Meet.
 
-It's quite difficult customize WebRTC outside of a few configurable modes.
-It's a black box that you turn on, and if it works it works, and if it doesn't work then you hope Google fixes it for you.
-The protocol has some wiggle room, but ultimately you're ultimately bound by the browser implementation for web support.
+It's quite difficult to customize WebRTC outside of a few configurable modes.
+It's a black box that you turn on, and if it works it works, and if it doesn't work, then you hope Google fixes it for you.
+The protocol has some wiggle room, but you're ultimately bound by the browser implementation for web support.
 And if you don't need web support, then you don't need WebRTC.
 
 For example, Twitch's H.264 video (with B-frames) and AAC audio was not supported by WebRTC.
@@ -95,16 +95,16 @@ We ultimately had to transcode every live stream to remove B-frames and use Opus
 
 WebRTC also has a data channel API, which is particularly useful because [until recently](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport), it's been the only way to send/receive unreliable messages from a browser.
 
-In fact many companies use WebRTC data channels to avoid the WebRTC media stack (ex. Zoom).
+In fact, many companies use WebRTC data channels to avoid the WebRTC media stack (ex. Zoom).
 I went down this path too, attempting to send each frame as an unreliable message.
 But ultimately it doesn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc4960.html), the protocol behind data channels.
 
 I eventually hacked "datagram" support into SCTP by breaking frames into unreliable messages below the MTU size.
 Finally! UDP in the browser, but at what cost:
 
--   A convoluted handshake that takes at least 10 (!) round trips.
+-   a convoluted handshake that takes at least 10 (!) round trips.
 -   2x the packets, because libsctp immediately ACKs every "datagram".
--   A custom SCTP implementation, which means the browser can't send "datagrams".
+-   a custom SCTP implementation, which means the browser can't send "datagrams".
 
 Oof.
 
@@ -116,7 +116,7 @@ The lamest part about WebRTC is that it requires peer-to-peer.
 Most conferencing solutions these days are actually client-server for better QoS.
 However, you're still forced to perform the complicated ICE handshake designed for client-client.
 
-But if you do use P2P, there's just so many network permutations to support:
+But if you do use P2P, there are so many network permutations to support:
 
 -   Some networks use symmetric NATS, so you're forced to host a TURN server.
 -   Some networks block UDP, so you're forced to host a TCP TURN server.
@@ -127,7 +127,7 @@ But if you do use P2P, there's just so many network permutations to support:
 If you need to use a TURN server, well you can't actually send traffic peer-to-peer; they're expensive UDP/TCP proxies.
 Plus you still need a server to facilitate the SDP offer/answer exchange anyway.
 
-P2P has magical allure but it's just so painful in practice that it's not worth the effort.
+P2P has a magical allure but it's so painful in practice that it's not worth the effort.
 Pay for servers if you have any customers.
 
 ### SFU
@@ -138,12 +138,12 @@ These are those servers I just told you to pay for.
 The problem with SFUs is subtle: they're custom. It requires a lot of business logic to determine _which_ packets to selectively forward and where:
 
 -   Detecting congestion: you need something like [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02), [NADA](https://datatracker.ietf.org/doc/html/rfc8698), [SCReAM](https://github.com/EricssonResearch/scream), and the peer needs to support it too.
--   Dropping packets: the SFU has to partially parse the packet payload to determine which packets to dropped.
+-   Dropping packets: the SFU has to partially parse the packet payload to determine which packets to drop.
 
 Additionally, push-based SFUs share very little in common with traditional pull-based CDNs.
 One team is optimizing WebRTC, another team is optimizing HTTP, and they're not talking to each other.
 
-This is the fundamental reason why HLS/DASH uses HTTP/TCP actually.
+Actually, this is the fundamental reason why HLS/DASH uses HTTP/TCP.
 Economies of scale.
 
 # Replacing WebRTC
@@ -226,12 +226,12 @@ The tricky part is the bit in the middle, the network.
 
 The internet is a [series of tubes](https://en.wikipedia.org/wiki/Series_of_tubes).
 You put packets in one end and they eventually come out of the other end, kinda.
-This section will get an entire blog post in the future, but until then let's over-simplify things.
+This section will get an entire blog post in the future, but until then, let's over-simplify things.
 
 Every packet you send fights with other packets on the internet.
 
 -   If routers have sufficient throughput, then the only limit is the speed of light.
--   If routers don't have sufficient thoughput, then packets will be queued.
+-   If routers don't have sufficient throughput, then packets will be queued.
 -   If those queues are full, then packets will be dropped instead.
 
 ### Detecting Queuing
@@ -259,7 +259,7 @@ For real-time media, we can lower the bitrate by either:
 2.  Dropping encoded media
 
 We can easily drop the encoder bitrate with [WebCodecs](#webcodecs).
-However this only applies to future frames; we can't retroactively re-encode frames already queued.
+However, this only applies to future frames; we can't retroactively re-encode frames already queued.
 It's also not an option for CDNs since it's too expensive to retranscode for each viewer.
 
 So we have to drop encoded media with [WebTransport](#webtransport).
@@ -277,7 +277,7 @@ But that deserves an entire blog post on its own.
 
 # Replacing WebRTC
 
-But to actually replace WebRTC, we need a standard. Anybody can make their own UDP-based protocol (and they do) using this new web tech (and they will).
+But to actually replace WebRTC, we need a standard. Anybody can make their own UDP-based protocol (and they do), using this new web tech (and they will).
 
 What sets [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/) apart is that we're doing it through the IETF, the same organization that standardized WebRTC.
 
@@ -285,11 +285,12 @@ It's going to take a while.<br />
 It's going to take a lot of idiots like myself who think they can do better than WebRTC. <br />
 It's going to take a lot of companies who are willing to bet on a new standard.<br />
 
-And there's major flaws with both **WebCodecs** and **WebTransport** that still need to be addressed before we'll ever reach WebRTC parity.
+And there are major flaws with both **WebCodecs** and **WebTransport** that still need to be addressed before we'll ever reach WebRTC parity.
 To name a few:
 
 -   We need something like [transport-wide-cc](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/transport-wide-cc-02/README.md) in QUIC.
 -   We need better [congestion control](https://www.w3.org/TR/webtransport/#dom-webtransportoptions-congestioncontrol) in browsers.
+-   We need echo cancellation in WebCodecs, which might be possible already?
 -   We need [FEC](https://datatracker.ietf.org/doc/draft-michel-quic-fec/) in QUIC, at least to experiment.
 -   We need more encoding options, like non-reference frames or SVC.
 -   Oh yeah and full browser support: [WebCodecs](https://caniuse.com/webcodecs) - [WebTransport](https://caniuse.com/webtransport)
