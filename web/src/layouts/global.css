@@ -14,6 +14,7 @@
 		@apply prose prose-lg lg:prose-xl;
 		@apply prose-moq;
 		@apply prose-headings:underline prose-headings:decoration-green-500 prose-headings:decoration-2 prose-headings:underline-offset-4;
+		@apply prose-h3:text-2xl;
 		@apply prose-a:no-underline;
 		@apply prose-th:no-underline;
 		@apply prose-h1:mb-8 prose-h1:mt-12;
