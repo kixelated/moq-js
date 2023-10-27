@@ -7,7 +7,7 @@
 	],
 	"scripts": {
 		"dev": "npm run dev --workspace web",
-		"build": "npm run build --workspace web",
+		"build": "npm run build --workspaces",
 		"lint": "npm run lint --workspaces",
 		"fmt": "npm run fmt --workspaces"
 	}
