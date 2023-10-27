@@ -55,7 +55,7 @@ It's actually quite a feat of software engineering, _especially_ the part where 
 
 My favorite part about WebRTC is that it manages to leverage existing standards.
 WebRTC is not really a protocol, but rather a collection of protocols: [ICE](https://datatracker.ietf.org/doc/html/rfc8445), [STUN](https://datatracker.ietf.org/doc/html/rfc5389), [TURN](https://datatracker.ietf.org/doc/html/rfc5766), [DTLS](https://datatracker.ietf.org/doc/html/rfc6347), [RTP/RTCP](https://datatracker.ietf.org/doc/html/rfc3550), [SRTP](https://datatracker.ietf.org/doc/html/rfc3711), [SCTP](https://datatracker.ietf.org/doc/html/rfc4960), [SDP](https://datatracker.ietf.org/doc/html/rfc4566), [mDNS](https://datatracker.ietf.org/doc/html/rfc6762), etc.
-Throw a [Javascript API](https://www.w3.org/TR/webtransport/) on top of these and you have WebRTC.
+Throw a [Javascript API](https://www.w3.org/TR/webrtc/) on top of these and you have WebRTC.
 
 <figure>
 	![WebRTC protocols and layers](/blog/replacing-webrtc/layers.png)
@@ -96,7 +96,7 @@ But you're ultimately bound by the browser implementation, unless you don't need
 WebRTC also has a data channel API, which is particularly useful because [until recently](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport), it's been the only way to send/receive unreliable messages from a browser.
 
 In fact, many companies use WebRTC data channels to avoid the WebRTC media stack (ex. Zoom).
-I went down this path too, attempting to send each video frame as an unreliable message, but ultimately it didn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc4960.html).
+I went down this path too, attempting to send each video frame as an unreliable message, but ultimately it didn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc9260.html).
 
 I eventually hacked "datagram" support into SCTP by breaking frames into unreliable messages below the MTU size.
 Finally! UDP in the browser, but at what cost:
