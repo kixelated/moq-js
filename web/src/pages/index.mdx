@@ -26,17 +26,8 @@ Check out the [issues](/issues) and in touch if you're interested in contributin
 <p class="tagline">Visit [Github](/source) or join [Discord](https://discord.gg/FCYF3p99mr)</p>
 
 We are designing a protocol that is simple and yet flexible enough to support the wide range of use-cases:
-from ultra-low latency to ultra-high quality, 1 viewer to 1 million viewers, contribution and distribution, and everything in
-between. It's possible by carefully breaking the protocol into layers:
-
--   **QUIC**: Provides the networking: independent streams and datagrams.
--   **WebTransport**: (optional) Provides web support for QUIC.
--   **MoqTransport**: Designed specifically for CDNs and mass fanout.
--   **Catalog**: Describes the available tracks: the codec, container, resolution, etc.
--   **Container**: Describes the encoding of each track.
-
-This website uses CMAF for backwards compatibility with HLS/DASH but it's not required.
-You can use whatever encoding the encoder/decoder agree to support, including for non-media purposes like chat, input, metadata, etc.
+from ultra-low latency to ultra-high quality, 1 viewer to 1 million viewers, contribution and distribution, and everything in between.
+See the [motivation](https://www.ietf.org/archive/id/draft-ietf-moq-transport-01.html#name-motivation) for more information.
 
 MoQ is still very early in development and many features are missing.
 Everything is liable to change, especially if you get involved!

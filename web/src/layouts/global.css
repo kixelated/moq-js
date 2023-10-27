@@ -19,6 +19,8 @@
 		@apply prose-th:no-underline;
 		@apply prose-h1:mb-8 prose-h1:mt-12;
 		@apply prose-li:my-1;
+		@apply prose-img:rounded-lg;
+		@apply prose-figure:object-center prose-figure:text-center prose-img:m-auto;
 	}
 
 	.tagline {

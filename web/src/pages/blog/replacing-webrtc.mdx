@@ -6,7 +6,7 @@ author: kixelated
 
 # Replacing WebRTC
 
-The long road to deprecating WebRTC.
+The long and winding path to using _something_ else.
 
 ## tl;dr
 
@@ -18,8 +18,8 @@ If you primarily use WebRTC for...
 
 ## Disclaimer
 
-I spent over a year building/optimizing a full WebRTC stack @ Twitch using [pion](https://github.com/pion/webrtc), but we ultimately scrapped it.
-My use-case was quite custom and not the typical WebRTC use-case.
+I spent over a year building/optimizing a full WebRTC stack @ Twitch using [pion](https://github.com/pion/webrtc).
+We ultimately scrapped it and my use-case was quite custom so your millage will vary.
 Also, some of these issues may have been addressed since then.
 
 ## Why WebRTC?
@@ -31,9 +31,9 @@ Google released WebRTC in 2011 as a way of fixing a very specific problem:
 Back then, the web was a very different place.
 Flash was the only way to do live media and it was a _mess_.
 HTML5 video was primarily for pre-recorded content.
-It personally took me until 2015 to write a [HTML5 player for Twitch](https://reddit.com/r/Twitch/comments/3hqfkw/the_csgo_client_embeds_the_twitch_html5_player/) using [MSE](https://developer.mozilla.org/en-US/docs/Web/API/Media_Source_Extensions_API), and we're still talking 10+ seconds of latency.
+It personally took me until 2015 to write a [HTML5 player for Twitch](https://reddit.com/r/Twitch/comments/3hqfkw/the_csgo_client_embeds_the_twitch_html5_player/) using [MSE](https://developer.mozilla.org/en-US/docs/Web/API/Media_Source_Extensions_API), and we're still talking 5+ seconds of latency on a good day.
 
-Transmitting video over the internet in real-time is difficult.
+Transmitting video over the internet _in real-time_ is hard.
 
 You need a tight coupling between the video encoding and the network to avoid any form of queuing, which adds latency.
 This effectively rules out TCP and forces you to use UDP.
@@ -42,15 +42,15 @@ But now you also need a video encoder/decoder that can deal with packet loss wit
 <figure>
 	![Video artifacts](/blog/replacing-webrtc/artifact.png)
 	<figcaption>
-		[Source](https://flashphoner.com/10-important-webrtc-streaming-metrics-and-configuring-prometheus-grafana-monitoring/)
+		[Source](https://flashphoner.com/10-important-webrtc-streaming-metrics-and-configuring-prometheus-grafana-monitoring/).
 		Example of Artifacts caused by packet loss.
 	</figcaption>
 </figure>
 
-Google determined that it would be impossible to solve these problems piecewise with new web standards.
+Google (correctly) determined that it would be impossible to solve these problems piecewise with new web standards.
 The approach instead was to create [libwebrtc](https://webrtc.googlesource.com/src/), the defacto WebRTC implementation that still ships with all browsers.
 It does everything, from networking to video encoding/decoding to data transfer, and it does it remarkably well.
-It's actually quite a feat of software engineering, _especially_ the part where Google managed to convince Apple/Mozilla to embed a full media stack into their browsers.
+It's actually quite a feat of software engineering, _especially_ the part where Google managed to convince Apple/Mozilla to embed a full media/networking stack into their browsers.
 
 My favorite part about WebRTC is that it manages to leverage existing standards.
 WebRTC is not really a protocol, but rather a collection of protocols: [ICE](https://datatracker.ietf.org/doc/html/rfc8445), [STUN](https://datatracker.ietf.org/doc/html/rfc5389), [TURN](https://datatracker.ietf.org/doc/html/rfc5766), [DTLS](https://datatracker.ietf.org/doc/html/rfc6347), [RTP/RTCP](https://datatracker.ietf.org/doc/html/rfc3550), [SRTP](https://datatracker.ietf.org/doc/html/rfc3711), [SCTP](https://datatracker.ietf.org/doc/html/rfc4960), [SDP](https://datatracker.ietf.org/doc/html/rfc4566), [mDNS](https://datatracker.ietf.org/doc/html/rfc6762), etc.
@@ -58,7 +58,7 @@ Throw a [Javascript API](https://www.w3.org/TR/webtransport/) on top of these an
 
 <figure>
 	![WebRTC protocols and layers](/blog/replacing-webrtc/layers.png)
-	<figcaption>[Source](https://hpbn.co/webrtc/) That's a lot of protocols layered on top of each other.</figcaption>
+	<figcaption>[Source](https://hpbn.co/webrtc/). That's a lot of protocols layered on top of each other.</figcaption>
 </figure>
 
 ## Why not WebRTC?
@@ -66,7 +66,7 @@ Throw a [Javascript API](https://www.w3.org/TR/webtransport/) on top of these an
 I wouldn't be writing this blog post if WebRTC was perfect.
 The core issue is that WebRTC is not a protocol; it's a monolith.
 
-If you're using WebRTC, you're using it for at least one of the following reasons:
+WebRTC does a lot of things, let's break down it down piece by piece:
 
 -   [Media](#media): a full capture/encoding/networking/rendering pipeline.
 -   [Data](#data): reliable/unreliable messages.
@@ -75,29 +75,27 @@ If you're using WebRTC, you're using it for at least one of the following reason
 
 ### Media
 
-WebRTC is designed for conferencing and does an amazing job at it.
+The WebRTC media stack is designed for conferencing and does an amazing job at it.
 The problems start when you try to use it for anything else.
 
 My last project at Twitch was to reduce latency by replacing HLS with WebRTC for delivery.
 This seems like a no-brainer at first, but it quickly turned into [death by a thousand cuts](https://docs.google.com/document/d/1OTnJunbpSJchdj8XI3GU9Fo-RUUFBqLO1AhlaKk5Alo/edit?usp=sharing).
-And the user experience was just terrible; Twitch doesn't need the same aggressive latency as Google Meet.
+The biggest issue was that the user experience was just terrible.
+Twitch doesn't need the same aggressive latency as Google Meet, but WebRTC is hard-wired to compromise on quality.
 
-It's quite difficult to customize WebRTC outside of a few configurable modes.
-It's a black box that you turn on, and if it works it works, and if it doesn't work, then you hope Google fixes it for you.
-The protocol has some wiggle room, but you're ultimately bound by the browser implementation for web support.
-And if you don't need web support, then you don't need WebRTC.
+In general, it's quite difficult to customize WebRTC outside of a few configurable modes.
+It's a black box that you turn on, and if it works it works.
+And if it doesn't work, then you have to deal with the pain that is [forking libwebrtc](https://github.com/webrtc-sdk/libwebrtc)... or just hope Google fixes it for you.
 
-For example, Twitch's H.264 video (with B-frames) and AAC audio was not supported by WebRTC.
-Both are technically supported by RTP standards, but not implemented by WebRTC.
-We ultimately had to transcode every live stream to remove B-frames and use Opus audio instead.
+The protocol has some wiggle room and I really enjoyed my time tinkering with [pion](https://github.com/pion/webrtc).
+But you're ultimately bound by the browser implementation, unless you don't need web support, in which case you don't need WebRTC.
 
 ### Data
 
 WebRTC also has a data channel API, which is particularly useful because [until recently](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport), it's been the only way to send/receive unreliable messages from a browser.
 
 In fact, many companies use WebRTC data channels to avoid the WebRTC media stack (ex. Zoom).
-I went down this path too, attempting to send each frame as an unreliable message.
-But ultimately it doesn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc4960.html), the protocol behind data channels.
+I went down this path too, attempting to send each frame as an unreliable message, but ultimately it doesn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc4960.html).
 
 I eventually hacked "datagram" support into SCTP by breaking frames into unreliable messages below the MTU size.
 Finally! UDP in the browser, but at what cost:
@@ -106,45 +104,47 @@ Finally! UDP in the browser, but at what cost:
 -   2x the packets, because libsctp immediately ACKs every "datagram".
 -   a custom SCTP implementation, which means the browser can't send "datagrams".
 
-Oof.
+Oof. Fortunately there's now a [better way](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport/datagrams) to send datagrams.
 
 ### P2P
 
-The coolest part about WebRTC is that it supports peer-to-peer.<br/>
-The lamest part about WebRTC is that it requires peer-to-peer.
+The best and worst part about WebRTC is that it supports peer-to-peer.
+The ICE handshake is extremely complicated:
+
+-   You need both peers to generate a SDP offer/answer.
+-   You need a public server (usually HTTPS/WebSocket) to exchange the offer/answer.
+-   Some networks use symmetric NATs, so you need a fallback TURN server.
+-   Some networks block UDP, so you need a fallback TCP TURN server.
+-   Some networks only support IPv4 or IPv6 internally, so you should support dual-stack.
+-   Some clients only support mDNS, so you have to figure that out too.
 
 Most conferencing solutions these days are actually client-server for better QoS.
-However, you're still forced to perform the complicated ICE handshake designed for client-client.
-
-But if you do use P2P, there are so many network permutations to support:
-
--   Some networks use symmetric NATS, so you're forced to host a TURN server.
--   Some networks block UDP, so you're forced to host a TCP TURN server.
--   Some networks allow only specific UDP ports (ex. 443), so you're forced to coalesce all flows to a single port (non-standard).
--   Some networks only support IPv4 or IPv6, so you're forced to support dual-stack.
--   Some clients use mDNS otherwise [WebRTC leak IPs](https://torrentfreak.com/huge-security-flaw-leaks-vpn-users-real-ip-addresses-150130/).
-
-If you need to use a TURN server, well you can't actually send traffic peer-to-peer; they're expensive UDP/TCP proxies.
-Plus you still need a server to facilitate the SDP offer/answer exchange anyway.
-
-P2P has a magical allure but it's so painful in practice that it's not worth the effort.
-Pay for servers if you have any customers.
+However, you're still forced to perform the complicated ICE handshake designed for peer-to-peer.
+This has major architecture ramifications, but I'll save that for another blog post.
 
 ### SFU
 
 Last but not least, WebRTC is scaled out using SFUs (Selective Forwarding Units).
-These are those servers I just told you to pay for.
 
-The problem with SFUs is subtle: they're custom. It requires a lot of business logic to determine _which_ packets to selectively forward and where:
+<figure>
+	![SFU example](/blog/replacing-webrtc/sfu.png)
+	<figcaption>
+		[Source](https://blog.livekit.io/scaling-webrtc-with-distributed-mesh/). Participants send to a central server,
+		rather than directly to each other.
+	</figcaption>
+</figure>
 
--   Detecting congestion: you need something like [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02), [NADA](https://datatracker.ietf.org/doc/html/rfc8698), [SCReAM](https://github.com/EricssonResearch/scream), and the peer needs to support it too.
--   Dropping packets: the SFU has to partially parse the packet payload to determine which packets to drop.
+The problem with SFUs is subtle: they're custom.
+It requires a lot of business logic to determine _which_ packets to selectively forward.
 
-Additionally, push-based SFUs share very little in common with traditional pull-based CDNs.
+-   Detecting congestion: you need something like [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02), [NADA](https://datatracker.ietf.org/doc/html/rfc8698), [SCReAM](https://github.com/EricssonResearch/scream), etc. And the peer needs to support it too.
+-   Dropping packets: the SFU has to partially parse the media contents to decide which packets to drop, otherwise you'll cause artiracts.
+-   Routing packets: A single server doesn't scale, so now you need to figure out how to route packets between servers/clients.
+
+What we ran into at Twitch is that push-based SFUs share very little in common with traditional pull-based CDNs.
 One team is optimizing WebRTC, another team is optimizing HTTP, and they're not talking to each other.
 
-Actually, this is the fundamental reason why HLS/DASH uses HTTP/TCP.
-Economies of scale.
+This is the fundamental reason why HLS/DASH uses HTTP: economies of scale.
 
 # Replacing WebRTC
 
@@ -210,7 +210,7 @@ Queuing can occur at any point in the media pipeline.
 
 | Capture | Encode | Send | Receive | Decode | Render |
 | :-----: | :----: | :--: | :-----: | :----: | :----: |
-|    ?    |   ?    |  ?   |    ?    |   ?    |   ?    |
+|   -->   |  -->   | -->  |   -->   |  -->   |  -->   |
 
 Let's start with the easy one.
 [WebCodecs](#webcodecs) allows you to avoid queuing almost entirely.
@@ -244,10 +244,7 @@ Here's a quick summary of TCP congestion control algorithms:
 -   ECN-based algorithms ([L4S](https://www.rfc-editor.org/rfc/rfc9331.html)) use an explicit signal from routers that packets are being queued.
 
 To keep latency low, you need to detect queuing as early as possible.
-
-WebRTC uses [transport-wide-cc](https://datatracker.ietf.org/doc/html/draft-holmer-rmcat-transport-wide-cc-extensions-01) to report the per-packet delay.
-The sender can then use an algorithm like [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02) to detect queuing and back off.
-QUIC performs a similar function, although not quite as well _yet_ for real-time media.
+WebRTC accomplishes that with [transport-wide-cc](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/transport-wide-cc-02/README.md), something that is probably necessary for QUIC too until widespread L4S support.
 
 ### Reducing Bitrate
 
@@ -262,8 +259,10 @@ We can easily drop the encoder bitrate with [WebCodecs](#webcodecs).
 However, this only applies to future frames; we can't retroactively re-encode frames already queued.
 It's also not an option for CDNs since it's too expensive to retranscode for each viewer.
 
-So we have to drop encoded media with [WebTransport](#webtransport).
-There's actually a few ways of doing this:
+So we have to drop encoded media.
+This is the fundamental problem with TCP: once you queue up data in the TCP socket, you can't drop it.
+
+However there are actually quite a few ways of dropping media with [WebTransport](#webtransport):
 
 1. Use datagrams and choose which packets to transmit. (like WebRTC)
 2. Use QUIC streams and reset them to stop transmitting. (like [RUSH](https://www.ietf.org/archive/id/draft-kpugin-rush-00.html))
@@ -271,18 +270,16 @@ There's actually a few ways of doing this:
 
 I'm biased because I made the 3rd one.
 I use WebTransport's [sendOrder](https://www.w3.org/TR/webtransport/#dom-webtransportsendstreamoptions-sendorder) to instruct the QUIC stack which streams to prioritize.
-`audio > video` and then `newer > older`
-
 But that deserves an entire blog post on its own.
 
 # Replacing WebRTC
 
-But to actually replace WebRTC, we need a standard. Anybody can make their own UDP-based protocol (and they do), using this new web tech (and they will).
+But to actually replace WebRTC, we need a standard. Anybody can make their own UDP-based protocol (_and they do_), using this new web tech (_and they will_).
 
-What sets [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/) apart is that we're doing it through the IETF, the same organization that standardized WebRTC.
+What sets [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/) apart is that we're doing it through the IETF, the same organization that standardized WebRTC... and QUIC... and HTTP... and almost every other protocol that I've linked.
 
-It's going to take a while.<br />
-It's going to take a lot of idiots like myself who think they can do better than WebRTC. <br />
+It's going to take a while. A few years at least.<br />
+It's going to take a lot of idiots like myself who want to replace WebRTC. <br />
 It's going to take a lot of companies who are willing to bet on a new standard.<br />
 
 And there are major flaws with both **WebCodecs** and **WebTransport** that still need to be addressed before we'll ever reach WebRTC parity.
@@ -295,4 +292,4 @@ To name a few:
 -   We need more encoding options, like non-reference frames or SVC.
 -   Oh yeah and full browser support: [WebCodecs](https://caniuse.com/webcodecs) - [WebTransport](https://caniuse.com/webtransport)
 
-Hit us up on [Discord](https://discord.gg/FCYF3p99mr) if you want to make **THE FUTURE OF THE INTERNET**.
+Hit me up on [Discord](https://discord.gg/FCYF3p99mr) (@kixelated) if you want to help or just chat.
