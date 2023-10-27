@@ -6,13 +6,14 @@ author: kixelated
 
 # Replacing WebRTC
 
-The long and winding path to using _something_ else.
+The long and winding path, searching for _something else_.
+Written by [@kixelated](https://github.com/kixelated).
 
 ## tl;dr
 
 If you primarily use WebRTC for...
 
--   **real-time media**: it will take a while to make something better; we're working on it.
+-   **real-time media**: it will take a while to make something comparable; we're working on it.
 -   **data channels**: WebTransport is amazing and _actually_ works.
 -   **peer-to-peer**: you're stuck with WebRTC for the forseeable future.
 
@@ -78,7 +79,7 @@ WebRTC does a lot of things, let's break down it down piece by piece:
 The WebRTC media stack is designed for conferencing and does an amazing job at it.
 The problems start when you try to use it for anything else.
 
-My last project at Twitch was to reduce latency by replacing HLS with WebRTC for delivery.
+My final project at Twitch was to reduce latency by replacing HLS with WebRTC for delivery.
 This seems like a no-brainer at first, but it quickly turned into [death by a thousand cuts](https://docs.google.com/document/d/1OTnJunbpSJchdj8XI3GU9Fo-RUUFBqLO1AhlaKk5Alo/edit?usp=sharing).
 The biggest issue was that the user experience was just terrible.
 Twitch doesn't need the same aggressive latency as Google Meet, but WebRTC is hard-wired to compromise on quality.
@@ -95,7 +96,7 @@ But you're ultimately bound by the browser implementation, unless you don't need
 WebRTC also has a data channel API, which is particularly useful because [until recently](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport), it's been the only way to send/receive unreliable messages from a browser.
 
 In fact, many companies use WebRTC data channels to avoid the WebRTC media stack (ex. Zoom).
-I went down this path too, attempting to send each frame as an unreliable message, but ultimately it doesn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc4960.html).
+I went down this path too, attempting to send each video frame as an unreliable message, but ultimately it didn't work due to fundamental flaws with [SCTP](https://www.rfc-editor.org/rfc/rfc4960.html).
 
 I eventually hacked "datagram" support into SCTP by breaking frames into unreliable messages below the MTU size.
 Finally! UDP in the browser, but at what cost:
@@ -105,6 +106,7 @@ Finally! UDP in the browser, but at what cost:
 -   a custom SCTP implementation, which means the browser can't send "datagrams".
 
 Oof. Fortunately there's now a [better way](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport/datagrams) to send datagrams.
+Feel free to use my [Rust library](https://docs.rs/webtransport-quinn/latest/webtransport_quinn/).
 
 ### P2P
 
@@ -119,12 +121,14 @@ The ICE handshake is extremely complicated:
 -   Some clients only support mDNS, so you have to figure that out too.
 
 Most conferencing solutions these days are actually client-server for better QoS.
-However, you're still forced to perform the complicated ICE handshake designed for peer-to-peer.
+However, you're still forced to perform the complicated ICE handshake.
 This has major architecture ramifications, but I'll save that for another blog post.
+
+Note that there are rumblings of [P2P WebTransport](https://w3c.github.io/p2p-webtransport/) and [P2P QUIC](https://datatracker.ietf.org/doc/draft-seemann-quic-nat-traversal/), but I wouldn't hold my breath.
 
 ### SFU
 
-Last but not least, WebRTC is scaled out using SFUs (Selective Forwarding Units).
+Last but not least, WebRTC scales using SFUs (Selective Forwarding Units).
 
 <figure>
 	![SFU example](/blog/replacing-webrtc/sfu.png)
@@ -135,30 +139,31 @@ Last but not least, WebRTC is scaled out using SFUs (Selective Forwarding Units)
 </figure>
 
 The problem with SFUs is subtle: they're custom.
-It requires a lot of business logic to determine _which_ packets to selectively forward.
 
--   Detecting congestion: you need something like [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02), [NADA](https://datatracker.ietf.org/doc/html/rfc8698), [SCReAM](https://github.com/EricssonResearch/scream), etc. And the peer needs to support it too.
--   Dropping packets: the SFU has to partially parse the media contents to decide which packets to drop, otherwise you'll cause artiracts.
--   Routing packets: A single server doesn't scale, so now you need to figure out how to route packets between servers/clients.
+It requires a lot of business logic to determine _where_ to forward packets.
+A single server like that diagram won't scale, nor will all of the participants be located in the same geo.
+Each SFU needs to be made aware of the network topology and the location of each participant _somehow_.
 
-What we ran into at Twitch is that push-based SFUs share very little in common with traditional pull-based CDNs.
+Additionally, a good SFU will avoid dropping packets based on dependencies, otherwise you waste bandwidth on undecodable packets.
+Unfortunately, determining this requires parsing each RTP packet on a _per-codec_ basis.
+For example, here's a [h.264 depacketizer](https://webrtc.googlesource.com/src/+/refs/heads/main/modules/rtp_rtcp/source/video_rtp_depacketizer_h264.cc) for libwebrtc.
+
+But the biggest issue at Twitch was that SFUs share very little in common with CDNs.
 One team is optimizing WebRTC, another team is optimizing HTTP, and they're not talking to each other.
 
-This is the fundamental reason why HLS/DASH uses HTTP: economies of scale.
+This is why HLS/DASH uses HTTP instead: **economies of scale**
 
 # Replacing WebRTC
 
 Okay enough ranting about what's wrong, let's fix it.
 
 First off, **WebRTC is not going anywhere**. It does a fantastic job at what it was designed for: conferencing.
-It will take a long time before it's possible to reach feature/performance parity with WebRTC.
+It will take a long time before anything will reach feature/latency parity with WebRTC.
 
-## **Web**Support
-
-Before you can replace **Web**RTC, you need some new technologies that also start with **Web**.
+Before you can replace **Web**RTC, you need **Web**Support.
 Fortunately, we now have **Web**Codecs and **Web**Transport.
 
-### WebCodecs
+## WebCodecs
 
 [WebCodecs](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) is a new API for encoding/decoding media in the browser.
 It's remarkably simple:
@@ -173,12 +178,12 @@ The catch is that the application is responsible for all timing.
 That means you need to choose when to render each frame via [requestAnimationFrame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
 In fact, you need to choose when to render each audio _sample_ via [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet).
 
-The upside is that now your web application gets full control and can implement WebRTC-like functionality.
-For example, temporarily playing audio with frozen video before suddenly jumping forward.
+The upside is that now your web application gets full control of how to render media.
+It's now possible to implement WebRTC-like behavior, like temporarily freezing video and desyncing A/V.
 
 [caniuse](https://caniuse.com/webcodecs)
 
-### WebTransport
+## WebTransport
 
 [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API) is a new API for transmitting data over the network.
 Think of it like WebSockets, but with a few key differences:
@@ -197,7 +202,7 @@ QUIC has too many benefits to enumerate, but some highlights:
 -   Used for HTTP/3
 
 That last one is surprisingly important: WebTransport will share all of the optimizations that HTTP/3 receives.
-A HTTP/3 server can simultaneously serve WebTransport sessions and HTTP requests over the same connection.
+A HTTP/3 server can simultaneously serve multiple WebTransport sessions and HTTP requests over the same connection.
 
 [caniuse](https://caniuse.com/webtransport)
 
@@ -205,7 +210,7 @@ A HTTP/3 server can simultaneously serve WebTransport sessions and HTTP requests
 
 Okay, so we have WebCodecs and WebTransport, but are they actually useful?
 
-I alluded to the secret behind reducing latency earlier: avoiding queues.
+I alluded to the secret behind latency earlier: avoiding queues.
 Queuing can occur at any point in the media pipeline.
 
 | Capture | Encode | Send | Receive | Decode | Render |
@@ -214,7 +219,6 @@ Queuing can occur at any point in the media pipeline.
 
 Let's start with the easy one.
 [WebCodecs](#webcodecs) allows you to avoid queuing almost entirely.
-You'll still want some form of jitter buffer before rendering, but that's it.
 
 |    Capture    |    Encode     | Send | Receive |    Decode     |    Render     |
 | :-----------: | :-----------: | :--: | :-----: | :-----------: | :-----------: |
@@ -228,57 +232,72 @@ The internet is a [series of tubes](https://en.wikipedia.org/wiki/Series_of_tube
 You put packets in one end and they eventually come out of the other end, kinda.
 This section will get an entire blog post in the future, but until then, let's over-simplify things.
 
-Every packet you send fights with other packets on the internet.
+Every packet you send will fight with other packets on the internet.
 
--   If routers have sufficient throughput, then the only limit is the speed of light.
--   If routers don't have sufficient throughput, then packets will be queued.
--   If those queues are full, then packets will be dropped instead.
+-   If routers have sufficient throughput, **packets arrive on time**.
+-   If routers have limited throughput, **packets will be queued**.
+-   If those queues are full, **packets will be dropped**.
+
+There can be random packet loss, but 99% of the time we care about loss due to queuing.
 
 ### Detecting Queuing
 
-The entire point of congestion control is to detect this situation and back off.
-Here's a quick summary of TCP congestion control algorithms:
+The goal of congestion control is to detect queuing and back off.
 
--   Loss-based algorithms ([Reno/CUBIC](https://en.wikipedia.org/wiki/TCP_congestion_control)) use packet loss as a signal that a queue is full.
--   Delay-based algorithms ([BBR](https://research.google/pubs/pub45646/)/[COPA](https://web.mit.edu/copa/)) use RTT as a signal that packets are being queued.
--   ECN-based algorithms ([L4S](https://www.rfc-editor.org/rfc/rfc9331.html)) use an explicit signal from routers that packets are being queued.
+Different congestion control algorithms use different signals to detect queuing.
+This is a gross oversimplification of a topic with an immense amount of research, but here's a rough breakdown:
 
-To keep latency low, you need to detect queuing as early as possible.
-WebRTC accomplishes that with [transport-wide-cc](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/transport-wide-cc-02/README.md), something that is probably necessary for QUIC too until widespread L4S support.
+|    Signal    | Description                                           |                      Latency                      |                                                          Examples                                                          |
+| :----------: | :---------------------------------------------------- | :-----------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------: |
+| Packet Loss  | Wait until the queue is full and packets are dropped. | [High](https://en.wikipedia.org/wiki/Bufferbloat) |       [Reno](https://en.wikipedia.org/wiki/TCP_congestion_control), [CUBIC](https://en.wikipedia.org/wiki/CUBIC_TCP)       |
+|  ACK Delay   | Indirectly measure the queue size via ACK RTT.        |                      Medium                       |                      [BBR](https://research.google/pubs/pub45646/), [COPA](https://web.mit.edu/copa/)                      |
+| Packet Delay | Indirectly measure the queue size via packet RTT.     |                        Low                        | [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02), [SCReAM](https://github.com/EricssonResearch/scream) |
+|     ECN      | Get told by the router to back off.                   |                      None\*                       |                                      [L4S](https://datatracker.ietf.org/doc/rfc9330/)                                      |
+
+There's no single "best" congestion control algorithm; it depends on your use-case, network, and target latency.
+But this is one area where WebRTC has a huge advantage thanks to [transport-wide-cc](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/transport-wide-cc-02/README.md).
 
 ### Reducing Bitrate
 
-Once you detect queuing, the application needs to send fewer bytes if it wants them to arrive in a timely manner.
+Once you detect queuing, the application needs to send fewer bytes.
 
-For real-time media, we can lower the bitrate by either:
+In some situations we can just reduce the encoder bitrate, however:
 
-1.  Reducing the encoder bitrate
-2.  Dropping encoded media
+-   This only applies to future frames.
+-   We don't want one viewer to degrade the experience for all.
+-   It's too expensive to encode on a per-viewer basis.
 
-We can easily drop the encoder bitrate with [WebCodecs](#webcodecs).
-However, this only applies to future frames; we can't retroactively re-encode frames already queued.
-It's also not an option for CDNs since it's too expensive to retranscode for each viewer.
+So basically, we have to drop encoded media in response to congestion.
 
-So we have to drop encoded media.
-This is the fundamental problem with TCP: once you queue up data in the TCP socket, you can't drop it.
+This is the fundamental problem with TCP.
+Once you queue data on a TCP socket, it can't be undone without closing the connection.
+You can't put the toothpaste back in the tube.
 
-However there are actually quite a few ways of dropping media with [WebTransport](#webtransport):
+<figure>
+	![TCP toothpaste](/blog/replacing-webrtc/toothpaste.jpg)
+	<figcaption>
+		[Source](https://knowyourmeme.com/memes/shitting-toothpaste-pooping-toothpaste). You earned a meme for making it
+		this far.
+	</figcaption>
+</figure>
+
+However, there are actually quite a few ways of dropping media with [WebTransport](#webtransport):
 
 1. Use datagrams and choose which packets to transmit. (like WebRTC)
 2. Use QUIC streams and reset them to stop transmitting. (like [RUSH](https://www.ietf.org/archive/id/draft-kpugin-rush-00.html))
-3. Use QUIC streams and prioritize them to prefer newer media. (like [Warp](https://www.youtube.com/watch?v=PncdrMPVaNc))
+3. Use QUIC streams and prioritize them. (like [Warp](https://www.youtube.com/watch?v=PncdrMPVaNc))
 
 I'm biased because I made the 3rd one.
-I use WebTransport's [sendOrder](https://www.w3.org/TR/webtransport/#dom-webtransportsendstreamoptions-sendorder) to instruct the QUIC stack which streams to prioritize.
+WebTransport's [sendOrder](https://www.w3.org/TR/webtransport/#dom-webtransportsendstreamoptions-sendorder) can be used to instruct the QUIC stack what should be sent during congestion.
 But that deserves an entire blog post on its own.
 
 # Replacing WebRTC
 
 But to actually replace WebRTC, we need a standard. Anybody can make their own UDP-based protocol (_and they do_), using this new web tech (_and they will_).
 
-What sets [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/) apart is that we're doing it through the IETF, the same organization that standardized WebRTC... and QUIC... and HTTP... and almost every other protocol that I've linked.
+What sets [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/) apart is that we're doing it through the IETF, the same organization that standardized WebRTC... and virtually every internet protocol.
 
-It's going to take a while. A few years at least.<br />
+It's going to take years.<br />
 It's going to take a lot of idiots like myself who want to replace WebRTC. <br />
 It's going to take a lot of companies who are willing to bet on a new standard.<br />
 
@@ -292,4 +311,6 @@ To name a few:
 -   We need more encoding options, like non-reference frames or SVC.
 -   Oh yeah and full browser support: [WebCodecs](https://caniuse.com/webcodecs) - [WebTransport](https://caniuse.com/webtransport)
 
-Hit me up on [Discord](https://discord.gg/FCYF3p99mr) (@kixelated) if you want to help or just chat.
+## So yeah...
+
+Hit us up on [Discord](https://discord.gg/FCYF3p99mr) if you want to help!
