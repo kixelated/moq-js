@@ -41,4 +41,6 @@ export default defineConfig({
 			},
 		},
 	},
+	// Don't add trailing slashes to paths
+	trailingSlash: "never",
 })
