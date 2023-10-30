@@ -110,7 +110,7 @@ Oof.
 The best and worst part about WebRTC is that it supports peer-to-peer.
 
 The [ICE handshake](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Connectivity) is extremely complicated, even from the [application's point of view](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Signaling_and_video_calling).
-Without going into detail, there's an explosion of permutations cases that you need to handle based on the network topology.
+Without going into detail, there's an explosion of permutations that you need to handle based on the network topology.
 Some networks block P2P (ex. symmetric NATs) while others outright block UDP, forcing you to use a TURN server a [non-insignificant amount of time](https://twitter.com/HCornflower/status/894600051506515968).
 
 Most conferencing solutions are client-server anyway, relying on their own private network instead of public transit (aka a CDN).
