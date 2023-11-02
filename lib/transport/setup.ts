@@ -125,7 +125,7 @@ export class Encoder {
 	}
 
 	async client(c: Client) {
-		await this.w.u53(1) // message_type = 1
+		await this.w.u53(0x40)
 		await this.w.u53(c.versions.length)
 		for (const v of c.versions) {
 			await this.w.u53(v)
@@ -138,7 +138,7 @@ export class Encoder {
 	}
 
 	async server(s: Server) {
-		await this.w.u53(2) // message_type = 2
+		await this.w.u53(0x41)
 		await this.w.u53(s.version)
 		await this.parameters(s.params)
 	}

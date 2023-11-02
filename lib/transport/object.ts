@@ -58,7 +58,7 @@ export class Objects {
 			track: await r.u62(),
 			group: await r.u53(),
 			object: await r.u53(),
-			priority: await r.i32(),
+			priority: await r.u53(),
 			expires: (await r.u53()) || undefined,
 			size: has_size ? await r.u53() : undefined,
 		}
@@ -70,7 +70,7 @@ export class Objects {
 		await w.u62(h.track)
 		await w.u53(h.group)
 		await w.u53(h.object)
-		await w.i32(h.priority)
+		await w.u53(h.priority)
 		await w.u53(h.expires ?? 0)
 		if (h.size) await w.u53(h.size)
 	}
