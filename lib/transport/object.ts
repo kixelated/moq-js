@@ -3,16 +3,13 @@ export { Reader, Writer }
 
 // This is OBJECT but we can't use that name because it's a reserved word.
 
-// NOTE: This is forked from moq-transport-00.
-//   1. messages lack a specified length
-//   2. OBJECT must be the only message on a unidirectional stream
-
 export interface Header {
 	track: bigint
-	sequence: number // To make it easier, we don't use a bigint here.
-	priority: number // i32
-	expires: number // 0 means never
-	// followed by payload
+	group: number // The group sequence, as a number because 2^53 is enough.
+	object: number // The object sequence within a group, as a number because 2^53 is enough.
+	priority: number // VarInt with a u32 maximum value
+	expires?: number // optional: expiration in seconds
+	size?: number // optional: size of payload, otherwise it continues until end of stream
 }
 
 export class Objects {
@@ -39,6 +36,10 @@ export class Objects {
 		const stream = value
 
 		const header = await this.#decode(stream)
+		if (header.size) {
+			throw new Error("TODO: handle OBJECT with size")
+		}
+
 		//console.debug("received object: ", header)
 		return { header, stream }
 	}
@@ -47,27 +48,30 @@ export class Objects {
 		const r = new Reader(s)
 
 		const type = await r.u8()
-		if (type !== 0) throw new Error(`OBJECT type must be 0, got ${type}`)
+		if (type !== 0 && type !== 2) {
+			throw new Error(`invalid OBJECT type, got ${type}`)
+		}
 
-		const track = await r.u62()
-		const sequence = await r.u53()
-		const priority = await r.i32()
-		const expires = await r.u53()
+		const has_size = type === 2
 
 		return {
-			track,
-			sequence,
-			priority,
-			expires,
+			track: await r.u62(),
+			group: await r.u53(),
+			object: await r.u53(),
+			priority: await r.i32(),
+			expires: (await r.u53()) || undefined,
+			size: has_size ? await r.u53() : undefined,
 		}
 	}
 
 	async #encode(s: WritableStream<Uint8Array>, h: Header) {
 		const w = new Writer(s)
-		await w.u8(0)
+		await w.u8(h.size ? 2 : 0)
 		await w.u62(h.track)
-		await w.u53(h.sequence)
+		await w.u53(h.group)
+		await w.u53(h.object)
 		await w.i32(h.priority)
-		await w.u53(h.expires)
+		await w.u53(h.expires ?? 0)
+		if (h.size) await w.u53(h.size)
 	}
 }

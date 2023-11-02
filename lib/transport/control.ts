@@ -1,25 +1,45 @@
 import { Reader, Writer } from "./stream"
 
 export type Message = Subscriber | Publisher
-export type Subscriber = Subscribe | SubscribeEnd | AnnounceOk | AnnounceReset
-export type Publisher = SubscribeOk | SubscribeReset | Announce | AnnounceEnd
+
+// Sent by subscriber
+export type Subscriber = Subscribe | Unsubscribe | AnnounceOk | AnnounceError
+
+export function isSubscriber(m: Message): m is Subscriber {
+	return (
+		m.kind == Msg.Subscribe || m.kind == Msg.Unsubscribe || m.kind == Msg.AnnounceOk || m.kind == Msg.AnnounceError
+	)
+}
+
+// Sent by publisher
+export type Publisher = SubscribeOk | SubscribeReset | SubscribeError | SubscribeFin | Announce | Unannounce
+
+export function isPublisher(m: Message): m is Publisher {
+	return (
+		m.kind == Msg.SubscribeOk ||
+		m.kind == Msg.SubscribeReset ||
+		m.kind == Msg.SubscribeError ||
+		m.kind == Msg.SubscribeFin ||
+		m.kind == Msg.Announce ||
+		m.kind == Msg.Unannounce
+	)
+}
 
 // I wish we didn't have to split Msg and Id into separate enums.
 // However using the string in the message makes it easier to debug.
 // We'll take the tiny performance hit until I'm better at Typescript.
 export enum Msg {
 	// NOTE: object and setup are in other modules
-	// Object = 0,
-	// Setup = 1,
-
 	Subscribe = "subscribe",
 	SubscribeOk = "subscribe_ok",
-	SubscribeReset = "subscribe_reset", // error termination by the publisher
-	SubscribeEnd = "subscribe_end", // clean termination by the subscriber
+	SubscribeError = "subscribe_error",
+	SubscribeReset = "subscribe_reset",
+	SubscribeFin = "subscribe_fin",
+	Unsubscribe = "unsubscribe",
 	Announce = "announce",
 	AnnounceOk = "announce_ok",
-	AnnounceReset = "announce_reset", // error termination by the subscriber
-	AnnounceEnd = "announce_end", // clean termination by the publisher
+	AnnounceError = "announce_error",
+	Unannounce = "unannounce",
 	GoAway = "go_away",
 }
 
@@ -30,20 +50,16 @@ enum Id {
 
 	Subscribe = 0x3,
 	SubscribeOk = 0x4,
-	SubscribeReset = 0x5, // error termination by the publisher
-	SubscribeEnd = 0x15, // clean termination by the subscriber
+	SubscribeError = 0x5,
+	SubscribeReset = 0xc,
+	SubscribeFin = 0xb,
+	Unsubscribe = 0xa,
 	Announce = 0x6,
 	AnnounceOk = 0x7,
-	AnnounceReset = 0x8, // error termination by the subscriber
-	AnnounceEnd = 0x18, // clean termination by the publisher
+	AnnounceError = 0x8,
+	Unannounce = 0x9,
 	GoAway = 0x10,
 }
-
-// NOTE: These are forked from moq-transport-00.
-//   1. subscribe specifies the track_id, not subscribe_ok
-//   2. messages lack a specified length
-//   3. optional parameters are not supported (announce, subscribe)
-//   4. not allowed on undirectional streams; only after SETUP on the bidirectional stream
 
 export interface Subscribe {
 	kind: Msg.Subscribe
@@ -51,11 +67,26 @@ export interface Subscribe {
 	id: bigint
 	namespace: string
 	name: string
+
+	start_group: Location
+	start_object: Location
+	end_group: Location
+	end_object: Location
+
+	params?: Parameters
 }
+
+export interface Location {
+	mode: "none" | "absolute" | "latest" | "future"
+	value?: number // ignored for type=none, otherwise defaults to 0
+}
+
+export type Parameters = Map<bigint, Uint8Array>
 
 export interface SubscribeOk {
 	kind: Msg.SubscribeOk
 	id: bigint
+	expires?: bigint
 }
 
 export interface SubscribeReset {
@@ -63,16 +94,33 @@ export interface SubscribeReset {
 	id: bigint
 	code: bigint
 	reason: string
+	final_group: number
+	final_object: number
 }
 
-export interface SubscribeEnd {
-	kind: Msg.SubscribeEnd
+export interface SubscribeFin {
+	kind: Msg.SubscribeFin
+	id: bigint
+	final_group: number
+	final_object: number
+}
+
+export interface SubscribeError {
+	kind: Msg.SubscribeError
+	id: bigint
+	code: bigint
+	reason: string
+}
+
+export interface Unsubscribe {
+	kind: Msg.Unsubscribe
 	id: bigint
 }
 
 export interface Announce {
 	kind: Msg.Announce
 	namespace: string
+	params?: Parameters
 }
 
 export interface AnnounceOk {
@@ -80,15 +128,15 @@ export interface AnnounceOk {
 	namespace: string
 }
 
-export interface AnnounceReset {
-	kind: Msg.AnnounceReset
+export interface AnnounceError {
+	kind: Msg.AnnounceError
 	namespace: string
 	code: bigint
 	reason: string
 }
 
-export interface AnnounceEnd {
-	kind: Msg.AnnounceEnd
+export interface Unannounce {
+	kind: Msg.Unannounce
 	namespace: string
 }
 
@@ -154,16 +202,20 @@ export class Decoder {
 				return Msg.SubscribeOk
 			case Id.SubscribeReset:
 				return Msg.SubscribeReset
-			case Id.SubscribeEnd:
-				return Msg.SubscribeEnd
+			case Id.SubscribeFin:
+				return Msg.SubscribeFin
+			case Id.SubscribeError:
+				return Msg.SubscribeError
+			case Id.Unsubscribe:
+				return Msg.Unsubscribe
 			case Id.Announce:
 				return Msg.Announce
 			case Id.AnnounceOk:
 				return Msg.AnnounceOk
-			case Id.AnnounceReset:
-				return Msg.AnnounceReset
-			case Id.AnnounceEnd:
-				return Msg.AnnounceEnd
+			case Id.AnnounceError:
+				return Msg.AnnounceError
+			case Id.Unannounce:
+				return Msg.Unannounce
 			case Id.GoAway:
 				return Msg.GoAway
 		}
@@ -180,38 +232,80 @@ export class Decoder {
 				return this.subscribe_ok()
 			case Msg.SubscribeReset:
 				return this.subscribe_reset()
-			case Msg.SubscribeEnd:
-				return this.subscribe_end()
+			case Msg.SubscribeError:
+				return this.subscribe_error()
+			case Msg.SubscribeFin:
+				return this.subscribe_fin()
+			case Msg.Unsubscribe:
+				return this.unsubscribe()
 			case Msg.Announce:
 				return this.announce()
 			case Msg.AnnounceOk:
 				return this.announce_ok()
-			case Msg.AnnounceReset:
-				return this.announce_reset()
-			case Msg.AnnounceEnd:
-				return this.announce_end()
+			case Msg.Unannounce:
+				return this.unannounce()
+			case Msg.AnnounceError:
+				return this.announce_error()
 			case Msg.GoAway:
 				throw new Error("TODO: implement go away")
 		}
 	}
 
 	private async subscribe(): Promise<Subscribe> {
-		const id = await this.r.u62()
-		const namespace = await this.r.string()
-		const name = await this.r.string()
-
 		return {
 			kind: Msg.Subscribe,
-			id,
-			namespace,
-			name,
+			id: await this.r.u62(),
+			namespace: await this.r.string(),
+			name: await this.r.string(),
+			start_group: await this.location(),
+			start_object: await this.location(),
+			end_group: await this.location(),
+			end_object: await this.location(),
+			params: await this.parameters(),
 		}
+	}
+
+	private async location(): Promise<Location> {
+		const mode = await this.r.u62()
+		if (mode == 0n) {
+			return { mode: "none", value: 0 }
+		} else if (mode == 1n) {
+			return { mode: "absolute", value: await this.r.u53() }
+		} else if (mode == 2n) {
+			return { mode: "latest", value: await this.r.u53() }
+		} else if (mode == 3n) {
+			return { mode: "future", value: await this.r.u53() }
+		} else {
+			throw new Error(`invalid location mode: ${mode}`)
+		}
+	}
+
+	private async parameters(): Promise<Parameters | undefined> {
+		const count = await this.r.u53()
+		if (count == 0) return undefined
+
+		const params = new Map<bigint, Uint8Array>()
+
+		for (let i = 0; i < count; i++) {
+			const id = await this.r.u62()
+			const size = await this.r.u53()
+			const value = await this.r.readExact(size)
+
+			if (params.has(id)) {
+				throw new Error(`duplicate parameter id: ${id}`)
+			}
+
+			params.set(id, value)
+		}
+
+		return params
 	}
 
 	private async subscribe_ok(): Promise<SubscribeOk> {
 		return {
 			kind: Msg.SubscribeOk,
 			id: await this.r.u62(),
+			expires: (await this.r.u62()) || undefined,
 		}
 	}
 
@@ -221,12 +315,32 @@ export class Decoder {
 			id: await this.r.u62(),
 			code: await this.r.u62(),
 			reason: await this.r.string(),
+			final_group: await this.r.u53(),
+			final_object: await this.r.u53(),
 		}
 	}
 
-	private async subscribe_end(): Promise<SubscribeEnd> {
+	private async subscribe_fin(): Promise<SubscribeFin> {
 		return {
-			kind: Msg.SubscribeEnd,
+			kind: Msg.SubscribeFin,
+			id: await this.r.u62(),
+			final_group: await this.r.u53(),
+			final_object: await this.r.u53(),
+		}
+	}
+
+	private async subscribe_error(): Promise<SubscribeError> {
+		return {
+			kind: Msg.SubscribeError,
+			id: await this.r.u62(),
+			code: await this.r.u62(),
+			reason: await this.r.string(),
+		}
+	}
+
+	private async unsubscribe(): Promise<Unsubscribe> {
+		return {
+			kind: Msg.Unsubscribe,
 			id: await this.r.u62(),
 		}
 	}
@@ -237,6 +351,7 @@ export class Decoder {
 		return {
 			kind: Msg.Announce,
 			namespace,
+			params: await this.parameters(),
 		}
 	}
 
@@ -247,18 +362,18 @@ export class Decoder {
 		}
 	}
 
-	private async announce_reset(): Promise<AnnounceReset> {
+	private async announce_error(): Promise<AnnounceError> {
 		return {
-			kind: Msg.AnnounceReset,
+			kind: Msg.AnnounceError,
 			namespace: await this.r.string(),
 			code: await this.r.u62(),
 			reason: await this.r.string(),
 		}
 	}
 
-	private async announce_end(): Promise<AnnounceEnd> {
+	private async unannounce(): Promise<Unannounce> {
 		return {
-			kind: Msg.AnnounceEnd,
+			kind: Msg.Unannounce,
 			namespace: await this.r.string(),
 		}
 	}
@@ -279,16 +394,20 @@ export class Encoder {
 				return this.subscribe_ok(m)
 			case Msg.SubscribeReset:
 				return this.subscribe_reset(m)
-			case Msg.SubscribeEnd:
-				return this.subscribe_end(m)
+			case Msg.SubscribeError:
+				return this.subscribe_error(m)
+			case Msg.SubscribeFin:
+				return this.subscribe_fin(m)
+			case Msg.Unsubscribe:
+				return this.unsubscribe(m)
 			case Msg.Announce:
 				return this.announce(m)
 			case Msg.AnnounceOk:
 				return this.announce_ok(m)
-			case Msg.AnnounceReset:
-				return this.announce_reset(m)
-			case Msg.AnnounceEnd:
-				return this.announce_end(m)
+			case Msg.AnnounceError:
+				return this.announce_error(m)
+			case Msg.Unannounce:
+				return this.unannounce(m)
 		}
 	}
 
@@ -297,11 +416,46 @@ export class Encoder {
 		await this.w.u62(s.id)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
+		await this.location(s.start_group)
+		await this.location(s.start_object)
+		await this.location(s.end_group)
+		await this.location(s.end_object)
+		await this.parameters(s.params)
+	}
+
+	private async location(l: Location) {
+		if (l.mode == "none") {
+			await this.w.u8(0)
+		} else if (l.mode == "absolute") {
+			await this.w.u8(1)
+			await this.w.u53(l.value ?? 0)
+		} else if (l.mode == "latest") {
+			await this.w.u8(2)
+			await this.w.u53(l.value ?? 0)
+		} else if (l.mode == "future") {
+			await this.w.u8(3)
+			await this.w.u53(l.value ?? 0)
+		}
+	}
+
+	private async parameters(p: Parameters | undefined) {
+		if (!p) {
+			await this.w.u8(0)
+			return
+		}
+
+		await this.w.u53(p.size)
+		for (const [id, value] of p) {
+			await this.w.u62(id)
+			await this.w.u53(value.length)
+			await this.w.write(value)
+		}
 	}
 
 	async subscribe_ok(s: SubscribeOk) {
 		await this.w.u53(Id.SubscribeOk)
 		await this.w.u62(s.id)
+		await this.w.u62(s.expires ?? 0n)
 	}
 
 	async subscribe_reset(s: SubscribeReset) {
@@ -309,10 +463,24 @@ export class Encoder {
 		await this.w.u62(s.id)
 		await this.w.u62(s.code)
 		await this.w.string(s.reason)
+		await this.w.u53(s.final_group)
+		await this.w.u53(s.final_object)
 	}
 
-	async subscribe_end(s: SubscribeEnd) {
-		await this.w.u53(Id.SubscribeEnd)
+	async subscribe_fin(s: SubscribeFin) {
+		await this.w.u53(Id.SubscribeFin)
+		await this.w.u62(s.id)
+		await this.w.u53(s.final_group)
+		await this.w.u53(s.final_object)
+	}
+
+	async subscribe_error(s: SubscribeError) {
+		await this.w.u53(Id.SubscribeError)
+		await this.w.u62(s.id)
+	}
+
+	async unsubscribe(s: Unsubscribe) {
+		await this.w.u53(Id.Unsubscribe)
 		await this.w.u62(s.id)
 	}
 
@@ -326,15 +494,15 @@ export class Encoder {
 		await this.w.string(a.namespace)
 	}
 
-	async announce_reset(a: AnnounceReset) {
-		await this.w.u53(Id.AnnounceReset)
+	async announce_error(a: AnnounceError) {
+		await this.w.u53(Id.AnnounceError)
 		await this.w.string(a.namespace)
 		await this.w.u62(a.code)
 		await this.w.string(a.reason)
 	}
 
-	async announce_end(a: AnnounceEnd) {
-		await this.w.u53(Id.AnnounceEnd)
+	async unannounce(a: Unannounce) {
+		await this.w.u53(Id.Unannounce)
 		await this.w.string(a.namespace)
 	}
 }

@@ -77,19 +77,10 @@ export class Connection {
 	}
 
 	async #recv(msg: Control.Message) {
-		switch (msg.kind) {
-			case Control.Msg.Announce:
-				return this.#subscriber.recvAnnounce(msg)
-			case Control.Msg.AnnounceOk:
-				return this.#publisher.recvAnnounceOk(msg)
-			case Control.Msg.AnnounceReset:
-				return this.#publisher.recvAnnounceReset(msg)
-			case Control.Msg.Subscribe:
-				return this.#publisher.recvSubscribe(msg)
-			case Control.Msg.SubscribeOk:
-				return this.#subscriber.recvSubscribeOk(msg)
-			case Control.Msg.SubscribeReset:
-				return this.#subscriber.recvSubscribeReset(msg)
+		if (Control.isPublisher(msg)) {
+			await this.#subscriber.recv(msg)
+		} else {
+			await this.#publisher.recv(msg)
 		}
 	}
 

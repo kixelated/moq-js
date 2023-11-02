@@ -138,7 +138,11 @@ export default class Player {
 			track = this.#audio
 		}
 
-		const segment = new Segment(track.source, init, msg.header.sequence)
+		if (msg.header.object !== 0) {
+			throw new Error("multiple objects per group not supported")
+		}
+
+		const segment = new Segment(track.source, init, msg.header.group)
 		track.add(segment)
 
 		const container = new MP4.Parser()

@@ -71,10 +71,14 @@ class Worker {
 
 		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
 
+		if (msg.header.object !== 0) {
+			throw new Error("multiple objects per group not supported")
+		}
+
 		// Add the segment to the timeline
 		const segments = timeline.segments.getWriter()
 		await segments.write({
-			sequence: msg.header.sequence,
+			sequence: msg.header.group,
 			frames: container.decode.readable,
 		})
 		segments.releaseLock()

@@ -27,6 +27,24 @@ export class Subscriber {
 		return this.#announceQueue
 	}
 
+	async recv(msg: Control.Publisher) {
+		if (msg.kind == Control.Msg.Announce) {
+			await this.recvAnnounce(msg)
+		} else if (msg.kind == Control.Msg.Unannounce) {
+			this.recvUnannounce(msg)
+		} else if (msg.kind == Control.Msg.SubscribeOk) {
+			this.recvSubscribeOk(msg)
+		} else if (msg.kind == Control.Msg.SubscribeReset) {
+			await this.recvSubscribeReset(msg)
+		} else if (msg.kind == Control.Msg.SubscribeError) {
+			await this.recvSubscribeError(msg)
+		} else if (msg.kind == Control.Msg.SubscribeFin) {
+			await this.recvSubscribeFin(msg)
+		} else {
+			throw new Error(`unknown control message`) // impossible
+		}
+	}
+
 	async recvAnnounce(msg: Control.Announce) {
 		if (this.#announce.has(msg.namespace)) {
 			throw new Error(`duplicate announce for namespace: ${msg.namespace}`)
@@ -40,6 +58,10 @@ export class Subscriber {
 		this.#announceQueue.update((queue) => [...queue, announce])
 	}
 
+	recvUnannounce(_msg: Control.Unannounce) {
+		throw new Error(`TODO Unannounce`)
+	}
+
 	async subscribe(namespace: string, track: string) {
 		const id = this.#subscribeNext++
 
@@ -51,6 +73,10 @@ export class Subscriber {
 			id,
 			namespace,
 			name: track,
+			start_group: { mode: "latest", value: 0 },
+			start_object: { mode: "absolute", value: 0 },
+			end_group: { mode: "none" },
+			end_object: { mode: "none" },
 		})
 
 		return subscribe
@@ -72,6 +98,24 @@ export class Subscriber {
 		}
 
 		await subscribe.onError(msg.code, msg.reason)
+	}
+
+	async recvSubscribeError(msg: Control.SubscribeError) {
+		const subscribe = this.#subscribe.get(msg.id)
+		if (!subscribe) {
+			throw new Error(`subscribe error for unknown id: ${msg.id}`)
+		}
+
+		await subscribe.onError(msg.code, msg.reason)
+	}
+
+	async recvSubscribeFin(msg: Control.SubscribeFin) {
+		const subscribe = this.#subscribe.get(msg.id)
+		if (!subscribe) {
+			throw new Error(`subscribe error for unknown id: ${msg.id}`)
+		}
+
+		await subscribe.onError(0n, "fin")
 	}
 
 	async recvObject(header: Header, stream: ReadableStream<Uint8Array>) {
@@ -110,7 +154,7 @@ export class AnnounceRecv {
 		if (this.#state === "closed") return
 		this.#state = "closed"
 
-		return this.#control.send({ kind: Control.Msg.AnnounceReset, namespace: this.namespace, code, reason })
+		return this.#control.send({ kind: Control.Msg.AnnounceError, namespace: this.namespace, code, reason })
 	}
 }
 
