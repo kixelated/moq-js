@@ -59,6 +59,8 @@ export class Reader {
 
 		reader.releaseLock()
 
+		console.log("read", dst)
+
 		return dst
 	}
 

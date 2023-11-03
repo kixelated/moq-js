@@ -43,6 +43,20 @@ export class Publisher {
 		return await this.#subscribeQueue.next()
 	}
 
+	async recv(msg: Control.Subscriber) {
+		if (msg.kind == Control.Msg.Subscribe) {
+			await this.recvSubscribe(msg)
+		} else if (msg.kind == Control.Msg.Unsubscribe) {
+			this.recvUnsubscribe(msg)
+		} else if (msg.kind == Control.Msg.AnnounceOk) {
+			this.recvAnnounceOk(msg)
+		} else if (msg.kind == Control.Msg.AnnounceError) {
+			this.recvAnnounceError(msg)
+		} else {
+			throw new Error(`unknown control message`) // impossible
+		}
+	}
+
 	recvAnnounceOk(msg: Control.AnnounceOk) {
 		const announce = this.#announce.get(msg.namespace)
 		if (!announce) {
@@ -52,7 +66,7 @@ export class Publisher {
 		announce.onOk()
 	}
 
-	recvAnnounceReset(msg: Control.AnnounceReset) {
+	recvAnnounceError(msg: Control.AnnounceError) {
 		const announce = this.#announce.get(msg.namespace)
 		if (!announce) {
 			// TODO debug this
@@ -73,6 +87,10 @@ export class Publisher {
 		await this.#subscribeQueue.push(subscribe)
 
 		await this.#control.send({ kind: Control.Msg.SubscribeOk, id: msg.id })
+	}
+
+	recvUnsubscribe(_msg: Control.Unsubscribe) {
+		throw new Error("TODO unsubscribe")
 	}
 }
 
@@ -110,9 +128,9 @@ export class AnnounceSend {
 		}
 	}
 
-	async close(_code = 0n, _reason = "") {
+	async close() {
 		// TODO implement unsubscribe
-		// await this.#inner.sendReset(code, reason)
+		// await this.#inner.sendUnsubscribe()
 	}
 
 	closed() {
@@ -166,11 +184,18 @@ export class SubscribeRecv {
 		if (this.#state === "closed") return
 		this.#state = "closed"
 
-		return this.#control.send({ kind: Control.Msg.SubscribeReset, id: this.#id, code, reason })
+		return this.#control.send({
+			kind: Control.Msg.SubscribeReset,
+			id: this.#id,
+			code,
+			reason,
+			final_group: 0, // TODO
+			final_object: 0, // TODO
+		})
 	}
 
 	// Create a writable data stream
-	async data(header: { sequence: number; priority: number; expires: number }) {
+	async data(header: { group: number; object: number; priority: number; expires?: number }) {
 		return this.#objects.send({ track: this.#id, ...header })
 	}
 }
