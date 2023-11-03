@@ -59,8 +59,6 @@ export class Reader {
 
 		reader.releaseLock()
 
-		console.log("read", dst)
-
 		return dst
 	}
 
@@ -77,12 +75,6 @@ export class Reader {
 	async u8(): Promise<number> {
 		this.#scratch = await this.read(this.#scratch, 0, 1)
 		return this.#scratch[0]
-	}
-
-	async i32(): Promise<number> {
-		this.#scratch = await this.read(this.#scratch, 0, 4)
-		const view = new DataView(this.#scratch.buffer, this.#scratch.byteOffset, 4)
-		return view.getInt32(0)
 	}
 
 	// Returns a Number using 53-bits, the max Javascript can use for integer math
