@@ -1,0 +1,318 @@
+---
+layout: "@/layouts/global.astro"
+title: Replacing WebRTC
+author: kixelated
+---
+
+# Replacing HLS/DASH
+
+Low-latency, high bitrate, mass fanout is hard. Who knew?
+
+See [Replacing WebRTC](https://quic.video/blog/replacing-webrtc) for the previous post in this series.
+
+## tl;dr
+
+If you're using HLS/DASH and your main priority is...
+
+-   **cost**: wait until there CDN offerings.
+-   **latency**: you should seriously consider MoQ.
+-   **features**: it will take a while to implement everything.
+-   **vod**: you're good!
+
+## Intro
+
+Thanks for the positive reception on [Hacker News](https://news.ycombinator.com/item?id=38069974)!
+Anyway, I'm back.
+
+I spent the last 9 years working on literally all facets of HLS and Twitch's extension: [LHLS](https://www.theoplayer.com/blog/low-latency-hls-lhls).
+We hit a latency wall and my task was to find an alternative, originally WebRTC but that eventually pivoted into **Media over QUIC**.
+
+Hopefully this time I won't be _"dunning-Krugerering off a cliff"_. Thanks random Reddit user for that confidence boost.
+
+## Why HLS/DASH?
+
+Simple answer: [Apple](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/StreamingMediaGuide/UsingHTTPLiveStreaming/UsingHTTPLiveStreaming.html)
+
+> If your app delivers video over cellular networks, and the video exceeds either 10 minutes duration or 5 MB of data in a five minute period, you are required to use HTTP Live Streaming.
+
+It's an anti-climactic answer, but Twitch migrated from [RTMP](https://en.wikipedia.org/wiki/Real-Time_Messaging_Protocol) to [HLS](https://en.wikipedia.org/wiki/HTTP_Live_Streaming) to avoid getting kicked off the App Store.
+The next sentence gives a hint as to why:
+
+> If your app uses HTTP Live Streaming over cellular networks, you are required to provide at least one stream at 64 Kbps or lower bandwidth.
+
+This was back in 2009 when the iPhone 3GS was released and AT&T's network was [struggling to meet the demand](https://www.wired.com/2010/07/ff-att-fail/).
+The key feature of HLS is [ABR](https://en.wikipedia.org/wiki/Adaptive_bitrate_streaming): encoding multiple copies of the same content at different bitrates.
+This allowed the Apple-controlled HLS player to reduce the bitrate rather than pummel a poor megacorp's cellular network.
+
+[DASH](https://en.wikipedia.org/wiki/Dynamic_Adaptive_Streaming_over_HTTP) came afterwards in an attempt to standardize HLS... but without the controlled by Apple part.
+There's definitely some cool features in DASH but the [core concepts are the same](https://www.cloudflare.com/learning/video/what-is-mpeg-dash/) and now they even share the same [media container](https://www.wowza.com/blog/what-is-cmaf).
+So the two get bundled together as **HLS/DASH**.
+
+But I'll focus more on HLS since that's my shit.
+
+## The Good Stuff
+
+While we were forced to switch protocols at the tech equivalent of gunpoint, HLS actually has some amazing benfits.
+The biggest one is that it uses **HTTP**.
+
+HLS/DASH works by breaking media into "segments", each containing a few seconds of media.
+The player will individually request each segment via a HTTP request and seamlessly stitch them together.
+New segments are constantly being generated and announced to the player via a "playlist".
+
+<figure>
+	![carrot](/blog/replacing-hls-dash/carrot.png)
+	<figcaption>Thanks for the filer image, DALL·E</figcaption>
+</figure>
+
+By using HTTP, a service like Twitch can piggyback on the existing infrastructure of the internet.
+There's a plethora of optimized CDNs, servers, and clients that all speak HTTP and can be used to transport media.
+You do have to do some extra work to mold live video into HTTP semantics, but it's worth it.
+
+Crafting individual IP packets might be the most _correct_ way to send live media (ie. WebRTC), but it's not the most cost effective.
+The key is utilizing [economies of scale](https://napkinfinance.com/napkin/what-are-economies-of-scale/) to make it cheap to deliver media when latency is not critical.
+
+## The Bad Stuff
+
+I hope you weren't expecting a fluff piece.
+
+### Latency
+
+We were somewhat sad to bid farewell to Flash (_gasp_).
+Twitch's latency went from something like 3 seconds with RTMP to 15 seconds with HLS.
+
+There's a boatload of latency sources, anywhere from the duration of segments to the frequency of playlist updates.
+Over the years we were able to slowly able to chip away at the problem, eventually extending HLS to get latency back down to theoretical RTMP levels.
+I [documented our journey](/blog/distribution-at-twitch) if you're interested in the gritty details.
+
+But one big source of latency remains: **T** **C** **P**
+
+I went into more detail with my [previous blog post](/blog/replacing-webrtc), but the problem is head-of-line blocking.
+Once you flush a frame to the TCP socket, it will be delivered reliably and in order.
+However, when the network is congested, the encoded media bitrate will exceed the network bitrate and queues will grow.
+Frames will take longer and longer to reach the player until the buffer is depleted and the viewer gets to see their least favorite spinny boye.
+
+<figure>
+	![buffering](/blog/replacing-hls-dash/buffering.gif)
+	<figcaption>> tfw HLS/DASH</figcaption>
+</figure>
+
+A HLS/DASH player can detect queuing and switch to a lower bitrate via ABR.
+However, it can only do this at infrequent (ex. 2s) segment boundaries, and it can't renege any frames already flushed to the socket.
+So if you're watching 1080p video and your network takes a dump, well you still need to download seconds of 1080p video, before you can switch down to 360p.
+
+You can't just put the toothpaste back in the tube if you squeeze out too much.
+You gotta COMMIT to that toothpaste, even if it takes longer to brush your teeth.
+
+<figure>
+	![TCP toothpaste](/blog/replacing-webrtc/toothpaste.jpg)
+	<figcaption>
+		[Source](https://knowyourmeme.com/memes/shitting-toothpaste-pooping-toothpaste). The analogy falls apart but I
+		get to use this image again.
+	</figcaption>
+</figure>
+
+### Clients
+
+HLS utilizes "smart" clients and "dumb" servers.
+The client decides what, when, why, and how to download each media playlist, segment, and frame.
+Meanwhile the server just sits there and serves HTTP requests.
+
+The problem really depends on your perspective. If you control:
+
+-   **client only**: Life is great!
+-   **client and server**: Life is great! You can even extend the protocol!
+-   **server only**: Life is _pain_.
+
+For a service like Twitch, the solution might seem simple: build your own client and server!
+And we did, including a baremetal live CDN designed exclusively for HLS.
+
+But [until quite recently](https://bitmovin.com/managed-media-source) you've been forced to use the Apple HLS player on iOS for AirPlay or Safari support.
+And of course TVs, consoles, casting devices, and others have their own HLS players.
+And if you're offering your baremtal live CDN [to the public](https://aws.amazon.com/ivs/), you can't exactly force customers to use your proprietary player.
+
+So you're stuck with a _dumb_ server and a bunch of _dumb_ clients.
+These _dumb_ clients make _dumb_ decisions with no cooperation with the server, based on imperfect information.
+
+### Apple
+
+I love the simplicity of HLS compared to DASH.
+There's something so satisfying about a text-based playlist that you can actually read, versus a XML monstrosity designed by committee (_gasp_).
+But unfortunately Apple controls HLS.
+
+There's a misalignement of incentives between Apple and the rest of the industry.
+I'm not even sure how Apple uses HLS, or why they would care about latency, or why they insist on being the sole arbiter of a live streaming protocol.
+Pantos has done a great and thankless job, but improvements are often not good enough and it feels like a stand-off.
+
+For example, [LL-HLS originally required HTTP/2 server push](https://www.theoplayer.com/blog/impact-of-apple-ll-hls-update-2020) and it took nearly the entire industry to convince Apple that this was a bad idea.
+The upside is that we got [a mailing list](https://lists.apple.com/mailman/listinfo/hls-announce) so they can announce changes, but don't expect to propose changes like a standards body.
+
+DASH is more open protocol but it's controlled by [MPEG](https://en.wikipedia.org/wiki/Moving_Picture_Experts_Group), which is a whole other can of worms.
+It doesn't matter though until HLS is no longer required on iOS.
+
+# What's next?
+
+Given a blank slate and a green field, what do you do?
+
+## HTTP
+
+Notably absent thus far has been any mention of [LL-HLS](https://www.theoplayer.com/blog/low-latency-hls-lhls) and [LL-DASH](https://www.wowza.com/blog/what-is-low-latency-dash).
+These two protocols are meant to lower HLS/DASH latency respectively by breaking media segments into smaller chunks.
+
+The the chunks might be smaller, but they're still served sequentially over TCP.
+The latency floor is lower, but the latency ceiling is still just as high, and you're still going to buffer during congestion.
+
+<figure>
+	![buffering](/blog/replacing-hls-dash/buffering.gif)
+	<figcaption>> tfw LL-HLS/LL-DASH</figcaption>
+</figure>
+
+But we're also approaching the limit of what you can do with HTTP semantics.
+
+-   **LL-HLS** can be configured to make 20 sequential HTTP requests per second _per track_, all of which are in the latency critical path. And it still manages to add +100ms of latency making it untenable for real-time.
+-   **LL-DASH** can deliver frame-by-frame with chunked-transfer, but it adds overhead and absolutely wrecks client-side ABR algorithms. [Twitch hosted a challenge](https://blog.twitch.tv/en/2020/01/15/twitch-invites-you-to-take-on-our-acm-mmsys-2020-grand-challenge/) but I'm convinced it's impossible without server feedback.
+
+I do want to give a special shoutout to [HESP](https://www.theoplayer.com/solutions/hesp-high-efficiency-streaming).
+It works by canceling HTTP requests during congestion and frankensteining the video encoding which is quite clever, but suffers the same fate.
+
+We've hit a wall with HTTP over TCP.
+
+## TCP
+
+After my [previous blog post](/blog/replacing-webrtc), I had a few people hit up my DMs and claim they can do real-time latency with TCP.
+And I'm sure a few more people will too after this post.
+
+Yes, you can do real-time latency with TCP (or WebSockets) under ideal conditions.
+
+However, it just won't work well enough on poor networks.
+Congestion and buffer-bloat will absolutely wreck your protocol on poor networks.
+A lot of my time spent at Twitch was optimizing for the 90th percentile; the shoddy cellular networks in Brazil or India or Australia.
+If all of your customers have a flawless internet connection, or live inside your datacenter, then TCP is absolutely the great choice.
+
+But if you are going to reinvent RTMP, there are [some ways to reduce queuing](https://www.youtube.com/watch?v=cpYhm74zp0U) but they are quite limited.
+This is _especially_ true in a browser environment when limited to HTTP or [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API).
+
+See my next blog post about **Replacing RTMP**.
+
+## HTTP/3
+
+If you're an astute networking afficionado, you might have realized that [HTTP/3](https://www.cloudflare.com/learning/performance/what-is-http3) uses [QUIC](https://www.rfc-editor.org/rfc/rfc9000.html) instead of TCP.
+We can replace any mention of ~~TCP~~ with QUIC, problem solved!
+
+Well, not quite.
+
+To use another complicated topic as a metaphor:
+
+-   A TCP connection is a single-core CPU.
+-   A QUIC connection is a multi-core CPU.
+
+If you take a single threaded program and run it on a multi-core machine, it will run just as slow, and perhaps even slower.
+This is the case with HLS/DASH as each segment request is made _sequentially_: one after the other.
+
+Why not utilize multiple TCP connections?
+Well it's a great idea and that's how browsers work with HTTP/1.1.
+However, each one involves an expensive TCP/TLS handshake and they all fight for limited bandwidth.
+
+<center>The key to using QUIC is to **embrace concurrency**.</center>
+
+This means utilizing multiple prioritized but otherwise independent streams over the same connection.
+Think of it like using `nice` on Linux to (de)prioritize a process.
+If a stream is taking too long, you can cancel it much like you can `kill` a process.
+
+For live media, you want to prioritize new media over old media.
+You also want to prioritize audio over video so you can hear what someone is saying, without necessarily seeing their lips move.
+
+To Apple/Pantos' credit, LL-HLS is exploring [prioritization using HTTP/3](https://mailarchive.ietf.org/arch/msg/hls-interest/RcZ2SG8Sz_zZEcjWnDKzcM_-TJk/).
+It doesn't go far enough (yet!) and HTTP semantics get in the way, but it's absolutely the right direction.
+I'm conviced that somebody will make a [HTTP/3 only media protocol](https://mailarchive.ietf.org/arch/msg/moq/S3eOPU5XnvQ4kn1zJyDThG5U4sA/) at some point.
+
+But of course I'm biased towards...
+
+# Media over QUIC
+
+Media over QUIC utilizes WebTransport/QUIC directly to avoid TCP and HTTP.
+But what about that whole **economies of scale** stuff?
+
+Well, there are some important differences between Media over QUIC and your standard _not invented here_ protocol:
+
+## Reason 0: Utilize QUIC
+
+QUIC is the future of the internet and TCP is a relic of the past.
+
+It's a **bold** claim I know.
+But I struggle to think of a single reason why you would use TCP over QUIC going forward.
+There are still some corporate firewalls that block UDP (used by QUIC) but I mean that's about it.
+
+It will take a while, but every library, server, load balancer, and NIC will be optimized for QUIC delivery.
+By utilizing as much of QUIC as possible, we can shove as much complexity into these optimized layers.
+We benefit also from any proposed new features, such as [multi-path](https://datatracker.ietf.org/doc/draft-ietf-quic-multipath/), [FEC](https://datatracker.ietf.org/doc/draft-michel-quic-fec/), [congestion control](https://datatracker.ietf.org/doc/rfc9330/), etc.
+I don't want any of these network features implemented in my media layer thank you very much (looking at you WebRTC).
+
+It might not be obvious is that HTTP/3 is actually a thin layer on top of QUIC.
+Likewise MoQ is also meant to be a thin layer on top of QUIC, effectively just providing pub/sub semantics.
+We get all of the benefits of QUIC without the baggage of HTTP, and yet still have web support via [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport_API).
+
+We can focus on the important stuff instead: **live media**.
+
+## Reason 1: Designed for Relays
+
+To avoid [the mistakes of WebRTC](/blog/replacing-webrtc), we need to decouple the application from the transport.
+If a relay (ie. CDN) knows anything about media encoding, we have failed.
+
+The idea is to break MoQ into layers.
+
+[MoqTransport](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/) is the base layer and is a typical pub/sub protocol, although catered toward QUIC.
+The application splits data into "objects", annotated with a header providing simple instructions on how the relay needs to deliver it.
+These are generic signals, including stuff like the priority, reliability, grouping, expiration, etc.
+
+MoqTransport is designed to be used for arbitrary applications.
+For example, end-to-end encrypted chat messages, game state updates, live playlists, or even a clock!
+
+This is huge draw for CDN vendors.
+Instead of building a custom WebRTC CDN that targets one specific niche, you can cast a much wider net with MoqTransport.
+Individuals from Akamai, Google, and Cloudflare have been involved in the standardiziation process thus far.
+
+## Reason 2: Media Layer
+
+There will be at least one media layer on top of MoqTransport.
+We're focused on the transport right now, so there's no official "adopted" draft yet.
+
+However, my proposal is [Warp](https://datatracker.ietf.org/doc/draft-law-moq-warpstreamingformat/).
+It uses CMAF so it's backwards compatible with HLS/DASH while still being able to provide real-time latency.
+I think this is critically important, as any migration has to be done piecewise, client-by-client and user-by-user.
+The same media segments can be served for a dual Warp and HLS/DASH roll-out, while also being saved to disk for VoD.
+
+This website uses Warp! [Try it out!](/watch) Or watch one of my [presentations](https://www.youtube.com/watch?v=PncdrMPVaNc).
+
+There will absolutely be other mappings and containers; MoQ is not married to CMAF.
+The important part is that only the encoder/decoder understand this media layer and not any relays in the middle.
+There's a lot of cool ideas floating around, such as a [live playlist format](https://datatracker.ietf.org/doc/draft-wilaw-moq-catalogformat/) and a [low-overhead container](https://datatracker.ietf.org/doc/draft-mzanaty-moq-loc/).
+
+## Reason 3: IETF
+
+[Media over QUIC is an IETF working group](https://datatracker.ietf.org/wg/moq/about/).
+
+If you know nothing about the IETF, just know that it's the standards body behind favorites such as HTTP, DNS, TLS, QUIC, and even WebRTC.
+But I think [this part](https://www.ietf.org/about/introduction/) is especially important:
+
+> There is no membership in the IETF. Anyone can participate by signing up to a working group mailing list (more on that below), or registering for an IETF meeting. All IETF participants are considered volunteers and expected to participate as individuals, including those paid to participate.
+
+It's not a protocol controlled by a single company.
+[Join the mailing list](https://www.ietf.org/mailman/listinfo/moq).
+
+# What's missing?
+
+Okay cool so hopefully I sold you on MoQ.
+What can't you use it today to replace HLS/DASH?
+
+1. **It's not done yet**: The IETF is many things, but fast is not one of them.
+2. **Cost**: QUIC is a new protocol that has yet to be fully optimized to the extent of TCP.
+3. **Support**: Your favorite language/library/cdn/cloud might not even provide HTTP/3 support yet, let alone WebTransport or QUIC.
+4. **Features**: Somebody has to reimplement all of the annoying HLS/DASH features like DRM and server-side advertisements....
+5. **VoD**: HLS/DASH work great, why replace it? MoQ is currently live only.
+
+We'll get there eventually.
+
+Feel free to use our [Rust](https://github.com/kixelated/moq-rs) or [Typescript](https://github.com/kixelated/moq-js) implementation is you want to experiement.
+Join the [Discord](https://discord.gg/FCYF3p99mr) if you want to help!
+
+Written by [@kixelated](https://github.com/kixelated).
