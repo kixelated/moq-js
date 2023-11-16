@@ -17,7 +17,7 @@ export default function Clock() {
 	})
 
 	return (
-		<div class="mx-6 my-3 flex flex-row font-mono">
+		<div class="mx-6 my-3 flex flex-row font-mono gap-3">
 			<div class="text-yellow-300">note: clocks are not synchronized</div>
 			<div class="flex-grow text-right" ref={element} />
 		</div>
