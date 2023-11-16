@@ -6,6 +6,7 @@ if (!name) return Astro.redirect("/404")
 
 import Issues from "@/components/issues.astro"
 import Watch from "@/components/watch.tsx"
+import Clock from "@/components/clock.tsx"
 import Layout from "@/layouts/global.astro"
 ---
 
@@ -15,5 +16,6 @@ import Layout from "@/layouts/global.astro"
 	<p>
 		Watching a <strong>PUBLIC</strong> broadcast. Pls report any abuse.
 	</p>
+	{name == "bbb" && <Clock client:only />}
 	<Watch name={name} client:only />
 </Layout>
