@@ -591,20 +591,27 @@ function Video(props: {
 
 	// Fetch the list of supported codecs.
 	createEffect(() => {
-		const isSupported = async (codec: VideoCodec) => {
+		const isSupported = async (codec: VideoCodec, hardwareAcceleration: HardwareAcceleration) => {
 			const supported = await VideoEncoder.isSupported({
 				codec: codec.value,
 				width: width(height()),
 				height: height(),
 				framerate: fps(),
 				bitrate: bitrate(),
+				hardwareAcceleration,
 			})
 
 			if (supported) return codec
 		}
 
-		// Call isSupported on each codec
-		const promises = VIDEO_CODECS.map((codec) => isSupported(codec))
+		// Call isSupported on each codec.
+		//
+		// The resulting array is sorted in descending priority order, with devices supporting hardware acceleration
+		// preferred but other devices included for browser compat (specifically Chrome on Linux).
+		const promises = [
+			...VIDEO_CODECS.map((codec) => isSupported(codec, "prefer-hardware")),
+			...VIDEO_CODECS.map((codec) => isSupported(codec, "prefer-software")),
+		]
 
 		// Wait for all of the promises to return
 		Promise.all(promises)
