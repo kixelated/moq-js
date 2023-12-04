@@ -4,7 +4,7 @@
 
 @layer base {
 	a {
-		@apply font-bold hover:cursor-pointer hover:text-green-600;
+		@apply font-bold text-green-500 underline decoration-green-600 decoration-2 underline-offset-2 hover:cursor-pointer hover:text-green-600;
 	}
 }
 
@@ -15,9 +15,10 @@
 		@apply prose-moq;
 		@apply prose-headings:underline prose-headings:decoration-green-500 prose-headings:decoration-2 prose-headings:underline-offset-4;
 		@apply prose-h3:text-2xl;
-		@apply prose-a:no-underline;
 		@apply prose-th:no-underline;
-		@apply prose-h1:mb-8 prose-h1:mt-12;
+		@apply prose-h1:mb-8 prose-h1:mt-12 prose-h1:decoration-8;
+		@apply prose-h2:decoration-4;
+		@apply prose-h3:decoration-2;
 		@apply prose-li:my-1;
 		@apply prose-img:rounded-lg;
 		@apply prose-figure:object-center prose-figure:text-center prose-img:m-auto;
