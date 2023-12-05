@@ -1,0 +1,31 @@
+---
+layout: "@/layouts/global.astro"
+
+const { frontmatter, url } = Astro.props;
+const { title, author, description } = frontmatter;
+
+---
+
+<article class="card">
+  <a href={url} aria-hidden="true" tabindex="-1">
+  </a>
+  <div class="content">
+    <div>
+      <h3>
+        <a href={url}>{title}</a>
+	  </h3>
+      <small>
+        by {author}
+      </small>
+    </div>
+    <p>{description}</p>
+
+
+	<a href={url}>
+		<button> Read Post </button>
+	  </a>
+		</div>
+</article>
+
+
+
