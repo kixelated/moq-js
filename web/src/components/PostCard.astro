@@ -1,28 +1,20 @@
 ---
-layout: "@/layouts/global.astro"
-import Link from "./Link.astro";
-
-
-const { frontmatter, url } = Astro.props;
-const { title, author, description } = frontmatter;
-
+const { frontmatter, url } = Astro.props
+const { title, author, description } = frontmatter
 ---
 
 <article class="card">
 	<div class="relative my-8 border-2 border-lime-500">
-	  <div class="ml-2 flex justify-center items-center">
-		<h3>
-			<a href={url}>{title}</a>
-		</h3>
-
-	  </div>
-	  <small class="flex justify-center items-center m-8">
-		by {author}
-	  </small>
-	  <!-- <p>{description}</p> -->
-	<Link href={url} text="Read Post" style="secondary" borderVisible isFilled classes="absolute bottom-0 right-0 mr-4"/>
-
+		<div class="ml-2 flex justify-center items-center">
+			<h3>
+				<a href={url}>{title}</a>
+			</h3>
+		</div>
+		<!-- use a div or span and use the TW small text class. -->
+		<small class="flex justify-center items-center m-8">
+			by {author}
+		</small>
+		<!-- <p>{description}</p> -->
 	</div>
-	<break />
-  </article>
-
+	<break></break>
+</article>
