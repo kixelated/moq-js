@@ -1,5 +1,7 @@
 ---
 layout: "@/layouts/global.astro"
+import Link from "./Link.astro";
+
 
 const { frontmatter, url } = Astro.props;
 const { title, author, description } = frontmatter;
@@ -7,25 +9,20 @@ const { title, author, description } = frontmatter;
 ---
 
 <article class="card">
-  <a href={url} aria-hidden="true" tabindex="-1">
-  </a>
-  <div class="content">
-    <div>
-      <h3>
-        <a href={url}>{title}</a>
-	  </h3>
-      <small>
-        by {author}
-      </small>
-    </div>
-    <p>{description}</p>
+	<div class="relative my-8 border-2 border-lime-500">
+	  <div class="ml-2 flex justify-center items-center">
+		<h3>
+			<a href={url}>{title}</a>
+		</h3>
 
+	  </div>
+	  <small class="flex justify-center items-center m-8">
+		by {author}
+	  </small>
+	  <!-- <p>{description}</p> -->
+	<Link href={url} text="Read Post" style="secondary" borderVisible isFilled classes="absolute bottom-0 right-0 mr-4"/>
 
-	<a href={url}>
-		<button> Read Post </button>
-	  </a>
-		</div>
-</article>
-
-
+	</div>
+	<break />
+  </article>
 

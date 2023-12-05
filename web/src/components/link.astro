@@ -1,0 +1,37 @@
+---
+
+interface Props {
+  text: string;
+  href: string;
+  style: "primary" | "secondary";
+
+  isFilled?: boolean;
+  borderVisible?: boolean;
+  classes?: string;
+}
+
+const {
+  text,
+  href,
+  style,
+  isFilled = true,
+  borderVisible = false,
+  classes,
+  ...rest
+} = Astro.props as Props;
+---
+
+<a
+  href={href}
+  class:list={[
+    "link",
+    style,
+	classes,
+    { filled: isFilled, bordered: borderVisible },
+  ]}
+  {...rest}
+>
+
+  <span>{text}</span>
+
+</a>
