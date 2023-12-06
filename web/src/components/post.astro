@@ -1,6 +1,13 @@
 ---
-const { frontmatter, url } = Astro.props
-const { title, author, description } = frontmatter
+interface Prop {
+	frontmatter: {
+		title: string
+		author: string
+	}
+	url: string
+}
+const { frontmatter, url }: Prop = Astro.props as Prop
+const { title, author } = frontmatter
 ---
 
 <article class="card">

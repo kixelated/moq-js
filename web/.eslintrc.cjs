@@ -32,6 +32,7 @@ module.exports = {
 				caughtErrorsIgnorePattern: "^_",
 			},
 		],
+		"solid/prefer-for": "off",
 		// Make formatting errors into warnings
 		"prettier/prettier": 1,
 	},
