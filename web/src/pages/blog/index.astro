@@ -1,28 +1,36 @@
 ---
-/* eslint-disable solid/prefer-for */
-import MainLayout from "../../layouts/global.astro"
+/* eslint-disable  */
+import MainLayout from "../../layouts/global.astro";
 
 const allPosts = await Astro.glob("./*.mdx")
 ---
 
 <MainLayout title="Blog">
 	<section>
-		<p class="text-4xl font-extrabold">New Blog Posts</p>
-		<div>
-			{
-				allPosts.map((post) => (
-					<article>
-						<div class="my-8 border-2 border-lime-500">
-							<div class="ml-2 flex justify-center items-center">
-								<a href={post.url} class="text-2xl">
-									{post.frontmatter.title}
-								</a>
+		<p class="text-4xl font-extrabold flex items-center justify-center">New Blog Posts</p>
+		{
+			allPosts.map((post) => (
+				<div>
+					<a href={post.url}>
+						<article class="mb-6 grid grid-cols-2 rounded-lg hover:shadow-lg hover:bg-blue-950 hover:shadow-fuchsia-200 hover:scale-110 hover:translate-x-2 ">
+							<div class="rounded-2xl">
+								<img
+									class="object-cover h-48 w-96  transition-shadow ease-in-out transition-transform ease-in-out"
+									src={post.frontmatter.cover}
+								/>
 							</div>
-							<div class="flex justify-center items-center m-8">by {post.frontmatter.author}</div>
-						</div>
-					</article>
-				))
-			}
-		</div>
+							<div class="grid grid-cols-1 gap-2 font-mono text-2xl text-fuchsia-600 place-content-center">
+								{post.frontmatter.title}
+								<div class=" text-xs text-fuchsia-300 font-light italic flex place-self-start"> {post.frontmatter.description}</div>
+								<div class=" text-xs text-fuchsia-500 font-bold flex place-self-start"> by {post.frontmatter.author}</div>
+
+
+
+							</div>
+						</article>
+					</a>
+				</div>
+			))
+		}
 	</section>
 </MainLayout>
