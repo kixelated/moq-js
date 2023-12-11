@@ -1,15 +1,28 @@
 ---
+/* eslint-disable solid/prefer-for */
 import MainLayout from "../../layouts/global.astro"
-import PostCard from "../../components/post.astro"
 
 const allPosts = await Astro.glob("./*.mdx")
 ---
 
 <MainLayout title="Blog">
-	<section class="container" aria-label="New Blog Posts">
-		<h1 class="h1">New Blog Posts</h1>
-		<div class="post-container">
-			{allPosts.map((post) => <PostCard frontmatter={post.frontmatter} url={post.url} />)}
+	<section>
+		<p class="text-4xl font-extrabold">New Blog Posts</p>
+		<div>
+			{
+				allPosts.map((post) => (
+					<article>
+						<div class="my-8 border-2 border-lime-500">
+							<div class="ml-2 flex justify-center items-center">
+								<a href={post.url} class="text-2xl">
+									{post.frontmatter.title}
+								</a>
+							</div>
+							<div class="flex justify-center items-center m-8">by {post.frontmatter.author}</div>
+						</div>
+					</article>
+				))
+			}
 		</div>
 	</section>
 </MainLayout>
