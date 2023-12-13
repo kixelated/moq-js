@@ -1,8 +1,16 @@
 ---
-/* eslint-disable  */
-import MainLayout from "../../layouts/global.astro";
+/* eslint-disable solid/prefer-for */
+import MainLayout from "../../layouts/global.astro"
 
-const allPosts = await Astro.glob("./*.mdx")
+//TODO: add the interface for the frontmatter of the blog posts
+interface Frontmatter {
+	title: string
+	cover: string
+	description: string
+	author: string
+}
+
+const allPosts = await Astro.glob<Frontmatter>("./*.mdx")
 ---
 
 <MainLayout title="Blog">
@@ -12,20 +20,20 @@ const allPosts = await Astro.glob("./*.mdx")
 			allPosts.map((post) => (
 				<div>
 					<a href={post.url}>
-						<article class="mb-6 grid grid-cols-2 rounded-lg hover:shadow-lg hover:bg-blue-950 hover:shadow-fuchsia-200 hover:scale-110 hover:translate-x-2 ">
+						<article class="mb-6 grid grid-cols-2 rounded-lg hover:shadow-lg hover:bg-blue-950 hover:shadow-fuchsia-200 hover:scale-110 hover:translate-x-2 transition-shadow ease-in-out transition-transform ease-in-out">
 							<div class="rounded-2xl">
-								<img
-									class="object-cover h-48 w-96  transition-shadow ease-in-out transition-transform ease-in-out"
-									src={post.frontmatter.cover}
-								/>
+								<img class="object-cover h-48 w-96" src={post.frontmatter.cover} alt="blog cover" />
 							</div>
 							<div class="grid grid-cols-1 gap-2 font-mono text-2xl text-fuchsia-600 place-content-center">
 								{post.frontmatter.title}
-								<div class=" text-xs text-fuchsia-300 font-light italic flex place-self-start"> {post.frontmatter.description}</div>
-								<div class=" text-xs text-fuchsia-500 font-bold flex place-self-start"> by {post.frontmatter.author}</div>
-
-
-
+								<div class=" text-xs text-fuchsia-300 font-light italic flex place-self-start">
+									{" "}
+									{post.frontmatter.description}
+								</div>
+								<div class=" text-xs text-fuchsia-500 font-bold flex place-self-start">
+									{" "}
+									by {post.frontmatter.author}
+								</div>
 							</div>
 						</article>
 					</a>
