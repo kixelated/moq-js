@@ -18,24 +18,18 @@ const allPosts = await Astro.glob<Frontmatter>("./*.mdx")
 		<h1>Blog Posts</h1>
 		{
 			allPosts.map((post) => (
-				<div>
-					<article class="mb-6 grid grid-cols-2 hover:bg-blue-950 hover:scale-110 hover:translate-x-2 transition-all ease-in-out">
-						<a href={post.url} class="rounded-2xl">
-							<img
-								class="object-cover h-48 w-96 rounded-2xl"
-								src={post.frontmatter.cover}
-								alt="blog cover"
-							/>
+				<article class="mb-6 rounded-lg grid grid-cols-2 hover:bg-blue-950 hover:scale-110 hover:translate-x-2 transition-all ease-in-out">
+					<a href={post.url} class="rounded-2xl">
+						<img class="object-cover h-48 w-96 rounded-2xl" src={post.frontmatter.cover} alt="blog cover" />
+					</a>
+					<div class="grid grid-cols-1 gap-2 text-2xl place-content-center">
+						<a href={post.url} class="text-white">
+							{post.frontmatter.title}
 						</a>
-						<div class="grid grid-cols-1 gap-2 text-2xl place-content-center">
-							<a href={post.url} class="text-white">
-								{post.frontmatter.title}
-							</a>
-							<div class="text-sm font-light">{post.frontmatter.description}</div>
-							<div class="text-sm font-bold ">by {post.frontmatter.author}</div>
-						</div>
-					</article>
-				</div>
+						<div class="text-sm font-light">{post.frontmatter.description}</div>
+						<div class="text-sm font-bold ">by {post.frontmatter.author}</div>
+					</div>
+				</article>
 			))
 		}
 	</section>
