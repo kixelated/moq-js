@@ -1,4 +1,4 @@
-import { onMount, onCleanup } from "solid-js"
+import { onCleanup, onMount } from "solid-js"
 
 // Print the current time to check the latency.
 export default function Clock() {
@@ -17,7 +17,7 @@ export default function Clock() {
 	})
 
 	return (
-		<div class="mx-6 my-3 flex flex-row font-mono gap-6">
+		<div class="mx-6 my-3 flex flex-row gap-6 font-mono">
 			<div class="text-yellow-300">note: clocks are not synchronized</div>
 			<div class="flex-grow text-right" ref={element} />
 		</div>
