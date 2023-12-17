@@ -2,18 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-	a {
-		@apply font-bold text-green-500 underline decoration-green-600 decoration-2 underline-offset-2 hover:cursor-pointer hover:text-green-600;
-	}
-}
-
 @layer components {
 	/* see https://tailwindcss.com/docs/typography-plugin */
 	.markdown {
 		@apply prose prose-lg lg:prose-xl;
 		@apply prose-moq;
-		@apply prose-headings:underline prose-headings:decoration-green-500 prose-headings:decoration-2 prose-headings:underline-offset-4;
+		@apply prose-headings:underline prose-headings:decoration-green-500 prose-headings:decoration-4 prose-headings:underline-offset-4;
 		@apply prose-h3:text-2xl;
 		@apply prose-th:no-underline;
 		@apply prose-h1:mb-8 prose-h1:mt-12 prose-h1:decoration-8;
@@ -22,10 +16,11 @@
 		@apply prose-li:my-1;
 		@apply prose-img:rounded-lg;
 		@apply prose-figure:object-center prose-figure:text-center prose-img:m-auto;
+		@apply prose-a:font-bold prose-a:text-green-500 prose-a:underline prose-a:decoration-green-500 prose-a:decoration-2 prose-a:underline-offset-4;
 	}
 
 	.tagline {
-		@apply my-12 text-center text-2xl font-bold text-white underline decoration-green-500 decoration-2 underline-offset-4 md:text-3xl;
+		@apply my-12 text-center text-2xl font-bold text-white underline decoration-green-500 decoration-4 underline-offset-4 md:text-3xl;
 	}
 
 	button,
