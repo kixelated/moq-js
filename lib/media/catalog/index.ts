@@ -15,13 +15,19 @@ export class Catalog {
 	static decode(raw: Uint8Array): Catalog {
 		const decoder = new TextDecoder()
 		const str = decoder.decode(raw)
-		const catalog = JSON.parse(str)
 
-		if (!isCatalog(catalog)) {
+		try {
+			const catalog = new Catalog()
+			catalog.tracks = JSON.parse(str).tracks
+
+			if (!isCatalog(catalog)) {
+				throw new Error("invalid catalog")
+			}
+
+			return catalog
+		} catch (e) {
 			throw new Error("invalid catalog")
 		}
-
-		return catalog
 	}
 
 	static async fetch(connection: Connection): Promise<Catalog> {
