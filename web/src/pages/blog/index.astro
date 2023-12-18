@@ -15,29 +15,21 @@ const allPosts = await Astro.glob<Frontmatter>("./*.mdx")
 
 <MainLayout title="Blog">
 	<section>
-		<p class="text-4xl font-extrabold flex items-center justify-center">New Blog Posts</p>
+		<h1>Blog Posts</h1>
 		{
 			allPosts.map((post) => (
-				<div>
-					<a href={post.url}>
-						<article class="mb-6 grid grid-cols-2 rounded-lg hover:shadow-lg hover:bg-blue-950 hover:shadow-fuchsia-200 hover:scale-110 hover:translate-x-2 transition-shadow ease-in-out transition-transform ease-in-out">
-							<div class="rounded-2xl">
-								<img class="object-cover h-48 w-96" src={post.frontmatter.cover} alt="blog cover" />
-							</div>
-							<div class="grid grid-cols-1 gap-2 font-mono text-2xl text-fuchsia-600 place-content-center">
-								{post.frontmatter.title}
-								<div class=" text-xs text-fuchsia-300 font-light italic flex place-self-start">
-									{" "}
-									{post.frontmatter.description}
-								</div>
-								<div class=" text-xs text-fuchsia-500 font-bold flex place-self-start">
-									{" "}
-									by {post.frontmatter.author}
-								</div>
-							</div>
-						</article>
+				<article class="mb-6 rounded-lg grid grid-cols-2 hover:bg-blue-950 hover:scale-110 hover:translate-x-2 transition-all ease-in-out">
+					<a href={post.url} class="rounded-2xl">
+						<img class="object-cover h-48 w-96 rounded-2xl" src={post.frontmatter.cover} alt="blog cover" />
 					</a>
-				</div>
+					<div class="grid grid-cols-1 gap-2 text-2xl place-content-center">
+						<a href={post.url} class="text-white">
+							{post.frontmatter.title}
+						</a>
+						<div class="text-sm font-light">{post.frontmatter.description}</div>
+						<div class="text-sm font-bold ">by {post.frontmatter.author}</div>
+					</div>
+				</article>
 			))
 		}
 	</section>
