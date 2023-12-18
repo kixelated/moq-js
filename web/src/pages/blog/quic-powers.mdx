@@ -62,29 +62,37 @@ Delete that shit and use HTTP/3.
 </figure>
 
 However, as a humble (and handsome) application developer, **I don't care about HTTP/3**.
+
 The problem is that the HTTP version is transparent to my application.
+If you visit my website, you can use any version of HTTP and basically it all works the same.
+However, if issue a ton of requests in parallel in an attempt to utilize QUIC's concurrency, then my application will absolutely choke on the older HTTP versions.
 
-This is great for backwards compatibility because an application designed for HTTP will work the same regardless of the version.
-However it means that you can't take full advantage of QUIC via HTTP/3 otherwise your application will choke older HTTP versions.
-
-Don't get me wrong, HTTP/3 can help when you're issuing a lot of requests concurrently, but otherwise it's an incremental improvement.
+Don't get me wrong, HTTP/3 _might_ be an improvement, but it's an incremental improvement.
 It's not exciting unless you're a CDN vendor for all the reasons I'll mention below.
 
-And sometimes it's not worth fighting against HTTP semantics.
-If you want to make an application that relies on QUIC's behavior, then you should use QUIC directly.
-In a browser that means using [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport_API) which more-or-less exposes the QUIC API.
+## WebTransport
+
+And frankly, it's often just not worth fighting against HTTP semantics.
+If you want to make a web application that utilizes QUIC, then just use QUIC directly.
+
+Fortunately we have [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport_API) for that.
+It _mostly_ exposes the QUIC API and is supported in Chrome/Edge/Firefox with Safari coming soon™.
+
+You can think of WebTransport as a WebSocket replacement, but using QUIC instead of TCP.
 
 # The Advanced Shit
 
 Anyway, time to get technical.
-I figured out most of these while writing my own QUIC implementation.
+Most of this won't matter for your everyday humble (and handsome) application developer, but maybe you find something useful.
 
+I figured out most of these while writing my own QUIC implementation.
 But don't be me.
 Use an [existing implementation](https://github.com/quicwg/base-drafts/wiki/Implementations) instead.
 I'm now a Rust fanboye so I'm using [Quinn](https://github.com/quinn-rs/quinn) with [WebTransport](https://docs.rs/webtransport-quinn/latest/webtransport_quinn/).
 CloudFlare's [Quiche](https://github.com/cloudflare/quiche) is also quite nice and interfaces with C/C++.
 
-But you can read the RFCs if you're mega bored on a plane:
+But you can read the RFCs if you're mega bored on a plane.
+They're extremely well-written and designed if you're into that sort of thing.
 
 -   [RFC9000](https://www.rfc-editor.org/rfc/rfc9000.html): QUIC Transport
 -   [RFC9001](https://www.rfc-editor.org/rfc/rfc9001.html): QUIC Security
@@ -109,9 +117,12 @@ The kernel uses this information to map incoming packets to the correct socket/c
 -   destination IP
 -   destination port
 
+Each IP packet contains the source ip/port and destination ip/port, so you know who sent it and where to send the reply.
+Kinda like mail if anybody is old enough to remember that.
+
 <figure>
 	![TCP tuples](/blog/quic-powers/tuple-tcp.png)
-	<figcaption>Each IP packet contains the source IP/port and destination IP/port</figcaption>
+	<figcaption>A thrilling diagram of a TCP connection.</figcaption>
 </figure>
 
 That's gone with QUIC.
@@ -134,6 +145,7 @@ When you switch networks, your source IP/port changes.
 
 **With TCP**, this changes the 4-tuple.
 The server will silently discard any packets from the unknown source, severing the connection.
+
 The application needs to detect this and retry, dialing a new connection and reissuing any pending requests.
 Retry logic is _always_ a pain to get right and often users will just have to refresh manually.
 
@@ -142,7 +154,7 @@ Retry logic is _always_ a pain to get right and often users will just have to re
 	<figcaption>There's no way to associate the new IP/port. Ripzo your connection</figcaption>
 </figure>
 
-**With QUIC**, the source IP will change but the Connection ID remains constant.
+**With QUIC**, the source address will change but the Connection ID remains constant.
 The QUIC stack will transparently [validate the new path](https://www.rfc-editor.org/rfc/rfc9000.html#name-path-validation) (to prevent spoofing attacks) before switching to it.
 The application doesn't need to do anything, it just works™
 
@@ -162,10 +174,10 @@ A NAT can transparently rebind your address without your knowledge, usually afte
 
 **In TCP land**, a NAT rebinding is fatal, as the 4-tuple changes and packets will get silently discarded.
 The application has no idea that this happened and the connection appears to hang.
-It's obnoxious and why you need some form of keep-alive to both detect and prevent any NAT rebinding.
+It's obnoxious and why you need some form of keep-alive to both detect and fend off any NAT rebinding.
 
 **In QUIC land**, the Connection ID saves the day.
-It will take 1 RTT for QUIC to verify the new path but it just works™
+It still takes 1 RTT for QUIC to verify the new path but it just works™
 
 ### Firewalls
 
@@ -179,7 +191,9 @@ This means the source IP/port can change without severing the connection: ez roa
 
 <figure>
 	![WebRTC success](/blog/quic-powers/tuple-webrtc2.png)
-	<figcaption>chad 2-tuple doesn't care about the source address</figcaption>
+	<figcaption>
+		The chad 2-tuple doesn't care about the source address. The unique destination port tells us the connection.
+	</figcaption>
 </figure>
 
 But why doesn't QUIC do this instead?
@@ -191,16 +205,17 @@ At one point I probed the Twitch corporate network and found that only around ~3
 
 <figure>
 	![WebRTC failure](/blog/quic-powers/tuple-webrtc.png)
-	<figcaption>beta 2-tuple failed to connect, oops</figcaption>
+	<figcaption>
+		The beta 2-tuple failed to connect, oops. Turns out the port was too unique for the firewall.
+	</figcaption>
 </figure>
 
-QUIC instead uses `udp/443` for _all_ connections, since it uses Connection ID to distinguish between them.
-This is huge because firewalls will often allow `tcp/443` for HTTPS or `udp/443` for HTTP/3, but block everything else.
+QUIC instead uses `udp/443` for _all_ connections.
+This is huge because firewalls will often allow port 443 for HTTPS but block almost everything else.
 If you use QUIC, you automatically leverage this firewall hole punching.
 
-Note that you can (and I have) hack a WebRTC server to use the 4-tuple instead.
-It means you can listen on `udp/443` but just like TCP, you lose roaming support.
-Unfortunately, there's no way to identify the connection based on the DTLS header otherwise you could use it like a connection ID.
+Note that you can (and I have) hack a WebRTC server to listen on `udp/443` instead.
+However, just like TCP, you lose roaming support because you rely on the 4-tuple to identify connections.
 
 **Fun fact**: a QUIC client can also use the same IP and port for all outgoing connections.
 There's no need for ephemeral ports!
@@ -231,7 +246,8 @@ Basically you can encode whatever load balancing information you want.
 </figure>
 
 There's an [entire draft](https://datatracker.ietf.org/doc/draft-ietf-quic-load-balancers/) dedicated to cool shit you could do with this.
-Here's a free idea: encode the name of the backend server into the Connection ID so you get sticky sessions without a lookup table.
+Here's a free idea: encode the name of the backend server into the Connection ID.
+Now you have sticky sessions without a lookup table!
 
 That being said:
 
@@ -245,34 +261,35 @@ But there's a lot of creative stuff you can do!
 **OH BOY**.
 This one is extremely well-hidden but extremely powerful.
 
-During the handshake, the server can reply with an optional [preferred_address](https://datatracker.ietf.org/doc/html/rfc9000#section-9.6.1).
+During the handshake, the server can reply with an optional and kinda obscure [preferred_address](https://datatracker.ietf.org/doc/html/rfc9000#section-9.6.1).
 The client will try to send packets to this address instead, [after validating it of course](https://datatracker.ietf.org/doc/html/rfc9000#forgery-spa).
 Why on earth does this matter?
 
 So there's this thing called [anycast](https://en.wikipedia.org/wiki/Anycast).
 Anycast allows multiple servers to advertise the same IP address and any packets will get routed to the "closest" server (based on [BGP](https://www.cloudflare.com/learning/security/glossary/what-is-bgp/)).
-This is amazing for global load balancing since it also gives network administrators some control over routing.
+This is amazing for global load balancing since it also gives network administrators control over routing.
 The path to the closest server might be congested, so ISPs can choose a different "closest" server instead.
 
 <figure>
 	![Anycast success](/blog/quic-powers/anycast.png)
-	<figcaption>Chad Anycast</figcaption>
+	<figcaption>All regions advertise the same address. Your packet gets routed to the closest one.</figcaption>
 </figure>
 
-However, if the "closest" server changes for any reason (flapping), unfortunately a different server will receive the packets.
+However, if the "closest" server changes for any reason (flapping), unfortunately a different server will receive your packets.
 Even with QUIC, the new server will discard these unknown packets and the connection is severed.
 
 <figure>
 	![Anycast flapping](/blog/quic-powers/anycast2.png)
-	<figcaption>Beta Anycast</figcaption>
+	<figcaption>Who knows why the route changed, but it does happen.</figcaption>
 </figure>
 
-Connection-oriented protocols use [unicast](https://en.wikipedia.org/wiki/Unicast) instead so each server has a unique IP address to ensure consistent routing.
+Anycast is usually reserved for UDP-protocols like DNS because of this flapping issue.
+It's usually better to use [unicast](https://en.wikipedia.org/wiki/Unicast) with TCP to ensure consistent routing.
 
 However, what if you could use **anycast for discovery** and then switch to **unicast for consistency**?
 That's exactly what `preferred_address` is for.
 
-Every server can advertise a shared anycast address used for the handshake _only_.
+Every server can advertise a shared anycast address used for the TLS handshake _only_.
 Afterwards, the clients are told to switch to the server's unique unicast address.
 The end result is a stable connection to the closest server, transparent to the application!
 
@@ -348,8 +365,7 @@ Subsequent ACKs [don't include the ACK'd ACK packet numbers](https://datatracker
 ### Deployable
 
 However, there is an **MAJOR** difference between TCP and QUIC congestion control.
-
-TCP is implemented in the kernel which means it's difficult or impossible to modify:
+TCP is implemented in the kernel which means it's difficult or impossible to modify.
 
 -   A Windows client is stuck with the crappy TCP implementation in Windows.
 -   An OSX client is stuck with the crappy TCP implementation in OSX.
@@ -408,12 +424,11 @@ All of the reasons above actually prevent implementing RTP naively by using QUIC
 
 1.  **Datagrams are congestion controlled**. It means you can't implement [GCC](https://datatracker.ietf.org/doc/html/draft-ietf-rmcat-gcc-02) or [SCReAM](https://datatracker.ietf.org/doc/html/rfc8298) on top of QUIC datagrams.
 2.  **Datagrams are acknowledged but you can't use them**. You send up sending both ACKs and NACKs in different layers, increasing overhead and hurting performance.
-3.  **Datagrams can't be sent to arbitrary destinations**. It means you can't send RTP and RTCP to different ports; they have to be muxed.
+3.  **Datagrams can't be sent to arbitrary destinations**. It means you can't send RTP and RTCP to different ports; they have to be muxed. (not a big deal)
 4.  **Datagrams may be coalesced into a single QUIC packet**. It makes it more difficult to implement [FEC](https://www.rfc-editor.org/rfc/rfc8854.html), since QUIC datagrams may be secretly coalesced.
 
 This is just an example for RTP but same is probably true for your favorite UDP-based protocol.
-Sorry to be a downer but QUIC datagrams are not one of the (hidden) super powers.
-You should stick with UDP if you need maximum control, preferably using [DTLS](https://www.rfc-editor.org/rfc/rfc9147.html) for encryption.
+Use QUIC streams instead.
 
 **NOTE**: Media over QUIC will likely support datagrams, primarily for experimentation.
 I've already stated my opinion but unfortunately, I'm not the boss of the IETF.
@@ -426,10 +441,12 @@ I'm super exited about QUIC and WebTransport.
 There's never been a better time to be a transport protocol nerd.
 
 On a personal note, I'm now [gainfully employed](https://discord.com/).
-That means I'm getting paid to actually make useful stuff instead of writing ~informative~ blog posts and working full time on open-source.
+That means I'm getting paid to actually make useful stuff instead of writing ~informative~ blog posts.
 Unfortunate for you, but fortunate for me since I get health insurance now (thanks America).
 
-I won't be able to devote as much time to Media over QUIC but the standard is still full steam ahead.
+I won't be able to devote as much time cheer-leading for Media over QUIC but the standard is still full steam ahead.
 Remember: it's co-authored by individuals from Google, Meta, Cisco, Akamai, along with IETF as a whole.
+
+Join the [discord server](https://discord.gg/FCYF3p99mr) though.
 
 <img src="/blog/kixelCat.png" class="inline w-16" />
