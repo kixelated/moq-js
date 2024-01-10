@@ -65,6 +65,7 @@ export class Container {
 			dops.parse(data)
 
 			options.description = dops
+			options.hdlr = "soun"
 		} else {
 			throw new Error(`unsupported codec: ${codec}`)
 		}
