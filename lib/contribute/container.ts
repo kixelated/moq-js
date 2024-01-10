@@ -64,6 +64,7 @@ export class Container {
 			const data = new MP4.Stream(desc, 8, MP4.Stream.LITTLE_ENDIAN)
 			dops.parse(data)
 
+			dops.Version = 0
 			options.description = dops
 			options.hdlr = "soun"
 		} else {
