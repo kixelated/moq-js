@@ -1,0 +1,44 @@
+---
+layout: "@/layouts/global.astro"
+title: Accelerating UDP
+author: kixelated
+description: UDP is surprisingly expensive. How can we make it faster?
+cover: "/blog/quic-powers/vegeta.png"
+date: 2024-01-28
+---
+
+# Background
+
+I worked on the baremetal CDN team at Twitch for 8 years.
+We transmitted a _LOT_ of data over the internet.
+
+It might be surprising to learn that this was all via a standard TCP socket on Linux.
+No special hardware, no special kernel modules, no special drivers.
+Just a custom HTTP server written in Go using the standard library.
+
+And despite the unquenchable urge within me to optimize everything, it was fine.
+We were consistenctly able to saturate at least one of our bonded 10/25/100 Gb/s NICs.
+It was never a priority given all of the other places we [were bleeding money](https://blog.twitch.tv/en/2023/12/05/an-update-on-twitch-in-korea/).
+
+But that changed with UDP.
+
+# UDP is expensive
+
+A quick refresher: TCP and UDP are both protocols that run on top of IP.
+
+-   UDP adds ports and checksums to IP.
+-   TCP also adds reliability, congestion control, and flow control.
+
+Counter-intunitively, it's far more computationality expensive to send a UDP packet than a TCP packet, despite the fact that UDP is so much simpler.
+
+[A recent blog post](https://github.com/icing/blog/blob/main/curl-h3-performance.md) benchmarked various HTTP/1.1, HTTP/2, and HTTP/3 implementations.
+There's almost a 4X difference in throughput between the fastest HTTP/1.1 (over TCP) and HTTP/3 (over QUIC/UDP) implementations.
+Why is that?
+
+# TCP Offload
+
+It's because the network card does most of the work for TCP.
+
+When you `write` data to a TCP socket, the Linux kernel is in charge of splitting the data into packets, adding TCP headers, calculating the TCP checksum, etc.
+
+copies the data into a buffer and then tells the network card to send it.
