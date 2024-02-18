@@ -23,7 +23,7 @@ The common wisdom is:
 * use **TCP** if you want **reliable** delivery
 * use **UDP** if you want **unreliable** delivery
 
-What the actual fuck does that mean?
+What the fuck does that mean?
 Who *wants* unreliability?
 
 - You don't want a hard-drive that fails 5% of writes.
@@ -76,18 +76,19 @@ We spent hours debating if we need both **FETCH** and **SUBSCRIBE** and what the
 	</figcaption>
 </figure>
 
-At one point somebody said that **SUBSCRIBE** is *unreliable*  and it triggered this blog post.
-Good job!
+A few times, it was stated that **SUBSCRIBE** should be *unreliable*.
+Good job, it triggered this blog post!
 
 Like I said, nobody wants unreliability.
 What we actually want is **timeliness**.
 If the internet can choose between delivering two pieces of data, I want it to deliver the newest one.
 
 In the live video scenario, this is the difference between buffering and skipping ahead.
-It's really difficult to have a conversation with somebody when they're lagging.
+If you're trying to have a conversation with someone on the internet, there can't be a delay.
 You don't want a buffering spinner on top of their face, nor do you want to hear only what they said 5 seconds ago.
 
-To accomplish timeliness, we often use UDP datagrams instead of TCP streams.
+To accomplish timeliness, the live video industry often use UDP datagrams instead of TCP streams.
+Likewise so does the video game industry.
 But why?
 
 ## Datagrams
@@ -147,61 +148,68 @@ All you need to know is that sending packets at unlimited rate is a recipe for d
 ## You, The Application Developer
 Speaking of a recipe for disaster.
 Let's say you made the mistake of using UDP directly because you want them datagrams.
+You're bound to mess up, and you won't even realize why.
 
-You're actually in good company with a lot of the video industry.
-Building a custom protocol on top of UDP is all the rage; for example [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/), and too many to list.
-But sorry, you're bound to fuck up.
+If you want to build your own transport protocol on top of UDP, you "need" to implement:
+- [retransmissions](https://www.rfc-editor.org/rfc/rfc9000.html#name-packetization-and-reliabili)
+- [congestion control](https://www.rfc-editor.org/rfc/rfc9002.html#name-congestion-control)
 
-WebRTC gets a pass because Google engineers are super smart.
-They also built on top of existing VoIP standards instead of reinventing everything... although [SDP](https://webrtchacks.com/sdp-anatomy/) is horrific.
+And if you want a great protocol, you also need:
+- [encryption](https://www.rfc-editor.org/rfc/rfc9001)
+- [RTT estimates](https://www.rfc-editor.org/rfc/rfc9002.html#name-estimating-the-round-trip-t)
+- [path validation](https://www.rfc-editor.org/rfc/rfc9000.html#name-address-validation)
+- [path migration](https://www.rfc-editor.org/rfc/rfc9000.html#name-connection-migration)
+- [pacing](https://www.rfc-editor.org/rfc/rfc9002.html#name-pacing)
+- [flow control](https://www.rfc-editor.org/rfc/rfc9000.html#name-flow-control)
+- [version negoiation](https://www.rfc-editor.org/rfc/rfc9000.html#name-version-negotiation)
+- [extensions](https://www.rfc-editor.org/rfc/rfc9000.html#name-transport-parameter-encodin)
+- [prioritization](https://www.rfc-editor.org/rfc/rfc9000.html#name-stream-prioritization)
+- [keep-alives](https://www.rfc-editor.org/rfc/rfc9000.html#name-idle-timeout)
+- [multiplexing](https://www.rfc-editor.org/rfc/rfc9000.html#name-streams)
 
-But yeah, if you want to build your own protocol on top of UDP, you "need" to implement at a minimum:
-- congestion control
-- retransmissions
-- multiplexing
-- keep-alives
+And if you want an AMAZING protocol, you also need:
+- [web support](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport_API)
+- [port reuse](https://www.rfc-editor.org/rfc/rfc9000.html#name-matching-packets-to-connect)
+- [dynamic MTUs](https://www.rfc-editor.org/rfc/rfc9000.html#name-datagram-size)
+- [multi-path](https://datatracker.ietf.org/doc/draft-ietf-quic-multipath/)
+- [stateless load balancing](https://datatracker.ietf.org/doc/draft-ietf-quic-load-balancers/)
+- [anycast load balancing](https://www.rfc-editor.org/rfc/rfc9000.html#section-9.6.1)
 
-And if you want a great protocol, you also want to implement:
-- encryption
-- delay feedback
-- path migration
-- pacing
-- multi-path
-- flow control
-- extensions
-- prioritization
-- ...and some more stuff I probably missed
+Let's be honest, you don't even know what half of those are, nor why they are worth implementing.
+Just use [QUIC](https://en.wikipedia.org/wiki/QUIC).
 
-And guess what, [QUIC](https://en.wikipedia.org/wiki/QUIC) implements all of these, or has extensions being hashed out that will.
-And support is already widespread given that it powers HTTP/3.
-Don't implement your own layer if there's a good one that gives you the properties you want.
+But if you still insist on UDP instead, you're actually in good company with a lot of the video industry.
+Building a live video protocol on top of UDP is all the rage; for example [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/), etc.
 
-Otherwise you'll end up like **SRT**, with highlights such as hand-rolled encryption (oh no) and 3 types of acknowledgements.
-I promise I'll eventually write the promised **Replacing RTMP *but please not with SRT*** blog post.
+Unless you're Google, it's very easy make a terrible protocol on top of UDP.
+Just wait for the **Replacing RTMP *but please not with SRT*** blog post.
 
 ## Timeliness
 But remember, I ultimately want to achieve **timeliness**.
 How can we do that with QUIC?
 
-The first step is to avoid bloating the buffers 🐷.
+1. **Avoid bloating the buffers** 🐷.
 Use a delay-based congestion controller like [BBR](https://www.ietf.org/archive/id/draft-cardwell-iccrg-bbr-congestion-control-01.html) that will detect queueing and back off.
 There are better ways of doing this, like how WebRTC uses [transport-wide-cc](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/transport-wide-cc-02/README.md), which I'll personally make sure gets added to QUIC.
 
-The second step is to split the data into streams.
-Each stream is independent, but the data within a stream is delivered reliably and in order.
-It could be a frame of data, or a game update, or a chat message, or really any unit of data.
+2. **Split data into streams**.
+The bytes within each stream are ordered, reliable, and can be any size; it's nice and convenient.
+Each stream could be a video frame, or a game update, or a chat message, or a JSON blob, or really any atomic unit.
 
-The final step is to prioritize the streams.
-If you have a video frame that you want delivered first, set the priority to high.
-The QUIC stack will make sure the stream is delivered first, even if it means starving other streams.
-You can optionally close low priority streams to avoid wasting bandwidth.
+3. **Prioritize the streams**.
+Streams are independent and can arrive in any order.
+But you can tell the QUIC stack to focus on delivering important streams first.
+The low priority streams will be starved, and can be closed to avoid wasting bandwidth.
 
 That's it.
 That's the secret behind [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/).
 Now all that's left is to bikeshed the details.
 
+And guess what?
+This approach works with higher latency targets too.
+If you want higher quality video at the cost of higher latency, then the fire-and-forget nature of datagrams is not what you want.
+
 You don't need datagrams.
-You should never use datagrams.
 Use QUIC streams instead.
 
 <figure>
@@ -213,72 +221,22 @@ But QUIC itself is implemented on top of UDP, so **Never\* use Datagrams** is a 
 My point is: let the smart network engineers handle the datagrams.
 You should care about the actually useful properties provided by QUIC.
 
-But what if you are a smart network engineer AND a smart audio codec developer?
-In particular, I want to talk about [Opus](https://opus-codec.org/) as it has FEC built-in.
-[Forward Error Correction](https://en.wikipedia.org/wiki/Error_correction_code) is a way to send extra data so that if some data is lost, the receiver can reconstruct it.
-Think like [RAID](https://en.wikipedia.org/wiki/RAID) but for packets instead of hard drives.
+"But Mr. Kixelated, the latest [MoQ draft](https://www.ietf.org/archive/id/draft-ietf-moq-transport-02.html) adds support for datagrams.
+You're one of the authors; are you daft?"
 
-Conveniently, audio bitrates are low enough that each audio "frame" can fit into a single datagram.
-So yes, you can just send OPUS audio over datagrams since it's a self-correcting codec.
-And as a result, the latest [MoQ draft](https://www.ietf.org/archive/id/draft-ietf-moq-transport-02.html) supports datagrams for this use-case.
-
-However, I will always contend that the audio codec is the wrong layer for this.
-
-## Networks are Complicated
-I worked with some very smart people at [Twitch](https://www.twitch.tv/).
-However, I will never forget a presentation maybe 4 years ago where a very smart codec engineer pitched using FEC.
-
-There was a graph that showed the TCP throughput during random packet loss.
-Wow, TCP sure sucks at 30% packet loss!
-But if we used FEC we could support much higher bitrates!
-All it takes is sending the same data multiple times, super easy!
-
-If somebody shows you any results based on simulated, random packet loss, you should politely tell them: **no, that's not how the internet works**.
-
-<figure>
-	![Series of Tubes](/blog/never-use-datagrams/tubes.png)
-	<figcaption>
-		**Fun fact**: the internet is not a series of tubes.
-	</figcaption>
-</figure>
-
-Networking is not quantum mechanics.
-There are no dice involved and packet loss is *not random*.
-It depends on the underlying transport and happens in bursts.
-And it's often just due to congestion, in which case sending more data will make the problem *worse*.
-
-Unfortunately, network simulation is just plain difficult.
-Tools like [netem](https://man7.org/linux/man-pages/man8/tc-netem.8.html) are useful, but you can't crank LOSS to 11.
-You're ultimately trying to solve a problem that doesn't exist in the real-world.
-
-## Hop-by-Hop
-But the real problem is something else.
-
-When I speak into a microphone, the audio data is encoded into packet via a codec like OPUS.
-That packet then traverses multiple multiple hops, potentially going over WiFi, Ethernet, 4G, fiber, satellites, etc.
-It switches between different cell towers, routers, ISPs, transit providers, business units, and who knows what else.
-
-Until finally, finally, the packet reaches ur Mom's iPhone and my words replay into her ear.
-Tell her I miss her. 😢
-
-Unfortuantely, each of those hops have different properties and packet loss scenarios.
-There's no one-size-fits-all FEC scheme, and it shouldn't be in the audio codec.
-And fun fact, many of these transports I mentioned already have some form of FEC built-in.
-
-Loss recovery should be a **hop-by-hop** property, and not an **end-to-end** property.
-
-And a good-old-fashioned retransmission is usually better than a complicated FEC scheme anyway.
-You still don't need datagrams.
+Yes, because you can enable FEC in OPUS and send each audio "frame" as a datagram.
+But I will always contend that the audio codec is the wrong layer for FEC.
+In fact, I wrote a [follow-up blog](/blog/forward-error-correction) about it if you can't get enough of my hot takes.
 
 ## Conclusion
 There is no conclusion.
 This is a rant.
 
 Please don't design your application on top of datagrams.
-You get a pass if you're using an old protocol like [DNS](https://en.wikipedia.org/wiki/Domain_Name_System), but be like [DNS over HTTPS](https://en.wikipedia.org/wiki/DNS_over_HTTPS) instead.
-And please please don't make yet another video protocol on top of UDP.
+Old protocols like [DNS](https://en.wikipedia.org/wiki/Domain_Name_System) get a pass, but be like [DNS over HTTPS](https://en.wikipedia.org/wiki/DNS_over_HTTPS) instead.
 
-Get involved with Media over QUIC instead!
+And please, please don't make yet another video protocol on top of UDP.
+Get involved with [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/) instead!
 Join our [Discord](https://discord.gg/FCYF3p99mr) and tell me how wrong I am.
 
 Written by [@kixelated](https://github.com/kixelated).
