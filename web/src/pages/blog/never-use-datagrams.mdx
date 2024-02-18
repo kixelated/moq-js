@@ -45,21 +45,21 @@ Unreliability is a consequence, not a goal.
 ## Properties
 So what do we actually want?
 
-Well if you go low enough level, you can use electrical impulses to do stuff like:
+Well, if you go low enough level, you can use electrical impulses to do stuff like:
 - Power on LEDs in a desired configuration.
 - Spin magnets at ludicrous speeds.
 - Make objects tingle and shake.
 - etc you get the idea.
 
 But we don't want to deal with electrical impulses.
-We want higher level functionaliy.
+We want higher level functionality.
 
 Fortunately, software engineering is all about standing on the shoulders of others.
 There are layers on top of layers on top of layers of abstraction.
 Each layer provides properties so you don't have to reinvent the personal computer every time.
 
 Our job as developers is to decide which shoulders we want to stand on.
-But some of some shoulders are awful, so we have to be selective.
+But some shoulders are awful, so we have to be selective.
 Over-abstraction is bad but so is under-abstraction.
 
 What user experience are we trying to build, and how can we leverage the properties of existing layers to achieve that?
@@ -85,10 +85,10 @@ If the internet can choose between delivering two pieces of data, I want it to d
 
 In the live video scenario, this is the difference between buffering and skipping ahead.
 If you're trying to have a conversation with someone on the internet, there can't be a delay.
-You don't want a buffering spinner on top of their face, nor do you want to hear only what they said 5 seconds ago.
+You don't want a buffering spinner on top of their face, nor do you want to hear what they said 5 seconds ago.
 
-To accomplish timeliness, the live video industry often use UDP datagrams instead of TCP streams.
-Likewise so does the video game industry.
+To accomplish timeliness, the live video industry often uses UDP datagrams instead of TCP streams.
+So does the video game industry.
 But why?
 
 ## Datagrams
@@ -125,7 +125,7 @@ But RAM is a finite resource so the packets will eventually get dropped.
 Then you finally get the **unreliability** you wanted all along...
 
 ## Oh no
-Oh shit I forgot, I actually want **timeliness**.
+Oh shit, I forgot, I actually want **timeliness**.
 Bufferbloat is the worst possible scenario since queued packets are late packets.
 
 So [congestion control](https://en.wikipedia.org/wiki/TCP_congestion_control) is a huge, never ending area of research.
@@ -161,7 +161,7 @@ And if you want a great protocol, you also need:
 - [path migration](https://www.rfc-editor.org/rfc/rfc9000.html#name-connection-migration)
 - [pacing](https://www.rfc-editor.org/rfc/rfc9002.html#name-pacing)
 - [flow control](https://www.rfc-editor.org/rfc/rfc9000.html#name-flow-control)
-- [version negoiation](https://www.rfc-editor.org/rfc/rfc9000.html#name-version-negotiation)
+- [version negotiation](https://www.rfc-editor.org/rfc/rfc9000.html#name-version-negotiation)
 - [extensions](https://www.rfc-editor.org/rfc/rfc9000.html#name-transport-parameter-encodin)
 - [prioritization](https://www.rfc-editor.org/rfc/rfc9000.html#name-stream-prioritization)
 - [keep-alives](https://www.rfc-editor.org/rfc/rfc9000.html#name-idle-timeout)
@@ -179,7 +179,7 @@ Let's be honest, you don't even know what half of those are, nor why they are wo
 Just use [QUIC](https://en.wikipedia.org/wiki/QUIC).
 
 But if you still insist on UDP instead, you're actually in good company with a lot of the video industry.
-Building a live video protocol on top of UDP is all the rage; for example [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/), etc.
+Building a live video protocol on top of UDP is all the rage; for example, [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/), etc.
 
 Unless you're Google, it's very easy make a terrible protocol on top of UDP.
 Just wait for the **Replacing RTMP *but please not with SRT*** blog post.
@@ -226,7 +226,7 @@ You're one of the authors; are you daft?"
 
 Yes, because you can enable FEC in OPUS and send each audio "frame" as a datagram.
 But I will always contend that the audio codec is the wrong layer for FEC.
-In fact, I wrote a [follow-up blog](/blog/forward-error-correction) about it if you can't get enough of my hot takes.
+In fact, I wrote a [follow-up blog post](/blog/forward-error-correction) about it if you can't get enough of my hot takes.
 
 ## Conclusion
 There is no conclusion.
