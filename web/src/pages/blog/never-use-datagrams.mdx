@@ -1,0 +1,285 @@
+---
+layout: "@/layouts/global.astro"
+title: Never* use Datagrams
+author: kixelated
+description: Rethink your approach. *Unless you're doing something dope.
+cover: "/blog/never-use-datagrams/bodies.jpeg"
+date: 2024-02-17
+---
+
+# Never* use Datagrams
+
+Click-bait title, but hear me out.
+
+## TCP vs UDP
+So you're reading this blog over the internet.
+I would wager you do a lot of things over the internet.
+
+If you've built an application on the internet, you've undoubtedly had to decide whether to use TCP or UDP.
+Maybe you're trying to make, oh I dunno, a live video protocol or something.
+There are more choices than just those two but let's pretend like we're a networking textbook from the 90s.
+
+The common wisdom is:
+* use **TCP** if you want **reliable** delivery
+* use **UDP** if you want **unreliable** delivery
+
+What the actual fuck does that mean?
+Who *wants* unreliability?
+
+- You don't want a hard-drive that fails 5% of writes.
+- You don't want something with random holes in the middle (unless it's cheese).
+- You don't want a service that is randomly unavailable because ¯\\\_(ツ)\_/¯.
+
+Nobody\* wants memory corruption or deadzones or artifacts or cosmic rays.
+Unreliability is a consequence, not a goal.
+
+<figure>
+	![Video glitch](/blog/never-use-datagrams/glitch.gif)
+	<figcaption>
+		\*Unless you're making some cursed GIF art.
+		[Source](https://en.wikipedia.org/wiki/Glitch_art)
+	</figcaption>
+</figure>
+
+
+## Properties
+So what do we actually want?
+
+Well if you go low enough level, you can use electrical impulses to do stuff like:
+- Power on LEDs in a desired configuration.
+- Spin magnets at ludicrous speeds.
+- Make objects tingle and shake.
+- etc you get the idea.
+
+But we don't want to deal with electrical impulses.
+We want higher level functionaliy.
+
+Fortunately, software engineering is all about standing on the shoulders of others.
+There are layers on top of layers on top of layers of abstraction.
+Each layer provides properties so you don't have to reinvent the personal computer every time.
+
+Our job as developers is to decide which shoulders we want to stand on.
+But some of some shoulders are awful, so we have to be selective.
+Over-abstraction is bad but so is under-abstraction.
+
+What user experience are we trying to build, and how can we leverage the properties of existing layers to achieve that?
+
+## "Unreliable"
+There was a recent [MoQ interim](https://datatracker.ietf.org/wg/moq/meetings/) in Denver.
+For those unaware, it's basically a meetup of masochistic super nerds who want to design a live video protocol.
+We spent hours debating if we need both **FETCH** and **SUBSCRIBE** and what the hell those even mean.
+
+<figure>
+	![Denver interim](/blog/never-use-datagrams/denver.jpeg)
+	<figcaption>
+	I'm the one in the back right corner, the one with the stupid grin on their face.
+	</figcaption>
+</figure>
+
+At one point somebody said that **SUBSCRIBE** is *unreliable*  and it triggered this blog post.
+Good job!
+
+Like I said, nobody wants unreliability.
+What we actually want is **timeliness**.
+If the internet can choose between delivering two pieces of data, I want it to deliver the newest one.
+
+In the live video scenario, this is the difference between buffering and skipping ahead.
+It's really difficult to have a conversation with somebody when they're lagging.
+You don't want a buffering spinner on top of their face, nor do you want to hear only what they said 5 seconds ago.
+
+To accomplish timeliness, we often use UDP datagrams instead of TCP streams.
+But why?
+
+## Datagrams
+A datagram, aka an IP packet, is an envelope of 0s and 1s that gets sent from a source address to a destination address.
+Each device has a different maximum size allowed, which is super annoying, but 1200 bytes is generally safe.
+And of course, they can be silently lost or even arrive out of order.
+
+But the physical world doesn't work in discrete packets; it's yet another layer of abstraction.
+I'm not a scientist-man, but the data is converted to analog signals and sent through some medium.
+It all gets serialized and deserialized and buffered and queued and retransmitted and dropped and corrupted and delayed and reordered and duplicated and lost and all sorts of other things.
+
+So why does this abstraction exist?
+
+## Internet of Queues
+It's pretty simple actually: something's got to give.
+
+<figure>
+	![Screamer Rock](/blog/never-use-datagrams/bodies.jpeg)
+	<figcaption>
+		Let the packets hit the FLOOR
+	</figcaption>
+</figure>
+
+When there's too much data sent over the network, the network has to decide what to do.
+In theory it could drop random bits but oh lord that is a nightmare, as evidenced by over-the-air TV.
+So instead, a bunch of smart people got together and decided that routers should drop at packet boundaries.
+
+But why drop packets again?
+Why can't we just queue and deliver them later?
+Well yeah, that's what a lot of routers do these days since RAM is cheap.
+It's a phenomenon called [bufferbloat](https://en.wikipedia.org/wiki/Bufferbloat) and my [coworkers](https://discord.com) can attest that it's my favorite thing to talk about. 🐷
+
+But RAM is a finite resource so the packets will eventually get dropped.
+Then you finally get the **unreliability** you wanted all along...
+
+## Oh no
+Oh shit I forgot, I actually want **timeliness**.
+Bufferbloat is the worst possible scenario since queued packets are late packets.
+
+So [congestion control](https://en.wikipedia.org/wiki/TCP_congestion_control) is a huge, never ending area of research.
+I briefly summarized it in the [Replacing WebRTC](/blog/replacing-webrtc) post if you want more CONTENT.
+
+But basically, the only way to avoid queuing is to detect it, and then send less.
+The sender uses some feedback from the receiver to determine how long it took a packet to arrive.
+That way we can infer when routers are queuing packets and back off.
+
+<figure>
+	![BBR](/blog/never-use-datagrams/bbr.png)
+	<figcaption>
+		[Source](https://datatracker.ietf.org/meeting/99/materials/slides-99-iccrg-iccrg-presentation-2-00.pdf):
+		Riveting slides from IETF meetings that you're missing out on.
+	</figcaption>
+</figure>
+
+All you need to know is that sending packets at unlimited rate is a recipe for disaster.
+
+## You, The Application Developer
+Speaking of a recipe for disaster.
+Let's say you made the mistake of using UDP directly because you want them datagrams.
+
+You're actually in good company with a lot of the video industry.
+Building a custom protocol on top of UDP is all the rage; for example [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/), and too many to list.
+But sorry, you're bound to fuck up.
+
+WebRTC gets a pass because Google engineers are super smart.
+They also built on top of existing VoIP standards instead of reinventing everything... although [SDP](https://webrtchacks.com/sdp-anatomy/) is horrific.
+
+But yeah, if you want to build your own protocol on top of UDP, you "need" to implement at a minimum:
+- congestion control
+- retransmissions
+- multiplexing
+- keep-alives
+
+And if you want a great protocol, you also want to implement:
+- encryption
+- delay feedback
+- path migration
+- pacing
+- multi-path
+- flow control
+- extensions
+- prioritization
+- ...and some more stuff I probably missed
+
+And guess what, [QUIC](https://en.wikipedia.org/wiki/QUIC) implements all of these, or has extensions being hashed out that will.
+And support is already widespread given that it powers HTTP/3.
+Don't implement your own layer if there's a good one that gives you the properties you want.
+
+Otherwise you'll end up like **SRT**, with highlights such as hand-rolled encryption (oh no) and 3 types of acknowledgements.
+I promise I'll eventually write the promised **Replacing RTMP *but please not with SRT*** blog post.
+
+## Timeliness
+But remember, I ultimately want to achieve **timeliness**.
+How can we do that with QUIC?
+
+The first step is to avoid bloating the buffers 🐷.
+Use a delay-based congestion controller like [BBR](https://www.ietf.org/archive/id/draft-cardwell-iccrg-bbr-congestion-control-01.html) that will detect queueing and back off.
+There are better ways of doing this, like how WebRTC uses [transport-wide-cc](https://webrtc.googlesource.com/src/+/refs/heads/main/docs/native-code/rtp-hdrext/transport-wide-cc-02/README.md), which I'll personally make sure gets added to QUIC.
+
+The second step is to split the data into streams.
+Each stream is independent, but the data within a stream is delivered reliably and in order.
+It could be a frame of data, or a game update, or a chat message, or really any unit of data.
+
+The final step is to prioritize the streams.
+If you have a video frame that you want delivered first, set the priority to high.
+The QUIC stack will make sure the stream is delivered first, even if it means starving other streams.
+You can optionally close low priority streams to avoid wasting bandwidth.
+
+That's it.
+That's the secret behind [Media over QUIC](https://datatracker.ietf.org/wg/moq/about/).
+Now all that's left is to bikeshed the details.
+
+You don't need datagrams.
+You should never use datagrams.
+Use QUIC streams instead.
+
+<figure>
+	![QUIC logo](/home/quic.svg)
+</figure>
+
+## In Defense of Datagrams
+But QUIC itself is implemented on top of UDP, so **Never\* use Datagrams** is a bit of a stretch.
+My point is: let the smart network engineers handle the datagrams.
+You should care about the actually useful properties provided by QUIC.
+
+But what if you are a smart network engineer AND a smart audio codec developer?
+In particular, I want to talk about [Opus](https://opus-codec.org/) as it has FEC built-in.
+[Forward Error Correction](https://en.wikipedia.org/wiki/Error_correction_code) is a way to send extra data so that if some data is lost, the receiver can reconstruct it.
+Think like [RAID](https://en.wikipedia.org/wiki/RAID) but for packets instead of hard drives.
+
+Conveniently, audio bitrates are low enough that each audio "frame" can fit into a single datagram.
+So yes, you can just send OPUS audio over datagrams since it's a self-correcting codec.
+And as a result, the latest [MoQ draft](https://www.ietf.org/archive/id/draft-ietf-moq-transport-02.html) supports datagrams for this use-case.
+
+However, I will always contend that the audio codec is the wrong layer for this.
+
+## Networks are Complicated
+I worked with some very smart people at [Twitch](https://www.twitch.tv/).
+However, I will never forget a presentation maybe 4 years ago where a very smart codec engineer pitched using FEC.
+
+There was a graph that showed the TCP throughput during random packet loss.
+Wow, TCP sure sucks at 30% packet loss!
+But if we used FEC we could support much higher bitrates!
+All it takes is sending the same data multiple times, super easy!
+
+If somebody shows you any results based on simulated, random packet loss, you should politely tell them: **no, that's not how the internet works**.
+
+<figure>
+	![Series of Tubes](/blog/never-use-datagrams/tubes.png)
+	<figcaption>
+		**Fun fact**: the internet is not a series of tubes.
+	</figcaption>
+</figure>
+
+Networking is not quantum mechanics.
+There are no dice involved and packet loss is *not random*.
+It depends on the underlying transport and happens in bursts.
+And it's often just due to congestion, in which case sending more data will make the problem *worse*.
+
+Unfortunately, network simulation is just plain difficult.
+Tools like [netem](https://man7.org/linux/man-pages/man8/tc-netem.8.html) are useful, but you can't crank LOSS to 11.
+You're ultimately trying to solve a problem that doesn't exist in the real-world.
+
+## Hop-by-Hop
+But the real problem is something else.
+
+When I speak into a microphone, the audio data is encoded into packet via a codec like OPUS.
+That packet then traverses multiple multiple hops, potentially going over WiFi, Ethernet, 4G, fiber, satellites, etc.
+It switches between different cell towers, routers, ISPs, transit providers, business units, and who knows what else.
+
+Until finally, finally, the packet reaches ur Mom's iPhone and my words replay into her ear.
+Tell her I miss her. 😢
+
+Unfortuantely, each of those hops have different properties and packet loss scenarios.
+There's no one-size-fits-all FEC scheme, and it shouldn't be in the audio codec.
+And fun fact, many of these transports I mentioned already have some form of FEC built-in.
+
+Loss recovery should be a **hop-by-hop** property, and not an **end-to-end** property.
+
+And a good-old-fashioned retransmission is usually better than a complicated FEC scheme anyway.
+You still don't need datagrams.
+
+## Conclusion
+There is no conclusion.
+This is a rant.
+
+Please don't design your application on top of datagrams.
+You get a pass if you're using an old protocol like [DNS](https://en.wikipedia.org/wiki/Domain_Name_System), but be like [DNS over HTTPS](https://en.wikipedia.org/wiki/DNS_over_HTTPS) instead.
+And please please don't make yet another video protocol on top of UDP.
+
+Get involved with Media over QUIC instead!
+Join our [Discord](https://discord.gg/FCYF3p99mr) and tell me how wrong I am.
+
+Written by [@kixelated](https://github.com/kixelated).
+<img src="/blog/kixelCat.png" class="inline w-16" />
