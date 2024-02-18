@@ -1,5 +1,4 @@
 import { Source } from "./source"
-import { Init } from "./init"
 import * as MP4 from "../../media/mp4"
 
 // Manage a segment download, keeping a buffer of a single sample to potentially rewrite the duration.
@@ -7,7 +6,7 @@ export class Segment {
 	source: Source // The SourceBuffer used to decode media.
 	offset: number // The byte offset in the received file so far
 	samples: MP4.Sample[] // The samples ready to be flushed to the source.
-	init: Init
+	init: Uint8Array
 
 	sequence: number // The order within the track
 	dts?: number // The parsed DTS of the first sample
@@ -17,7 +16,7 @@ export class Segment {
 
 	done: boolean // The segment has been completed
 
-	constructor(source: Source, init: Init, sequence: number) {
+	constructor(source: Source, init: Uint8Array, sequence: number) {
 		this.source = source
 		this.offset = 0
 		this.done = false
@@ -27,12 +26,13 @@ export class Segment {
 		this.output = MP4.New()
 		this.samples = []
 
-		// We have to reparse the init segment to work with mp4box
-		for (let i = 0; i < init.raw.length; i += 1) {
-			// Populate the output with our init segment so it knows about tracks
-			this.output.appendBuffer(init.raw[i])
-		}
+		// For some reason we need to modify the underlying ArrayBuffer with offset
+		const copy = new Uint8Array(init)
+		const buffer = copy.buffer as MP4.ArrayBuffer
+		buffer.fileStart = 0
 
+		// Populate the output with our init segment so it knows about tracks
+		this.output.appendBuffer(buffer)
 		this.output.flush()
 	}
 

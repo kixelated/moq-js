@@ -1,5 +1,5 @@
 import * as Control from "./control"
-import { Objects } from "./object"
+import { Objects } from "./objects"
 import { asError } from "../common/error"
 
 import { Publisher } from "./publisher"
@@ -72,7 +72,7 @@ export class Connection {
 			const obj = await this.#objects.recv()
 			if (!obj) break
 
-			await this.#subscriber.recvObject(obj.header, obj.stream)
+			await this.#subscriber.recvObject(obj)
 		}
 	}
 

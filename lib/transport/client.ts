@@ -1,7 +1,7 @@
 import * as Stream from "./stream"
 import * as Setup from "./setup"
 import * as Control from "./control"
-import { Objects } from "./object"
+import { Objects } from "./objects"
 import { Connection } from "./connection"
 
 export interface ClientConfig {

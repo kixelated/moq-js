@@ -1,5 +1,5 @@
 import { Catalog } from "../media/catalog"
-import { Header } from "../transport/object"
+import { GroupHeader } from "../transport/objects"
 
 // TODO make an interface for backends
 
@@ -9,12 +9,12 @@ export interface Config {
 
 export interface Init {
 	name: string // name of the init track
-	stream: ReadableStream<Uint8Array>
+	data: Uint8Array
 }
 
 export interface Segment {
 	init: string // name of the init track
 	kind: "audio" | "video"
-	header: Header
+	header: GroupHeader
 	stream: ReadableStream<Uint8Array>
 }

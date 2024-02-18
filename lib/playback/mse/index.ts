@@ -1,9 +1,10 @@
 import { Source } from "./source"
-import { InitParser } from "./init"
 import { Segment } from "./segment"
 import { Track } from "./track"
 import * as MP4 from "../../media/mp4"
 import * as Message from "../backend"
+import { GroupReader } from "../../transport/objects"
+import { Deferred } from "../../common/async"
 
 export interface PlayerConfig {
 	element: HTMLVideoElement
@@ -12,7 +13,9 @@ export interface PlayerConfig {
 export default class Player {
 	#source: MediaSource
 
-	#init: Map<string, InitParser>
+	// A map of init tracks.
+	#inits = new Map<string, Deferred<Uint8Array>>()
+
 	#audio: Track
 	#video: Track
 
@@ -28,7 +31,6 @@ export default class Player {
 			this.play().catch(console.warn)
 		})
 
-		this.#init = new Map()
 		this.#audio = new Track(new Source(this.#source))
 		this.#video = new Track(new Source(this.#source))
 
@@ -97,24 +99,13 @@ export default class Player {
 	}
 
 	init(msg: Message.Init) {
-		this.#runInit(msg).catch((e) => console.warn("failed to run init", e))
-	}
-
-	async #runInit(msg: Message.Init) {
-		let init = this.#init.get(msg.name)
+		let init = this.#inits.get(msg.name)
 		if (!init) {
-			init = new InitParser()
-			this.#init.set(msg.name, init)
+			init = new Deferred()
+			this.#inits.set(msg.name, init)
 		}
 
-		const reader = msg.stream.getReader()
-
-		for (;;) {
-			const { value, done } = await reader.read()
-			if (done) break
-
-			init.push(value)
-		}
+		init.resolve(msg.data)
 	}
 
 	segment(msg: Message.Segment) {
@@ -122,45 +113,38 @@ export default class Player {
 	}
 
 	async #runSegment(msg: Message.Segment) {
-		let pending = this.#init.get(msg.init)
-		if (!pending) {
-			pending = new InitParser()
-			this.#init.set(msg.init, pending)
+		let init = this.#inits.get(msg.init)
+		if (!init) {
+			init = new Deferred()
+			this.#inits.set(msg.init, init)
 		}
 
-		// Wait for the init segment to be fully received and parsed
-		const init = await pending.ready
+		const container = new MP4.Parser(await init.promise)
 
 		let track: Track
-		if (init.info.videoTracks.length) {
+		if (container.info.videoTracks.length) {
 			track = this.#video
 		} else {
 			track = this.#audio
 		}
 
-		if (msg.header.object !== 0) {
-			throw new Error("multiple objects per group not supported")
-		}
+		const header = msg.header
+		const stream = new GroupReader(msg.stream)
 
-		const segment = new Segment(track.source, init, msg.header.group)
+		const segment = new Segment(track.source, await init.promise, header.group)
 		track.add(segment)
 
-		const container = new MP4.Parser()
-
-		// We need to reparse the init segment to work with mp4box
-		const writer = container.decode.writable.getWriter()
-		for (const raw of init.raw) {
-			// I hate this
-			await writer.write(new Uint8Array(raw))
-		}
-		writer.releaseLock()
-
-		const reader = msg.stream.pipeThrough(container.decode).getReader()
 		for (;;) {
-			const { value, done } = await reader.read()
-			if (done) break
+			const chunk = await stream.chunk()
+			if (!chunk) {
+				break
+			}
 
-			segment.push(value.sample)
+			const frames = container.decode(chunk.payload)
+			for (const frame of frames) {
+				segment.push(frame.sample)
+			}
+
 			track.flush()
 		}
 

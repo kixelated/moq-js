@@ -1,6 +1,6 @@
 import * as Control from "./control"
 import { Queue, Watch } from "../common/async"
-import { Objects } from "./object"
+import { Objects, GroupWriter, ObjectWriter, StreamType, TrackWriter } from "./objects"
 
 export class Publisher {
 	// Used to send control messages
@@ -82,7 +82,7 @@ export class Publisher {
 			throw new Error(`duplicate subscribe for id: ${msg.id}`)
 		}
 
-		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg.id, msg.namespace, msg.name)
+		const subscribe = new SubscribeRecv(this.#control, this.#objects, msg)
 		this.#subscribe.set(msg.id, subscribe)
 		await this.#subscribeQueue.push(subscribe)
 
@@ -155,6 +155,7 @@ export class SubscribeRecv {
 	#control: Control.Stream
 	#objects: Objects
 	#id: bigint
+	#trackId: bigint
 
 	readonly namespace: string
 	readonly track: string
@@ -162,12 +163,13 @@ export class SubscribeRecv {
 	// The current state of the subscription.
 	#state: "init" | "ack" | "closed" = "init"
 
-	constructor(control: Control.Stream, objects: Objects, id: bigint, namespace: string, track: string) {
+	constructor(control: Control.Stream, objects: Objects, msg: Control.Subscribe) {
 		this.#control = control // so we can send messages
 		this.#objects = objects // so we can send objects
-		this.#id = id
-		this.namespace = namespace
-		this.track = track
+		this.#id = msg.id
+		this.#trackId = msg.trackId
+		this.namespace = msg.namespace
+		this.track = msg.name
 	}
 
 	// Acknowledge the subscription as valid.
@@ -194,8 +196,36 @@ export class SubscribeRecv {
 		})
 	}
 
-	// Create a writable data stream
-	async data(header: { group: number; object: number; priority: number; expires?: number }) {
-		return this.#objects.send({ track: this.#id, ...header })
+	// Create a writable data stream for the entire track
+	async serve(props?: { priority: number }): Promise<TrackWriter> {
+		return this.#objects.send({
+			type: StreamType.Track,
+			sub: this.#id,
+			track: this.#trackId,
+			priority: props?.priority ?? 0,
+		})
+	}
+
+	// Create a writable data stream for a group within the track
+	async group(props: { group: number; priority?: number }): Promise<GroupWriter> {
+		return this.#objects.send({
+			type: StreamType.Group,
+			sub: this.#id,
+			track: this.#trackId,
+			group: props.group,
+			priority: props.priority ?? 0,
+		})
+	}
+
+	// Create a writable data stream for a single object within the track
+	async object(props: { group: number; object: number; priority?: number }): Promise<ObjectWriter> {
+		return this.#objects.send({
+			type: StreamType.Object,
+			sub: this.#id,
+			track: this.#trackId,
+			group: props.group,
+			object: props.object,
+			priority: props.priority ?? 0,
+		})
 	}
 }

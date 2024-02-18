@@ -1,7 +1,7 @@
 import * as Control from "./control"
 import { Queue, Watch } from "../common/async"
-import { Objects } from "./object"
-import type { Header } from "./object"
+import { Objects } from "./objects"
+import type { TrackReader, GroupReader, ObjectReader } from "./objects"
 
 export class Subscriber {
 	// Use to send control messages.
@@ -71,6 +71,7 @@ export class Subscriber {
 		await this.#control.send({
 			kind: Control.Msg.Subscribe,
 			id,
+			trackId: id,
 			namespace,
 			name: track,
 			start_group: { mode: "latest", value: 0 },
@@ -118,12 +119,14 @@ export class Subscriber {
 		await subscribe.onError(0n, "fin")
 	}
 
-	async recvObject(header: Header, stream: ReadableStream<Uint8Array>) {
+	async recvObject(reader: TrackReader | GroupReader | ObjectReader) {
+		const header = await reader.header()
+
 		const subscribe = this.#subscribe.get(header.track)
 		if (!subscribe) {
 			throw new Error(`data for for unknown track: ${header.track}`)
 		} else {
-			await subscribe.onData(header, stream)
+			await subscribe.onData(reader)
 		}
 	}
 }
@@ -166,7 +169,7 @@ export class SubscribeSend {
 	readonly track: string
 
 	// A queue of received streams for this subscription.
-	#data = new Queue<{ header: Header; stream: ReadableStream<Uint8Array> }>()
+	#data = new Queue<TrackReader | GroupReader | ObjectReader>()
 
 	constructor(control: Control.Stream, id: bigint, namespace: string, track: string) {
 		this.#control = control // so we can send messages
@@ -197,8 +200,8 @@ export class SubscribeSend {
 		return await this.#data.abort(err)
 	}
 
-	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
-		if (!this.#data.closed()) await this.#data.push({ header, stream })
+	async onData(reader: TrackReader | GroupReader | ObjectReader) {
+		if (!this.#data.closed()) await this.#data.push(reader)
 	}
 
 	// Receive the next a readable data stream

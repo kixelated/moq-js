@@ -8,6 +8,7 @@ import { asError } from "../common/error"
 import Webcodecs from "./webcodecs"
 import MSE from "./mse"
 import { Client } from "../transport/client"
+import { GroupReader } from "../transport/objects"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
@@ -98,7 +99,21 @@ export class Player {
 			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
 
-			this.#backend.init({ stream: init.stream, name })
+			if (!(init instanceof GroupReader)) {
+				throw new Error(`expected group reader for init: ${name}`)
+			}
+
+			const header = await init.header()
+			if (header.group !== 0) {
+				throw new Error("expected group 0")
+			}
+
+			const chunk = await init.chunk()
+			if (chunk.object !== 0) {
+				throw new Error("expected object 0")
+			}
+
+			this.#backend.init({ data: chunk.payload, name })
 		} finally {
 			await sub.close()
 		}
@@ -115,10 +130,16 @@ export class Player {
 				const segment = await Promise.race([sub.data(), this.#running])
 				if (!segment) break
 
+				if (!(segment instanceof GroupReader)) {
+					throw new Error(`expected group reader for segment: ${track.data_track}`)
+				}
+
+				const header = await segment.header()
+
 				this.#backend.segment({
 					init: track.init_track,
 					kind: track.kind,
-					header: segment.header,
+					header,
 					stream: segment.stream,
 				})
 			}

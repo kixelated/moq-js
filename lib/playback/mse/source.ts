@@ -1,11 +1,10 @@
-import { Init } from "./init"
+import * as MP4 from "../../media/mp4"
 
 // Create a SourceBuffer with convenience methods
 export class Source {
 	sourceBuffer?: SourceBuffer
 	mediaSource: MediaSource
 	queue: Array<SourceInit | SourceData | SourceTrim>
-	init?: Init
 
 	constructor(mediaSource: MediaSource) {
 		this.mediaSource = mediaSource
@@ -13,32 +12,17 @@ export class Source {
 	}
 
 	// (re)initialize the source using the provided init segment.
-	initialize(init: Init) {
-		// Check if the init segment is already in the queue.
-		for (let i = this.queue.length - 1; i >= 0; i--) {
-			if ((this.queue[i] as SourceInit).init == init) {
-				// Already queued up.
-				return
-			}
-		}
-
-		// Check if the init segment has already been applied.
-		if (this.init == init) {
-			return
-		}
-
+	initialize(init: Uint8Array) {
 		// Add the init segment to the queue so we call addSourceBuffer or changeType
 		this.queue.push({
 			kind: "init",
 			init: init,
 		})
 
-		for (let i = 0; i < init.raw.length; i += 1) {
-			this.queue.push({
-				kind: "data",
-				data: init.raw[i],
-			})
-		}
+		this.queue.push({
+			kind: "data",
+			data: init,
+		})
 
 		this.flush()
 	}
@@ -91,16 +75,15 @@ export class Source {
 			}
 
 			if (next.kind == "init") {
-				this.init = next.init
-
+				const parsed = new MP4.Parser(next.init)
 				if (!this.sourceBuffer) {
 					// Create a new source buffer.
-					this.sourceBuffer = this.mediaSource.addSourceBuffer(this.init.info.mime)
+					this.sourceBuffer = this.mediaSource.addSourceBuffer(parsed.info.mime)
 
 					// Call flush automatically after each update finishes.
 					this.sourceBuffer.addEventListener("updateend", this.flush.bind(this))
 				} else {
-					this.sourceBuffer.changeType(next.init.info.mime)
+					this.sourceBuffer.changeType(parsed.info.mime)
 				}
 			} else if (next.kind == "data") {
 				if (!this.sourceBuffer) {
@@ -130,19 +113,17 @@ export class Source {
 	}
 }
 
-interface SourceItem {}
-
-class SourceInit implements SourceItem {
-	kind!: "init"
-	init!: Init
+interface SourceInit {
+	kind: "init"
+	init: Uint8Array
 }
 
-class SourceData implements SourceItem {
-	kind!: "data"
-	data!: Uint8Array | ArrayBuffer
+interface SourceData {
+	kind: "data"
+	data: Uint8Array | ArrayBuffer
 }
 
-class SourceTrim implements SourceItem {
-	kind!: "trim"
-	trim!: number
+interface SourceTrim {
+	kind: "trim"
+	trim: number
 }

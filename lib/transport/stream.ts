@@ -7,16 +7,16 @@ const MAX_U62: bigint = 2n ** 62n - 1n
 
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 export class Reader {
-	#reader: ReadableStream<Uint8Array>
+	stream: ReadableStream<Uint8Array>
 	#scratch: Uint8Array
 
-	constructor(reader: ReadableStream<Uint8Array>) {
-		this.#reader = reader
+	constructor(stream: ReadableStream<Uint8Array>) {
+		this.stream = stream
 		this.#scratch = new Uint8Array(8)
 	}
 
 	async readAll(): Promise<Uint8Array> {
-		const reader = this.#reader.getReader()
+		const reader = this.stream.getReader()
 		let buf = new Uint8Array(0)
 
 		for (;;) {
@@ -44,7 +44,7 @@ export class Reader {
 	}
 
 	async read(dst: Uint8Array, offset: number, size: number): Promise<Uint8Array> {
-		const reader = this.#reader.getReader({ mode: "byob" })
+		const reader = this.stream.getReader({ mode: "byob" })
 
 		while (offset < size) {
 			const empty = new Uint8Array(dst.buffer, dst.byteOffset + offset, size - offset)
@@ -115,16 +115,20 @@ export class Reader {
 			throw new Error("impossible")
 		}
 	}
+
+	async close() {
+		await this.stream.cancel()
+	}
 }
 
 // Writer wraps a stream and writes chunks of data
 export class Writer {
-	#writer: WritableStream<Uint8Array>
+	stream: WritableStream<Uint8Array>
 	#scratch: Uint8Array
 
-	constructor(writer: WritableStream<Uint8Array>) {
+	constructor(stream: WritableStream<Uint8Array>) {
 		this.#scratch = new Uint8Array(8)
-		this.#writer = writer
+		this.stream = stream
 	}
 
 	async u8(v: number) {
@@ -162,7 +166,7 @@ export class Writer {
 	}
 
 	async write(v: Uint8Array) {
-		const writer = this.#writer.getWriter()
+		const writer = this.stream.getWriter()
 		try {
 			await writer.write(v)
 		} finally {
@@ -174,6 +178,10 @@ export class Writer {
 		const data = new TextEncoder().encode(str)
 		await this.u53(data.byteLength)
 		await this.write(data)
+	}
+
+	async close() {
+		await this.stream.close()
 	}
 }
 

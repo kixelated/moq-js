@@ -65,6 +65,7 @@ export interface Subscribe {
 	kind: Msg.Subscribe
 
 	id: bigint
+	trackId: bigint
 	namespace: string
 	name: string
 
@@ -86,7 +87,6 @@ export type Parameters = Map<bigint, Uint8Array>
 export interface SubscribeOk {
 	kind: Msg.SubscribeOk
 	id: bigint
-	expires?: bigint
 }
 
 export interface SubscribeReset {
@@ -255,6 +255,7 @@ export class Decoder {
 		return {
 			kind: Msg.Subscribe,
 			id: await this.r.u62(),
+			trackId: await this.r.u62(),
 			namespace: await this.r.string(),
 			name: await this.r.string(),
 			start_group: await this.location(),
@@ -305,7 +306,6 @@ export class Decoder {
 		return {
 			kind: Msg.SubscribeOk,
 			id: await this.r.u62(),
-			expires: (await this.r.u62()) || undefined,
 		}
 	}
 
@@ -414,6 +414,7 @@ export class Encoder {
 	async subscribe(s: Subscribe) {
 		await this.w.u53(Id.Subscribe)
 		await this.w.u62(s.id)
+		await this.w.u62(s.trackId)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
 		await this.location(s.start_group)
@@ -455,7 +456,6 @@ export class Encoder {
 	async subscribe_ok(s: SubscribeOk) {
 		await this.w.u53(Id.SubscribeOk)
 		await this.w.u62(s.id)
-		await this.w.u62(s.expires ?? 0n)
 	}
 
 	async subscribe_reset(s: SubscribeReset) {
