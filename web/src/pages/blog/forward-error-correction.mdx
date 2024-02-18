@@ -9,7 +9,7 @@ date: 2024-02-17
 
 # Forward? Error? Correction?
 So I absolutely *dunked* on datagrams in the [last blog post](/blog/never-use-datagrams).
-Now it's time to dunk on the last remaining hope for datagrams: [Forward Error Correction](https://www.techtarget.com/searchmobilecomputing/definition/forward-error-correction) (FEC)
+Now it's time to dunk on the last remaining hope for datagrams: [Forward Error Correction](https://www.techtarget.com/searchmobilecomputing/definition/forward-error-correction) (FEC).
 
 ## OPUS
 [Opus](https://opus-codec.org/) is an amazing audio codec.
@@ -39,7 +39,7 @@ I worked with some very smart people at [Twitch](https://www.twitch.tv/).
 However, I will never forget a presentation maybe 4 years ago where a very smart codec engineer pitched using FEC.
 
 There was a graph that showed the TCP throughput during random packet loss.
-Wow, TCP sure has a low birate at 30% packet loss.
+Wow, TCP sure has a low bitrate at 30% packet loss.
 But look at this demo, we used UDP+FEC and made something faster than TCP!
 
 If somebody shows you any results based on simulated, random packet loss, you should politely tell them: **no, that's not how the internet works**.
@@ -58,24 +58,24 @@ It depends on the underlying transport.
 Sometimes it occurs randomly due to signal interference. <br />
 Sometimes it occurs in bursts due to batching. <br />
 Sometimes it occurs due to congestion. <br />
-Sometimes it occurs because ???.
+Sometimes it occurs because ???
 
-Unfortunately, there's no magic loophole on the interenet.
+Unfortunately, there's no magic loophole on the internet.
 You can't send 10x the data to mask packet loss.
 
 In fact, if you ever see a number like 30% packet loss in the real world (yikes), it's likely due to congestion.
 You're sending 30% *too much* and fully saturating a link.
-The solution is to send *less* instead to drain network queues. 🤯
+The solution is to send *less data* to instead drain network queues. 🤯
 
 **Fun-fact**: That's the fundamental difference between loss-based congestion control (ex. Reno, CUBIC) and delay-based congestion control (ex. BBR, COPA).
 BBRv1 doesn't even use packet loss as a signal; it's all about RTT.
 
 ## Expertise
 These packet loss misconceptions come up surprisingly often in the live video space.
-The hyper focus on packet loss is a symptom of a larger problem: media experts suddenly have to become networking experts.
+The hyperfocus on packet loss is a symptom of a larger problem: media experts suddenly have to become networking experts.
 
-Even modern media protocols are built directly on top of UDP, for example [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/).
-It's for a good reason, as the head-of-line blocking of TCP is a non-starter for real-time media.
+Even modern media protocols are built directly on top of UDP; for example [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/).
+And for good reason, as the head-of-line blocking of TCP is a non-starter for real-time media.
 But with great power (UDP) comes great responsibility.
 
 <figure>
@@ -87,7 +87,7 @@ But with great power (UDP) comes great responsibility.
 
 And the same mistakes keep getting repeated.
 I can't tell you the number of times I've talked to an engineer at a video conference who decries congestion control, and in the next breath claims FEC is the solution to all their problems.
-WebRTC gets a passing grade because the Google engineers are super smart, although its complexity is a testiment to the difficulty of networking.
+WebRTC gets a passing grade because the Google engineers are super smart, although its complexity is a testament to the difficulty of networking.
 
 This is one of the reasons why we need **Media over QUIC**.
 Let the network engineers handle the network and the media engineers handle the media.
@@ -95,13 +95,13 @@ Let the network engineers handle the network and the media engineers handle the 
 ## End-to-End
 But my beef with FEC in OPUS is more fundamental.
 
-When I speak into a microphone, the audio data is encoded into packet via a codec like OPUS.
-That packet then traverses multiple multiple hops, potentially going over WiFi, Ethernet, 4G, fiber, satellites, etc.
+When I speak into a microphone, the audio data is encoded into packets via a codec like OPUS.
+That packet then traverses multiple hops, potentially going over WiFi, Ethernet, 4G, fiber, satellites, etc.
 It switches between different cell towers, routers, ISPs, transit providers, business units, and who knows what else.
 Until finally, finally, the packet reaches ur Mom's iPhone and my words replay into her ear.
 Tell her I miss her. 😢
 
-Unfortuantely, each of those hops have different properties and packet loss scenarios.
+Unfortunately, each of those hops have different properties and packet loss scenarios.
 Many of them already have FEC built-in or don't need it at all.
 
 By performing FEC in the application layer, specifically the audio codec, we're making a decision that's **end-to-end**.
@@ -122,7 +122,7 @@ A protocol like WiFi is general purpose, so it uses a general purpose recovery m
 It doesn't know that audio packets are time-sensitive.
 
 There are ways to flag [QoS](https://en.wikipedia.org/wiki/Quality_of_service) in IP packets but ISP support is limited, as is the granularity.
-That's why it why does make sense to perform additional FEC at a higher level, but again it should be hop-by-hop.
+That's why it does make sense to perform additional FEC at a higher level, but again, it should be hop-by-hop.
 
 ## QUIC
 So I just dunked on FEC in OPUS.
@@ -132,7 +132,7 @@ Well QUIC doesn't support FEC yet.
 There are [some proposals](https://www.ietf.org/archive/id/draft-michel-quic-fec-01.html) but I imagine it will be a long time before anything materializes.
 
 QUIC is primarily designed and used by CDN companies.
-Their whole purpose is put edge nodes as close to the user as possible in order to improve the user experience.
+Their whole purpose is to put edge nodes as close to the user as possible in order to improve the user experience.
 When your RTT to the Google/CloudFlare/Akamai/Fastly/etc edge is 20ms, then FEC is strictly worse than retransmissions.
 FEC can only ever be an improvement when `target_latency < 2*RTT`.
 
@@ -147,7 +147,7 @@ This might just be good enough for now.
 
 ## Conclusion
 Audio is important. <br />
-Networks are quite complicated.<br />
+Networks are complicated.<br />
 This is not haiku.
 
 FEC should not be in an audio codec.
