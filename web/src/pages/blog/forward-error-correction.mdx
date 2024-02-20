@@ -13,59 +13,58 @@ Now it's time to dunk on the last remaining hope for datagrams: [Forward Error C
 
 ## OPUS
 [Opus](https://opus-codec.org/) is an amazing audio codec.
-Full disclosure, I haven't had the opportunity to work with it directly, since I was stuck in [AAC](https://en.wikipedia.org/wiki/Advanced_Audio_Coding) land at Twitch, so I'm talking out of my ass a bit.
+Full disclosure, I haven't had the opportunity to work with it directly;
+I was stuck in [AAC](https://en.wikipedia.org/wiki/Advanced_Audio_Coding) land at Twitch.
+But that's not going to stop me from talking out of my ass.
 
-OPUS has built-in support for FEC which is neat.
-There are so many possible FEC schemes, many of which are patented, and I would do the subject a disservice if I tried to explain them.
-The idea is to send redundant data, so the receiver can paper over small amounts of packet loss.
+I want to rant about OPUS' built-in support for FEC.
+And to be clear, this isn't a rant specific to OPUS.
+Somebody *inevitably* asks for FEC in every networking protocol (like [MoQ](https://github.com/moq-wg/moq-transport/issues/320)) and you can link them this post now.
+
+The general idea behind FEC is is to send redundant data so the receiver can paper over small amounts of packet loss.
 It's conceptually similar to [RAID](https://en.wikipedia.org/wiki/RAID) but for packets spread over time instead of hard drives.
-
-<figure>
-	![BBR](/blog/forward-error-correction/interleaving.png)
-	<figcaption>
-		[Source](https://en.wikipedia.org/wiki/Error_correction_code):
-		Instead you get this real image from Wikipedia.
-	</figcaption>
-</figure>
+There are so many possible FEC schemes, many of which are patented, and I would do the subject a disservice if I even understood them.
 
 Conveniently, audio "frames" are so small that they fit into a single datagram.
-So rather than deal with retransmissions at the disgusting transport layer, the encoder can just encode redundancy into the bitstream.
-RIP packet loss 1983-2024.
+So rather than deal with retransmissions at the *disgusting* transport layer, the audio encoder can just encode redundancy via FEC.
+🪦 RIP packet loss: 1983-2024 🪦
 
-But the audio codec is so the wrong layer for this.
+But despite being a great idea on paper, there's *so* many things wrong with this.
 
 ## Networks are Complicated
 I worked with some very smart people at [Twitch](https://www.twitch.tv/).
 However, I will never forget a presentation maybe 4 years ago where a very smart codec engineer pitched using FEC.
 
 There was a graph that showed the TCP throughput during random packet loss.
-Wow, TCP sure has a low bitrate at 30% packet loss.
-But look at this demo, we used UDP+FEC and made something faster than TCP!
-
-If somebody shows you any results based on simulated, random packet loss, you should politely tell them: **no, that's not how the internet works**.
+Wow, TCP sure has a low bitrate at 30% packet loss, it sucks!
+But look at this other green line!
+It's a custom protocol using UDP+FEC and it's multiple times faster than TCP!
 
 <figure>
-	![Series of Tubes](/blog/forward-error-correction/tubes.png)
+	![Look at this graph](/blog/forward-error-correction/graph.jpeg)
 	<figcaption>
-		**Fun fact**: the internet is not a series of tubes.
+		[Abridged recreation of the meeting](https://www.youtube.com/watch?v=sz2mmM-kN1I)
 	</figcaption>
 </figure>
+
+If somebody shows you any results based on simulated, random packet loss, you should politely tell them: **no, that's not how the internet works**.
 
 Networking is not quantum mechanics.
 There are no dice involved and packet loss is *not random*.
 It depends on the underlying transport.
 
-Sometimes it occurs randomly due to signal interference. <br />
-Sometimes it occurs in bursts due to batching. <br />
-Sometimes it occurs due to congestion. <br />
-Sometimes it occurs because ???
+- Sometimes it occurs randomly due to signal interference.
+- Sometimes it occurs in bursts due to batching.
+- Sometimes it occurs due to congestion.
+- Sometimes it occurs because ???
 
 Unfortunately, there's no magic loophole on the internet.
+There's no one trick that has eluded TCP for 40 years, and yet the UDP geniuses have figured it out.
 You can't send 10x the data to mask packet loss.
 
 In fact, if you ever see a number like 30% packet loss in the real world (yikes), it's likely due to congestion.
 You're sending 30% *too much* and fully saturating a link.
-The solution is to send *less data* to instead drain network queues. 🤯
+The solution is to send *less data*, not parity bits. 🤯
 
 **Fun-fact**: That's the fundamental difference between loss-based congestion control (ex. Reno, CUBIC) and delay-based congestion control (ex. BBR, COPA).
 BBRv1 doesn't even use packet loss as a signal; it's all about RTT.
@@ -87,9 +86,13 @@ But with great power (UDP) comes great responsibility.
 
 And the same mistakes keep getting repeated.
 I can't tell you the number of times I've talked to an engineer at a video conference who decries congestion control, and in the next breath claims FEC is the solution to all their problems.
-WebRTC gets a passing grade because the Google engineers are super smart, although its complexity is a testament to the difficulty of networking.
+Frankly, I'm just jaded at this point.
 
-This is one of the reasons why we need **Media over QUIC**.
+But it is definitely possible to have both media and networking expertise.
+The Google engineers who built WebRTC are a testament to that.
+However, the complexity of WebRTC speaks volumes to the difficulty of the task.
+
+This is one of the many reasons why we need **Media over QUIC**.
 Let the network engineers handle the network and the media engineers handle the media.
 
 ## End-to-End
@@ -118,17 +121,23 @@ This is based on the properties of the hop, and if they expect:
 - **congestion**: drop packets.
 
 But at which layer?
-A protocol like WiFi is general purpose, so it uses a general purpose recovery mechanism.
-It doesn't know that audio packets are time-sensitive.
+A protocol like WiFi doesn't know the contents of each packet, especially if they're encrypted like every modern protocol.
+Throughput matters when you're downloading a movie, but latency matters when you're on a conference call.
 
-There are ways to flag [QoS](https://en.wikipedia.org/wiki/Quality_of_service) in IP packets but ISP support is limited, as is the granularity.
-That's why it does make sense to perform additional FEC at a higher level, but again, it should be hop-by-hop.
+Our time-sensitive audio packets need to have different behavior than other traffic.
+There are ways to signal [QoS](https://en.wikipedia.org/wiki/Quality_of_service) in IP packets, but unfortunately, support is limited as is the granularity.
+All it takes is one router in the chain to ignore your flag and everything falls apart.
+
+That's why it absolutely makes sense to perform FEC at a higher level.
+If the transport layer knows the desired properties, then it can make the best decision.
+Not the audio codec.
 
 ## QUIC
 So I just dunked on FEC in OPUS.
 "Don't do FEC in the audio codec, do it in QUIC instead."
 
 Well QUIC doesn't support FEC yet.
+Oops.
 There are [some proposals](https://www.ietf.org/archive/id/draft-michel-quic-fec-01.html) but I imagine it will be a long time before anything materializes.
 
 QUIC is primarily designed and used by CDN companies.
@@ -143,19 +152,18 @@ It's wasteful but it's simple.
 
 RED actually works natively in QUIC without any extensions.
 A QUIC library can send redundant [STREAM frames](https://www.rfc-editor.org/rfc/rfc9000.html#name-stream-frames) and the receiver will transparently discard duplicates.
-This might just be good enough for now.
+This might just be good enough?
 
 ## Conclusion
 Audio is important. <br />
 Networks are complicated.<br />
 This is not haiku.
 
-FEC should not be in an audio codec.
-It should be closer to the source of packet loss .
+FEC should not be in an audio codec, but rather closer to the source of packet loss.
 But at the end of the day, I'm just shoving blame down the stack.
-Do what works best for your users at whatever layer you have access to.
+Do what works best for your users at whatever layer you control.
 
-Just please, never show me results based on random packet loss again.
+Just please, never show me a graph based on random packet loss again.
 
 Written by [@kixelated](https://github.com/kixelated).
 <img src="/blog/kixelCat.png" class="inline w-16" />
