@@ -147,12 +147,31 @@ FEC can only ever be an improvement when `target_latency < 2*RTT`.
 
 Additionally, there might not even be a need for FEC in QUIC.
 WebRTC supports [RED](https://webrtchacks.com/red-improving-audio-quality-with-redundancy/) which was [added to RTP in 1997](https://datatracker.ietf.org/doc/html/rfc2198).
-Why send parity data when you can just transmit the same packet multiple times?
-It's wasteful but it's simple.
+The idea is to just transmit the same packet multiple times and let the receiver discard duplicates.
 
 RED actually works natively in QUIC without any extensions.
 A QUIC library can send redundant [STREAM frames](https://www.rfc-editor.org/rfc/rfc9000.html#name-stream-frames) and the receiver will transparently discard duplicates.
-This might just be good enough?
+It's wasteful but it's simple and might be good enough for some hops.
+
+## In Defense of FEC
+This is a hot topic and I am quite ignorant.
+I don't to be too dismissive.
+
+There are absolutely scenarios where FEC is the best solution.
+When you're sending data over a satellite link, you're dealing with a high RTT and burst loss.
+And there's totally scenarios where you won't have intermediate hops that can perform retransmissions, like a P2P connection.
+When the RTT gets high enough, you need FEC.
+
+And performing that FEC in OPUS gives you an extra property that I haven't mentioned yet: partial reconstruction.
+You might not be able to reconstruct the entire audio bitstream, but you can fill in the blanks so to speak.
+The fact that OPUS can partially decode a bitstream with only a fraction of the packets, regardless of FEC, is frankly amazing.
+
+And most importantly, you might not have control over the lower layers.
+I'm used to working at a company with a global network and a CDN but that's not a common reality.
+If the only thing you can control is the audio codec, then ratchet that FEC up to 11 and see what happens.
+
+My point is that transport knows best.
+The audio encoder shouldn't know that there's a satellite link in the chain.
 
 ## Conclusion
 Audio is important. <br />
