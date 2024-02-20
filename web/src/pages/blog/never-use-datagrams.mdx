@@ -45,7 +45,7 @@ Unreliability is a consequence, not a goal.
 ## Properties
 So what do we actually want?
 
-Well, if you go low enough level, you can use electrical impulses to do stuff like:
+If you go low enough level, you can use electrical impulses to do neat stuff like:
 - Power on LEDs in a desired configuration.
 - Spin magnets at ludicrous speeds.
 - Make objects tingle and shake.
@@ -67,7 +67,7 @@ What user experience are we trying to build, and how can we leverage the propert
 ## "Unreliable"
 There was a recent [MoQ interim](https://datatracker.ietf.org/wg/moq/meetings/) in Denver.
 For those unaware, it's basically a meetup of masochistic super nerds who want to design a live video protocol.
-We spent hours debating if we need both **FETCH** and **SUBSCRIBE** and what the hell those even mean.
+We spent hours debating the semantic differences between **FETCH** and **SUBSCRIBE** among other riveting topics.
 
 <figure>
 	![Denver interim](/blog/never-use-datagrams/denver.jpeg)
@@ -77,10 +77,9 @@ We spent hours debating if we need both **FETCH** and **SUBSCRIBE** and what the
 </figure>
 
 A few times, it was stated that **SUBSCRIBE** should be *unreliable*.
-Good job, it triggered this blog post!
+The room cringed, and I hard cringed enough to write this blog post.
 
-Like I said, nobody wants unreliability.
-What we actually want is **timeliness**.
+What I actually want is **timeliness**.
 If the internet can choose between delivering two pieces of data, I want it to deliver the newest one.
 
 In the live video scenario, this is the difference between buffering and skipping ahead.
@@ -88,7 +87,7 @@ If you're trying to have a conversation with someone on the internet, there can'
 You don't want a buffering spinner on top of their face, nor do you want to hear what they said 5 seconds ago.
 
 To accomplish timeliness, the live video industry often uses UDP datagrams instead of TCP streams.
-So does the video game industry.
+As does the video game industry apparently.
 But why?
 
 ## Datagrams
@@ -125,15 +124,18 @@ But RAM is a finite resource so the packets will eventually get dropped.
 Then you finally get the **unreliability** you wanted all along...
 
 ## Oh no
-Oh shit, I forgot, I actually want **timeliness**.
-Bufferbloat is the worst possible scenario since queued packets are late packets.
+Oh shit, I forgot, I actually want **timeliness** and bufferbloat is the worst possible scenario.
+Naively, you would expect the internet to deliver packets immediately, with some random packets getting dropped.
+However bufferbloat causes *all* packets to get queued, possibly for seconds, ruling out any hope of timely delivery.
 
-So [congestion control](https://en.wikipedia.org/wiki/TCP_congestion_control) is a huge, never ending area of research.
-I briefly summarized it in the [Replacing WebRTC](/blog/replacing-webrtc) post if you want more CONTENT.
-
-But basically, the only way to avoid queuing is to detect it, and then send less.
+How do you avoid this?
+Basically, the only way to avoid queuing is to detect it, and then send less.
 The sender uses some feedback from the receiver to determine how long it took a packet to arrive.
-That way we can infer when routers are queuing packets and back off.
+We can use that signal to infer when routers are queuing packets, and back off to drain any queues.
+
+This is called [congestion control](https://en.wikipedia.org/wiki/TCP_congestion_control) and it's a huge, never ending area of research.
+I briefly summarized it in the [Replacing WebRTC](/blog/replacing-webrtc) post if you want more CONTENT.
+But all you need to know is that sending packets at unlimited rate is a recipe for disaster.
 
 <figure>
 	![BBR](/blog/never-use-datagrams/bbr.png)
@@ -142,8 +144,6 @@ That way we can infer when routers are queuing packets and back off.
 		Riveting slides from IETF meetings that you're missing out on.
 	</figcaption>
 </figure>
-
-All you need to know is that sending packets at unlimited rate is a recipe for disaster.
 
 ## You, The Application Developer
 Speaking of a recipe for disaster.
@@ -176,13 +176,12 @@ And if you want an AMAZING protocol, you also need:
 - [anycast load balancing](https://www.rfc-editor.org/rfc/rfc9000.html#section-9.6.1)
 
 Let's be honest, you don't even know what half of those are, nor why they are worth implementing.
-Just use [QUIC](https://en.wikipedia.org/wiki/QUIC).
+Just use a [QUIC](https://en.wikipedia.org/wiki/QUIC) library instead.
 
-But if you still insist on UDP instead, you're actually in good company with a lot of the video industry.
+But if you still insist on UDP, you're actually in good company with a lot of the video industry.
 Building a live video protocol on top of UDP is all the rage; for example, [WebRTC](https://webrtc.org/), [SRT](https://www.haivision.com/products/srt-secure-reliable-transport/), [Sye](https://nscreenmedia.com/amazon-buys-sye/), [RIST](https://www.rist.tv/), etc.
-
-Unless you're Google, it's very easy make a terrible protocol on top of UDP.
-Just wait for the **Replacing RTMP *but please not with SRT*** blog post.
+With the exception of Google, it's very easy make a terrible protocol on top of UDP.
+Look forward to the upcoming **Replacing RTMP *but please not with SRT*** blog post!
 
 ## Timeliness
 But remember, I ultimately want to achieve **timeliness**.
@@ -207,26 +206,36 @@ Now all that's left is to bikeshed the details.
 
 And guess what?
 This approach works with higher latency targets too.
-If you want higher quality video at the cost of higher latency, then the fire-and-forget nature of datagrams is not what you want.
+It turns out that the fire-and-forget nature of datagrams only works when you need real-time latency.
+For everything else, there's QUIC streams.
 
 You don't need datagrams.
-Use QUIC streams instead.
 
 <figure>
 	![QUIC logo](/home/quic.svg)
 </figure>
 
 ## In Defense of Datagrams
-But QUIC itself is implemented on top of UDP, so **Never\* use Datagrams** is a bit of a stretch.
-My point is: let the smart network engineers handle the datagrams.
-You should care about the actually useful properties provided by QUIC.
+**Never\* use Datagrams** got you to click, but the direction of QUIC and MoQ seems to tell another story:
 
-"But Mr. Kixelated, the latest [MoQ draft](https://www.ietf.org/archive/id/draft-ietf-moq-transport-02.html) adds support for datagrams.
-You're one of the authors; are you daft?"
+1. QUIC [has support for datagrams](https://datatracker.ietf.org/doc/html/rfc9221) via an extension.
+2. WebTransport [requires support for datagrams](https://datatracker.ietf.org/doc/html/draft-ietf-webtrans-http3-08#section-3.1-6).
+3. The latest MoQ version [adds support for datagrams](https://www.ietf.org/archive/id/draft-ietf-moq-transport-02.html#object-message-formats).
+4. The next MoQ version [will require support for datagrams](https://github.com/moq-wg/moq-transport/pull/384).
 
-Yes, because you can enable FEC in OPUS and send each audio "frame" as a datagram.
-But I will always contend that the audio codec is the wrong layer for FEC.
-In fact, I wrote a [follow-up blog post](/blog/forward-error-correction) about it if you can't get enough of my hot takes.
+Like all things designed by committee, there's going to be some compromise.
+There are some folks who think datagram support is important.
+And frankly, it's trivial to support and allow people to experiment.
+For example, OPUS has FEC support built-in, which is why MoQ supports the ability to send each audio "frame" as a datagram.
+
+But it's a trap.
+Designed to lure in developers who don't know any better.
+Who wouldn't give up their precious UDP datagrams otherwise.
+
+If you want some more of my hot-takes:
+- The next [blog post about FEC in OPUS](/blog/forward-error-correction), and why layers are important.
+- The previous [blog post gushed over QUIC](/blog/quic-powers), except for the datagram extension which is frankly terrible.
+
 
 ## Conclusion
 There is no conclusion.
