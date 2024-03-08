@@ -99,18 +99,9 @@ export class Player {
 			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
 
-			if (!(init instanceof GroupReader)) {
-				throw new Error(`expected group reader for init: ${name}`)
-			}
-
-			if (init.header.group !== 0) {
-				throw new Error("expected group 0")
-			}
-
+			// We don't care what type of reader we get, we just want the payload.
 			const chunk = await init.read()
-			if (chunk.object !== 0) {
-				throw new Error("expected object 0")
-			}
+			if (!chunk) throw new Error("no init chunk")
 
 			this.#backend.init({ data: chunk.payload, name })
 		} finally {

@@ -231,19 +231,6 @@ export default function Publish() {
 	return (
 		<>
 			<form onSubmit={(e) => e.preventDefault()}>
-				<p>
-					<button
-						onClick={(e) => {
-							setAdvanced((toggle) => !toggle)
-							e.preventDefault()
-						}}
-					>
-						<Show when={advanced()} fallback="Show advanced settings">
-							Hide advanced settings
-						</Show>
-					</button>
-				</p>
-
 				<Device setError={setError} setDevice={setDevice} setDeviceLoading={setDeviceLoading} />
 
 				<Show when={videoTrack()}>
@@ -288,6 +275,21 @@ export default function Publish() {
 							<Match when={isStatus("live")}>Live</Match>
 						</Switch>
 					</button>
+
+					<Show when={device() && !broadcast()}>
+						<p>
+							<button
+								onClick={(e) => {
+									setAdvanced((toggle) => !toggle)
+									e.preventDefault()
+								}}
+							>
+								<Show when={advanced()} fallback="Show Advanced">
+									Hide Advanced
+								</Show>
+							</button>
+						</p>
+					</Show>
 
 					<Show when={broadcast()}>
 						<a href={watchUrl} onClick={copyShare} class="form-button">

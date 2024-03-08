@@ -29,14 +29,7 @@ class Worker {
 			// TODO buffer the init segmnet so we don't hold the stream open.
 			this.#onInit(msg.init)
 		} else if (msg.segment) {
-			const segment = msg.segment
-			this.#onSegment(segment).catch(async (e) => {
-				// Cancel the stream so we don't hold it open.
-				const err = asError(e)
-				await segment.stream.cancel(err)
-
-				throw e
-			})
+			this.#onSegment(msg.segment).catch(console.warn)
 		} else {
 			throw new Error(`unknown message: + ${JSON.stringify(msg)}`)
 		}

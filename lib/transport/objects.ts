@@ -90,7 +90,7 @@ export class Objects {
 			throw new Error("unknown header type")
 		}
 
-		console.trace("send object", res.header)
+		// console.trace("send object", res.header)
 
 		return res
 	}
@@ -140,7 +140,7 @@ export class Objects {
 			throw new Error("unknown stream type")
 		}
 
-		console.trace("receive object", res.header)
+		// console.trace("receive object", res.header)
 
 		return res
 	}
@@ -202,7 +202,11 @@ export class TrackReader {
 		public stream: Reader,
 	) {}
 
-	async read(): Promise<TrackChunk> {
+	async read(): Promise<TrackChunk | undefined> {
+		if (await this.stream.done()) {
+			return
+		}
+
 		const group = await this.stream.u53()
 		const object = await this.stream.u53()
 		const size = await this.stream.u53()
@@ -226,7 +230,11 @@ export class GroupReader {
 		public stream: Reader,
 	) {}
 
-	async read(): Promise<GroupChunk> {
+	async read(): Promise<GroupChunk | undefined> {
+		if (await this.stream.done()) {
+			return
+		}
+
 		const object = await this.stream.u53()
 		const size = await this.stream.u53()
 		const payload = await this.stream.read(size)
@@ -248,7 +256,12 @@ export class ObjectReader {
 		public stream: Reader,
 	) {}
 
-	async read(): Promise<ObjectChunk> {
+	// NOTE: Can only be called once.
+	async read(): Promise<ObjectChunk | undefined> {
+		if (await this.stream.done()) {
+			return
+		}
+
 		return {
 			payload: await this.stream.readAll(),
 		}

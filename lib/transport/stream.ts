@@ -18,24 +18,32 @@ export class Reader {
 		this.#reader = this.#stream.getReader()
 	}
 
-	// Ensures the buffer is at least size bytes long, or 0 until the end of the stream.
-	async #fill(size: number) {
+	// Adds more data to the buffer, returning true if more data was added.
+	async #fill(): Promise<boolean> {
+		const result = await this.#reader.read()
+		if (result.done) {
+			return false
+		}
+
+		const buffer = new Uint8Array(result.value)
+
+		if (this.#buffer.byteLength == 0) {
+			this.#buffer = buffer
+		} else {
+			const temp = new Uint8Array(this.#buffer.byteLength + buffer.byteLength)
+			temp.set(this.#buffer)
+			temp.set(buffer, this.#buffer.byteLength)
+			this.#buffer = temp
+		}
+
+		return true
+	}
+
+	// Add more data to the buffer until it's at least size bytes.
+	async #fillTo(size: number) {
 		while (this.#buffer.byteLength < size) {
-			const result = await this.#reader.read()
-			if (result.done) {
-				if (size == 0) break
-				throw "short buffer"
-			}
-
-			const buffer = new Uint8Array(result.value)
-
-			if (this.#buffer.byteLength == 0) {
-				this.#buffer = buffer
-			} else {
-				const temp = new Uint8Array(this.#buffer.byteLength + buffer.byteLength)
-				temp.set(this.#buffer)
-				temp.set(buffer, this.#buffer.byteLength)
-				this.#buffer = temp
+			if (!(await this.#fill())) {
+				throw new Error("unexpected end of stream")
 			}
 		}
 	}
@@ -51,12 +59,13 @@ export class Reader {
 	async read(size: number): Promise<Uint8Array> {
 		if (size == 0) return new Uint8Array()
 
-		await this.#fill(size)
+		await this.#fillTo(size)
 		return this.#slice(size)
 	}
 
 	async readAll(): Promise<Uint8Array> {
-		await this.#fill(0)
+		// eslint-disable-next-line no-empty
+		while (await this.#fill()) {}
 		return this.#slice(this.#buffer.byteLength)
 	}
 
@@ -71,7 +80,7 @@ export class Reader {
 	}
 
 	async u8(): Promise<number> {
-		await this.#fill(1)
+		await this.#fillTo(1)
 		return this.#slice(1)[0]
 	}
 
@@ -87,26 +96,26 @@ export class Reader {
 
 	// NOTE: Returns a bigint instead of a number since it may be larger than 53-bits
 	async u62(): Promise<bigint> {
-		await this.#fill(1)
+		await this.#fillTo(1)
 		const size = (this.#buffer[0] & 0xc0) >> 6
 
 		if (size == 0) {
 			const first = this.#slice(1)[0]
 			return BigInt(first) & 0x3fn
 		} else if (size == 1) {
-			await this.#fill(2)
+			await this.#fillTo(2)
 			const slice = this.#slice(2)
 			const view = new DataView(slice.buffer, slice.byteOffset, slice.byteLength)
 
 			return BigInt(view.getInt16(0)) & 0x3fffn
 		} else if (size == 2) {
-			await this.#fill(4)
+			await this.#fillTo(4)
 			const slice = this.#slice(4)
 			const view = new DataView(slice.buffer, slice.byteOffset, slice.byteLength)
 
 			return BigInt(view.getUint32(0)) & 0x3fffffffn
 		} else if (size == 3) {
-			await this.#fill(8)
+			await this.#fillTo(8)
 			const slice = this.#slice(8)
 			const view = new DataView(slice.buffer, slice.byteOffset, slice.byteLength)
 
@@ -114,6 +123,11 @@ export class Reader {
 		} else {
 			throw new Error("impossible")
 		}
+	}
+
+	async done(): Promise<boolean> {
+		if (this.#buffer.byteLength > 0) return false
+		return !(await this.#fill())
 	}
 
 	async close() {
@@ -184,6 +198,7 @@ export class Writer {
 	}
 
 	async close() {
+		this.#writer.releaseLock()
 		await this.#stream.close()
 	}
 
