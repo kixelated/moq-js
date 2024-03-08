@@ -133,24 +133,9 @@ export class Broadcast {
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
 
-		const stream = await subscriber.data({
-			group: 0,
-			object: 0,
-			priority: 0,
-		})
-
-		const writer = stream.getWriter()
-
-		try {
-			await writer.write(bytes)
-			await writer.close()
-		} catch (e) {
-			const err = asError(e)
-			await writer.abort(err.message)
-			throw err
-		} finally {
-			writer.releaseLock()
-		}
+		const stream = await subscriber.group({ group: 0 })
+		await stream.write({ object: 0, payload: bytes })
+		await stream.close()
 	}
 
 	async #serveInit(subscriber: SubscribeRecv, name: string) {
@@ -162,28 +147,9 @@ export class Broadcast {
 
 		const init = await track.init()
 
-		// Create a new stream for each segment.
-		const stream = await subscriber.data({
-			group: 0,
-			object: 0,
-			priority: 0, // TODO
-			expires: 0, // Never expires
-		})
-
-		const writer = stream.getWriter()
-
-		// TODO make a helper to pipe a Uint8Array to a stream
-		try {
-			// Write the init segment to the stream.
-			await writer.write(init)
-			await writer.close()
-		} catch (e) {
-			const err = asError(e)
-			await writer.abort(err.message)
-			throw err
-		} finally {
-			writer.releaseLock()
-		}
+		const stream = await subscriber.group({ group: 0 })
+		await stream.write({ object: 0, payload: init })
+		await stream.close()
 	}
 
 	async #serveTrack(subscriber: SubscribeRecv, name: string) {
@@ -209,15 +175,28 @@ export class Broadcast {
 
 	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
 		// Create a new stream for each segment.
-		const stream = await subscriber.data({
+		const stream = await subscriber.group({
 			group: segment.id,
-			object: 0,
 			priority: 0, // TODO
-			expires: 30, // TODO configurable
 		})
 
+		let object = 0
+
 		// Pipe the segment to the stream.
-		await segment.chunks().pipeTo(stream)
+		const chunks = segment.chunks().getReader()
+		for (;;) {
+			const { value, done } = await chunks.read()
+			if (done) break
+
+			await stream.write({
+				object,
+				payload: value,
+			})
+
+			object += 1
+		}
+
+		await stream.close()
 	}
 
 	// Attach the captured video stream to the given video element.

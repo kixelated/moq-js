@@ -7,31 +7,21 @@ export interface Frame {
 
 // Decode a MP4 container into individual samples.
 export class Parser {
+	info!: MP4.Info
+
 	#mp4 = MP4.New()
 	#offset = 0
 
-	// TODO Parser should extend TransformStream
-	decode: TransformStream<Uint8Array, Frame>
+	#samples: Array<Frame> = []
 
-	constructor() {
-		this.decode = new TransformStream(
-			{
-				start: this.#start.bind(this),
-				transform: this.#transform.bind(this),
-				flush: this.#flush.bind(this),
-			},
-			// Buffer a single sample on either end
-			{ highWaterMark: 1 },
-			{ highWaterMark: 1 },
-		)
-	}
-
-	#start(controller: TransformStreamDefaultController<Frame>) {
+	constructor(init: Uint8Array) {
 		this.#mp4.onError = (err) => {
-			controller.error(err)
+			console.error("MP4 error", err)
 		}
 
 		this.#mp4.onReady = (info: MP4.Info) => {
+			this.info = info
+
 			// Extract all of the tracks, because we don't know if it's audio or video.
 			for (const track of info.tracks) {
 				this.#mp4.setExtractionOptions(track.id, track, { nbSamples: 1 })
@@ -40,14 +30,27 @@ export class Parser {
 
 		this.#mp4.onSamples = (_track_id: number, track: MP4.Track, samples: MP4.Sample[]) => {
 			for (const sample of samples) {
-				controller.enqueue({ track, sample })
+				this.#samples.push({ track, sample })
 			}
 		}
 
 		this.#mp4.start()
+
+		// For some reason we need to modify the underlying ArrayBuffer with offset
+		const copy = new Uint8Array(init)
+		const buffer = copy.buffer as MP4.ArrayBuffer
+		buffer.fileStart = this.#offset
+
+		this.#mp4.appendBuffer(buffer)
+		this.#offset += buffer.byteLength
+		this.#mp4.flush()
+
+		if (!this.info) {
+			throw new Error("could not parse MP4 info")
+		}
 	}
 
-	#transform(chunk: Uint8Array) {
+	decode(chunk: Uint8Array): Array<Frame> {
 		const copy = new Uint8Array(chunk)
 
 		// For some reason we need to modify the underlying ArrayBuffer with offset
@@ -59,9 +62,10 @@ export class Parser {
 		this.#mp4.flush()
 
 		this.#offset += buffer.byteLength
-	}
 
-	#flush() {
-		this.#mp4.flush()
+		const samples = [...this.#samples]
+		this.#samples.length = 0
+
+		return samples
 	}
 }

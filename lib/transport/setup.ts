@@ -4,7 +4,9 @@ export type Message = Client | Server
 export type Role = "publisher" | "subscriber" | "both"
 
 export enum Version {
-	DRAFT_00 = 0xff00,
+	DRAFT_00 = 0xff000000,
+	DRAFT_01 = 0xff000001,
+	DRAFT_02 = 0xff000002,
 	KIXEL_00 = 0xbad00,
 	KIXEL_01 = 0xbad01,
 }
@@ -88,7 +90,7 @@ export class Decoder {
 		for (let i = 0; i < count; i++) {
 			const id = await this.r.u62()
 			const size = await this.r.u53()
-			const value = await this.r.readExact(size)
+			const value = await this.r.read(size)
 
 			if (params.has(id)) {
 				throw new Error(`duplicate parameter id: ${id}`)

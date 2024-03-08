@@ -70,7 +70,7 @@ export default class Player {
 	play() {}
 
 	init(init: Init) {
-		this.send({ init }, init.stream)
+		this.send({ init })
 	}
 
 	segment(segment: Segment) {

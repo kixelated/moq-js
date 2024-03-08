@@ -1,7 +1,7 @@
 import * as Control from "./control"
 import { Queue, Watch } from "../common/async"
-import { Objects } from "./object"
-import type { Header } from "./object"
+import { Objects } from "./objects"
+import type { TrackReader, GroupReader, ObjectReader } from "./objects"
 
 export class Subscriber {
 	// Use to send control messages.
@@ -34,12 +34,10 @@ export class Subscriber {
 			this.recvUnannounce(msg)
 		} else if (msg.kind == Control.Msg.SubscribeOk) {
 			this.recvSubscribeOk(msg)
-		} else if (msg.kind == Control.Msg.SubscribeReset) {
-			await this.recvSubscribeReset(msg)
 		} else if (msg.kind == Control.Msg.SubscribeError) {
 			await this.recvSubscribeError(msg)
-		} else if (msg.kind == Control.Msg.SubscribeFin) {
-			await this.recvSubscribeFin(msg)
+		} else if (msg.kind == Control.Msg.SubscribeDone) {
+			await this.recvSubscribeDone(msg)
 		} else {
 			throw new Error(`unknown control message`) // impossible
 		}
@@ -71,6 +69,7 @@ export class Subscriber {
 		await this.#control.send({
 			kind: Control.Msg.Subscribe,
 			id,
+			trackId: id,
 			namespace,
 			name: track,
 			start_group: { mode: "latest", value: 0 },
@@ -91,15 +90,6 @@ export class Subscriber {
 		subscribe.onOk()
 	}
 
-	async recvSubscribeReset(msg: Control.SubscribeReset) {
-		const subscribe = this.#subscribe.get(msg.id)
-		if (!subscribe) {
-			throw new Error(`subscribe error for unknown id: ${msg.id}`)
-		}
-
-		await subscribe.onError(msg.code, msg.reason)
-	}
-
 	async recvSubscribeError(msg: Control.SubscribeError) {
 		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
@@ -109,22 +99,22 @@ export class Subscriber {
 		await subscribe.onError(msg.code, msg.reason)
 	}
 
-	async recvSubscribeFin(msg: Control.SubscribeFin) {
+	async recvSubscribeDone(msg: Control.SubscribeDone) {
 		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
 			throw new Error(`subscribe error for unknown id: ${msg.id}`)
 		}
 
-		await subscribe.onError(0n, "fin")
+		await subscribe.onError(msg.code, msg.reason)
 	}
 
-	async recvObject(header: Header, stream: ReadableStream<Uint8Array>) {
-		const subscribe = this.#subscribe.get(header.track)
+	async recvObject(reader: TrackReader | GroupReader | ObjectReader) {
+		const subscribe = this.#subscribe.get(reader.header.track)
 		if (!subscribe) {
-			throw new Error(`data for for unknown track: ${header.track}`)
-		} else {
-			await subscribe.onData(header, stream)
+			throw new Error(`data for for unknown track: ${reader.header.track}`)
 		}
+
+		await subscribe.onData(reader)
 	}
 }
 
@@ -166,7 +156,7 @@ export class SubscribeSend {
 	readonly track: string
 
 	// A queue of received streams for this subscription.
-	#data = new Queue<{ header: Header; stream: ReadableStream<Uint8Array> }>()
+	#data = new Queue<TrackReader | GroupReader | ObjectReader>()
 
 	constructor(control: Control.Stream, id: bigint, namespace: string, track: string) {
 		this.#control = control // so we can send messages
@@ -197,8 +187,8 @@ export class SubscribeSend {
 		return await this.#data.abort(err)
 	}
 
-	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
-		if (!this.#data.closed()) await this.#data.push({ header, stream })
+	async onData(reader: TrackReader | GroupReader | ObjectReader) {
+		if (!this.#data.closed()) await this.#data.push(reader)
 	}
 
 	// Receive the next a readable data stream

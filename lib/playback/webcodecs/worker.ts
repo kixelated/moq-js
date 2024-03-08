@@ -6,13 +6,15 @@ import * as Video from "./video"
 import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 import { asError } from "../../common/error"
+import { Deferred } from "../../common/async"
+import { GroupReader, Reader } from "../../transport/objects"
 
 class Worker {
 	// Timeline receives samples, buffering them and choosing the timestamp to render.
 	#timeline = new Timeline()
 
 	// A map of init tracks.
-	#inits = new Map<string, ReadableStream<Uint8Array>>()
+	#inits = new Map<string, Deferred<Uint8Array>>()
 
 	// Renderer requests samples, rendering video frames and emitting audio frames.
 	#audio?: Audio.Renderer
@@ -27,14 +29,7 @@ class Worker {
 			// TODO buffer the init segmnet so we don't hold the stream open.
 			this.#onInit(msg.init)
 		} else if (msg.segment) {
-			const segment = msg.segment
-			this.#onSegment(segment).catch(async (e) => {
-				// Cancel the stream so we don't hold it open.
-				const err = asError(e)
-				await segment.stream.cancel(err)
-
-				throw e
-			})
+			this.#onSegment(msg.segment).catch(console.warn)
 		} else {
 			throw new Error(`unknown message: + ${JSON.stringify(msg)}`)
 		}
@@ -51,42 +46,55 @@ class Worker {
 	}
 
 	#onInit(msg: Message.Init) {
-		// NOTE: We don't buffer the init segments because I'm lazy.
-		// Instead, we fork the reader on each segment so it gets a copy of the data.
-		// This is mostly done because I'm lazy and don't want to create a promise.
-		this.#inits.set(msg.name, msg.stream)
+		let init = this.#inits.get(msg.name)
+		if (!init) {
+			init = new Deferred()
+			this.#inits.set(msg.name, init)
+		}
+
+		init.resolve(msg.data)
 	}
 
 	async #onSegment(msg: Message.Segment) {
-		const init = this.#inits.get(msg.init)
-		if (!init) throw new Error(`unknown init track: ${msg.init}`)
-
-		// Make a copy of the init stream
-		// TODO: This could have performance ramifications?
-		const [initFork, initClone] = init.tee()
-		this.#inits.set(msg.init, initFork)
+		let init = this.#inits.get(msg.init)
+		if (!init) {
+			init = new Deferred()
+			this.#inits.set(msg.init, init)
+		}
 
 		// Create a new stream that we will use to decode.
-		const container = new MP4.Parser()
+		const container = new MP4.Parser(await init.promise)
 
 		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
+		const reader = new GroupReader(msg.header, new Reader(msg.buffer, msg.stream))
 
-		if (msg.header.object !== 0) {
-			throw new Error("multiple objects per group not supported")
-		}
+		// Create a queue that will contain each MP4 frame.
+		const queue = new TransformStream<MP4.Frame>({})
+		const segment = queue.writable.getWriter()
 
 		// Add the segment to the timeline
 		const segments = timeline.segments.getWriter()
 		await segments.write({
 			sequence: msg.header.group,
-			frames: container.decode.readable,
+			frames: queue.readable,
 		})
 		segments.releaseLock()
 
-		// Decode the init and then the segment itself
-		// TODO avoid decoding the init every time.
-		await initClone.pipeTo(container.decode.writable, { preventClose: true })
-		await msg.stream.pipeTo(container.decode.writable)
+		// Read each chunk, decoding the MP4 frames and adding them to the queue.
+		for (;;) {
+			const chunk = await reader.read()
+			if (!chunk) {
+				break
+			}
+
+			const frames = container.decode(chunk.payload)
+			for (const frame of frames) {
+				await segment.write(frame)
+			}
+		}
+
+		// We done.
+		await segment.close()
 	}
 }
 

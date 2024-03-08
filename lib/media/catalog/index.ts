@@ -1,5 +1,4 @@
 import { Connection } from "../../transport"
-import { Reader } from "../../transport/stream"
 import { asError } from "../../common/error"
 
 // JSON encoded catalog
@@ -31,27 +30,18 @@ export class Catalog {
 	}
 
 	static async fetch(connection: Connection): Promise<Catalog> {
-		let raw: Uint8Array
-
 		const subscribe = await connection.subscribe("", ".catalog")
 		try {
 			const segment = await subscribe.data()
 			if (!segment) throw new Error("no catalog data")
 
-			const { header, stream } = segment
+			const chunk = await segment.read()
+			if (!chunk) throw new Error("no catalog chunk")
 
-			if (header.group !== 0) {
-				throw new Error("TODO updates not supported")
-			}
-
-			if (header.object !== 0) {
-				throw new Error("TODO delta updates not supported")
-			}
-
-			const reader = new Reader(stream)
-			raw = await reader.readAll()
-
+			await segment.close()
 			await subscribe.close() // we done
+
+			return Catalog.decode(chunk.payload)
 		} catch (e) {
 			const err = asError(e)
 
@@ -60,8 +50,6 @@ export class Catalog {
 
 			throw err
 		}
-
-		return Catalog.decode(raw)
 	}
 }
 

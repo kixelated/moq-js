@@ -1,7 +1,7 @@
 import * as Stream from "./stream"
 import * as Setup from "./setup"
 import * as Control from "./control"
-import { Objects } from "./object"
+import { Objects } from "./objects"
 import { Connection } from "./connection"
 
 export interface ClientConfig {
@@ -42,16 +42,20 @@ export class Client {
 		const stream = await quic.createBidirectionalStream()
 
 		const writer = new Stream.Writer(stream.writable)
-		const reader = new Stream.Reader(stream.readable)
+		const reader = new Stream.Reader(new Uint8Array(), stream.readable)
 
 		const setup = new Setup.Stream(reader, writer)
 
 		// Send the setup message.
-		await setup.send.client({ versions: [Setup.Version.KIXEL_01], role: this.config.role })
+		await setup.send.client({ versions: [Setup.Version.DRAFT_02], role: this.config.role })
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
-		const _server = await setup.recv.server()
+		const server = await setup.recv.server()
+
+		if (server.version != Setup.Version.DRAFT_02) {
+			throw new Error(`unsupported server version: ${server.version}`)
+		}
 
 		const control = new Control.Stream(reader, writer)
 		const objects = new Objects(quic)
