@@ -120,14 +120,12 @@ export class Subscriber {
 	}
 
 	async recvObject(reader: TrackReader | GroupReader | ObjectReader) {
-		const header = await reader.header()
-
-		const subscribe = this.#subscribe.get(header.track)
+		const subscribe = this.#subscribe.get(reader.header.track)
 		if (!subscribe) {
-			throw new Error(`data for for unknown track: ${header.track}`)
-		} else {
-			await subscribe.onData(reader)
+			throw new Error(`data for for unknown track: ${reader.header.track}`)
 		}
+
+		await subscribe.onData(reader)
 	}
 }
 

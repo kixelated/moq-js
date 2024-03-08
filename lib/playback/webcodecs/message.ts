@@ -26,6 +26,7 @@ export interface Segment {
 	init: string // name of the init object
 	kind: "audio" | "video"
 	header: GroupHeader
+	buffer: Uint8Array
 	stream: ReadableStream<Uint8Array>
 }
 

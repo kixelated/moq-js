@@ -35,7 +35,7 @@ export class Catalog {
 			const segment = await subscribe.data()
 			if (!segment) throw new Error("no catalog data")
 
-			const chunk = await segment.chunk()
+			const chunk = await segment.read()
 			await segment.close()
 			await subscribe.close() // we done
 

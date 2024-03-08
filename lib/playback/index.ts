@@ -103,12 +103,11 @@ export class Player {
 				throw new Error(`expected group reader for init: ${name}`)
 			}
 
-			const header = await init.header()
-			if (header.group !== 0) {
+			if (init.header.group !== 0) {
 				throw new Error("expected group 0")
 			}
 
-			const chunk = await init.chunk()
+			const chunk = await init.read()
 			if (chunk.object !== 0) {
 				throw new Error("expected object 0")
 			}
@@ -134,13 +133,14 @@ export class Player {
 					throw new Error(`expected group reader for segment: ${track.data_track}`)
 				}
 
-				const header = await segment.header()
+				const [buffer, stream] = segment.stream.release()
 
 				this.#backend.segment({
 					init: track.init_track,
 					kind: track.kind,
-					header,
-					stream: segment.stream,
+					header: segment.header,
+					buffer,
+					stream,
 				})
 			}
 		} finally {

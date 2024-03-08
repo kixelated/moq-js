@@ -43,7 +43,6 @@ export class Parser {
 
 		this.#mp4.appendBuffer(buffer)
 		this.#offset += buffer.byteLength
-
 		this.#mp4.flush()
 
 		if (!this.info) {

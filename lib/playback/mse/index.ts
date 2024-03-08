@@ -3,7 +3,7 @@ import { Segment } from "./segment"
 import { Track } from "./track"
 import * as MP4 from "../../media/mp4"
 import * as Message from "../backend"
-import { GroupReader } from "../../transport/objects"
+import { GroupReader, Reader } from "../../transport/objects"
 import { Deferred } from "../../common/async"
 
 export interface PlayerConfig {
@@ -128,14 +128,14 @@ export default class Player {
 			track = this.#audio
 		}
 
-		const header = msg.header
-		const stream = new GroupReader(msg.stream)
+		const reader = new Reader(msg.buffer, msg.stream)
+		const group = new GroupReader(msg.header, reader)
 
-		const segment = new Segment(track.source, await init.promise, header.group)
+		const segment = new Segment(track.source, await init.promise, group.header.group)
 		track.add(segment)
 
 		for (;;) {
-			const chunk = await stream.chunk()
+			const chunk = await group.read()
 			if (!chunk) {
 				break
 			}

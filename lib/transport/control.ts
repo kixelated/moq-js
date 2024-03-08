@@ -87,6 +87,7 @@ export type Parameters = Map<bigint, Uint8Array>
 export interface SubscribeOk {
 	kind: Msg.SubscribeOk
 	id: bigint
+	expires: bigint
 }
 
 export interface SubscribeReset {
@@ -290,7 +291,7 @@ export class Decoder {
 		for (let i = 0; i < count; i++) {
 			const id = await this.r.u62()
 			const size = await this.r.u53()
-			const value = await this.r.readExact(size)
+			const value = await this.r.read(size)
 
 			if (params.has(id)) {
 				throw new Error(`duplicate parameter id: ${id}`)
@@ -306,6 +307,7 @@ export class Decoder {
 		return {
 			kind: Msg.SubscribeOk,
 			id: await this.r.u62(),
+			expires: await this.r.u62(),
 		}
 	}
 
@@ -456,6 +458,7 @@ export class Encoder {
 	async subscribe_ok(s: SubscribeOk) {
 		await this.w.u53(Id.SubscribeOk)
 		await this.w.u62(s.id)
+		await this.w.u62(s.expires)
 	}
 
 	async subscribe_reset(s: SubscribeReset) {

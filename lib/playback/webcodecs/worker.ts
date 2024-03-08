@@ -7,7 +7,7 @@ import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 import { asError } from "../../common/error"
 import { Deferred } from "../../common/async"
-import { GroupReader } from "../../transport/objects"
+import { GroupReader, Reader } from "../../transport/objects"
 
 class Worker {
 	// Timeline receives samples, buffering them and choosing the timestamp to render.
@@ -73,7 +73,7 @@ class Worker {
 		const container = new MP4.Parser(await init.promise)
 
 		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
-		const reader = new GroupReader(msg.stream)
+		const reader = new GroupReader(msg.header, new Reader(msg.buffer, msg.stream))
 
 		// Create a queue that will contain each MP4 frame.
 		const queue = new TransformStream<MP4.Frame>({})
@@ -89,7 +89,7 @@ class Worker {
 
 		// Read each chunk, decoding the MP4 frames and adding them to the queue.
 		for (;;) {
-			const chunk = await reader.chunk()
+			const chunk = await reader.read()
 			if (!chunk) {
 				break
 			}

@@ -134,7 +134,7 @@ export class Broadcast {
 		await subscriber.ack()
 
 		const stream = await subscriber.group({ group: 0 })
-		await stream.chunk({ object: 0, payload: bytes })
+		await stream.write({ object: 0, payload: bytes })
 		await stream.close()
 	}
 
@@ -148,7 +148,7 @@ export class Broadcast {
 		const init = await track.init()
 
 		const stream = await subscriber.group({ group: 0 })
-		await stream.chunk({ object: 0, payload: init })
+		await stream.write({ object: 0, payload: init })
 		await stream.close()
 	}
 
@@ -188,7 +188,7 @@ export class Broadcast {
 			const { value, done } = await chunks.read()
 			if (done) break
 
-			await stream.chunk({
+			await stream.write({
 				object,
 				payload: value,
 			})

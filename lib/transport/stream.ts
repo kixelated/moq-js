@@ -6,60 +6,58 @@ const MAX_U53 = Number.MAX_SAFE_INTEGER
 const MAX_U62: bigint = 2n ** 62n - 1n
 
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
+// Unfortunately we can't use a BYOB reader because it's not supported with WebTransport+WebWorkers yet.
 export class Reader {
-	stream: ReadableStream<Uint8Array>
-	#scratch: Uint8Array
+	#buffer: Uint8Array
+	#stream: ReadableStream<Uint8Array>
+	#reader: ReadableStreamDefaultReader<Uint8Array>
 
-	constructor(stream: ReadableStream<Uint8Array>) {
-		this.stream = stream
-		this.#scratch = new Uint8Array(8)
+	constructor(buffer: Uint8Array, stream: ReadableStream<Uint8Array>) {
+		this.#buffer = buffer
+		this.#stream = stream
+		this.#reader = this.#stream.getReader()
+	}
+
+	// Ensures the buffer is at least size bytes long, or 0 until the end of the stream.
+	async #fill(size: number) {
+		while (this.#buffer.byteLength < size) {
+			const result = await this.#reader.read()
+			if (result.done) {
+				if (size == 0) break
+				throw "short buffer"
+			}
+
+			const buffer = new Uint8Array(result.value)
+
+			if (this.#buffer.byteLength == 0) {
+				this.#buffer = buffer
+			} else {
+				const temp = new Uint8Array(this.#buffer.byteLength + buffer.byteLength)
+				temp.set(this.#buffer)
+				temp.set(buffer, this.#buffer.byteLength)
+				this.#buffer = temp
+			}
+		}
+	}
+
+	// Consumes the first size bytes of the buffer.
+	#slice(size: number): Uint8Array {
+		const result = new Uint8Array(this.#buffer.buffer, this.#buffer.byteOffset, size)
+		this.#buffer = new Uint8Array(this.#buffer.buffer, this.#buffer.byteOffset + size)
+
+		return result
+	}
+
+	async read(size: number): Promise<Uint8Array> {
+		if (size == 0) return new Uint8Array()
+
+		await this.#fill(size)
+		return this.#slice(size)
 	}
 
 	async readAll(): Promise<Uint8Array> {
-		const reader = this.stream.getReader()
-		let buf = new Uint8Array(0)
-
-		for (;;) {
-			const { value, done } = await reader.read()
-			if (done) break
-
-			if (buf.byteLength > 0) {
-				const append = new Uint8Array(buf.byteLength + value.byteLength)
-				append.set(buf)
-				append.set(value, buf.byteLength)
-				buf = append
-			} else {
-				buf = value
-			}
-		}
-
-		reader.releaseLock()
-
-		return buf
-	}
-
-	async readExact(size: number): Promise<Uint8Array> {
-		const dst = new Uint8Array(size)
-		return this.read(dst, 0, size)
-	}
-
-	async read(dst: Uint8Array, offset: number, size: number): Promise<Uint8Array> {
-		const reader = this.stream.getReader({ mode: "byob" })
-
-		while (offset < size) {
-			const empty = new Uint8Array(dst.buffer, dst.byteOffset + offset, size - offset)
-			const { value, done } = await reader.read(empty)
-			if (done) {
-				throw new Error(`short buffer`)
-			}
-
-			dst = new Uint8Array(value.buffer, value.byteOffset - offset)
-			offset += value.byteLength
-		}
-
-		reader.releaseLock()
-
-		return dst
+		await this.#fill(0)
+		return this.#slice(this.#buffer.byteLength)
 	}
 
 	async string(maxLength?: number): Promise<string> {
@@ -68,13 +66,13 @@ export class Reader {
 			throw new Error(`string length ${length} exceeds max length ${maxLength}`)
 		}
 
-		const buffer = await this.readExact(length)
+		const buffer = await this.read(length)
 		return new TextDecoder().decode(buffer)
 	}
 
 	async u8(): Promise<number> {
-		this.#scratch = await this.read(this.#scratch, 0, 1)
-		return this.#scratch[0]
+		await this.#fill(1)
+		return this.#slice(1)[0]
 	}
 
 	// Returns a Number using 53-bits, the max Javascript can use for integer math
@@ -89,26 +87,28 @@ export class Reader {
 
 	// NOTE: Returns a bigint instead of a number since it may be larger than 53-bits
 	async u62(): Promise<bigint> {
-		this.#scratch = await this.read(this.#scratch, 0, 1)
-		const first = this.#scratch[0]
-
-		const size = (first & 0xc0) >> 6
+		await this.#fill(1)
+		const size = (this.#buffer[0] & 0xc0) >> 6
 
 		if (size == 0) {
+			const first = this.#slice(1)[0]
 			return BigInt(first) & 0x3fn
 		} else if (size == 1) {
-			this.#scratch = await this.read(this.#scratch, 1, 2)
-			const view = new DataView(this.#scratch.buffer, 0, 2)
+			await this.#fill(2)
+			const slice = this.#slice(2)
+			const view = new DataView(slice.buffer, slice.byteOffset, slice.byteLength)
 
 			return BigInt(view.getInt16(0)) & 0x3fffn
 		} else if (size == 2) {
-			this.#scratch = await this.read(this.#scratch, 1, 4)
-			const view = new DataView(this.#scratch.buffer, 0, 4)
+			await this.#fill(4)
+			const slice = this.#slice(4)
+			const view = new DataView(slice.buffer, slice.byteOffset, slice.byteLength)
 
 			return BigInt(view.getUint32(0)) & 0x3fffffffn
 		} else if (size == 3) {
-			this.#scratch = await this.read(this.#scratch, 1, 8)
-			const view = new DataView(this.#scratch.buffer, 0, 8)
+			await this.#fill(8)
+			const slice = this.#slice(8)
+			const view = new DataView(slice.buffer, slice.byteOffset, slice.byteLength)
 
 			return view.getBigUint64(0) & 0x3fffffffffffffffn
 		} else {
@@ -117,18 +117,26 @@ export class Reader {
 	}
 
 	async close() {
-		await this.stream.cancel()
+		this.#reader.releaseLock()
+		await this.#stream.cancel()
+	}
+
+	release(): [Uint8Array, ReadableStream<Uint8Array>] {
+		this.#reader.releaseLock()
+		return [this.#buffer, this.#stream]
 	}
 }
 
 // Writer wraps a stream and writes chunks of data
 export class Writer {
-	stream: WritableStream<Uint8Array>
 	#scratch: Uint8Array
+	#writer: WritableStreamDefaultWriter<Uint8Array>
+	#stream: WritableStream<Uint8Array>
 
 	constructor(stream: WritableStream<Uint8Array>) {
+		this.#stream = stream
 		this.#scratch = new Uint8Array(8)
-		this.stream = stream
+		this.#writer = this.#stream.getWriter()
 	}
 
 	async u8(v: number) {
@@ -166,12 +174,7 @@ export class Writer {
 	}
 
 	async write(v: Uint8Array) {
-		const writer = this.stream.getWriter()
-		try {
-			await writer.write(v)
-		} finally {
-			writer.releaseLock()
-		}
+		await this.#writer.write(v)
 	}
 
 	async string(str: string) {
@@ -181,7 +184,12 @@ export class Writer {
 	}
 
 	async close() {
-		await this.stream.close()
+		await this.#stream.close()
+	}
+
+	release(): WritableStream<Uint8Array> {
+		this.#writer.releaseLock()
+		return this.#stream
 	}
 }
 

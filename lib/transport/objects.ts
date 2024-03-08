@@ -61,18 +61,38 @@ export class Objects {
 		this.quic = quic
 	}
 
-	async send<T extends TrackHeader | GroupHeader | ObjectHeader>(header: T): Promise<WriterType<T>> {
+	async send<T extends TrackHeader | GroupHeader | ObjectHeader>(h: T): Promise<WriterType<T>> {
 		const stream = await this.quic.createUnidirectionalStream()
+		const w = new Writer(stream)
 
-		if (header.type == StreamType.Object) {
-			return new ObjectWriter(stream) as WriterType<T>
-		} else if (header.type === StreamType.Group) {
-			return new GroupWriter(stream) as WriterType<T>
-		} else if (header.type === StreamType.Track) {
-			return new TrackWriter(stream) as WriterType<T>
+		await w.u53(h.type)
+		await w.u62(h.sub)
+		await w.u62(h.track)
+
+		let res: WriterType<T>
+
+		if (h.type == StreamType.Object) {
+			await w.u53(h.group)
+			await w.u53(h.object)
+			await w.u53(h.priority)
+
+			res = new ObjectWriter(h, w) as WriterType<T>
+		} else if (h.type === StreamType.Group) {
+			await w.u53(h.group)
+			await w.u53(h.priority)
+
+			res = new GroupWriter(h, w) as WriterType<T>
+		} else if (h.type === StreamType.Track) {
+			await w.u53(h.priority)
+
+			res = new TrackWriter(h, w) as WriterType<T>
 		} else {
 			throw new Error("unknown header type")
 		}
+
+		console.trace("send object", res.header)
+
+		return res
 	}
 
 	async recv(): Promise<TrackReader | GroupReader | ObjectReader | undefined> {
@@ -83,41 +103,60 @@ export class Objects {
 
 		if (done) return
 
-		const r = new Reader(value)
-		const typ = (await r.u53()) as StreamType
-		if (typ == StreamType.Track) {
-			return new TrackReader(r.stream)
-		} else if (typ == StreamType.Group) {
-			return new GroupReader(r.stream)
-		} else if (typ == StreamType.Object) {
-			return new ObjectReader(r.stream)
+		const r = new Reader(new Uint8Array(), value)
+		const type = (await r.u53()) as StreamType
+		let res: TrackReader | GroupReader | ObjectReader
+
+		if (type == StreamType.Track) {
+			const h: TrackHeader = {
+				type,
+				sub: await r.u62(),
+				track: await r.u62(),
+				priority: await r.u53(),
+			}
+
+			res = new TrackReader(h, r)
+		} else if (type == StreamType.Group) {
+			const h: GroupHeader = {
+				type,
+				sub: await r.u62(),
+				track: await r.u62(),
+				group: await r.u53(),
+				priority: await r.u53(),
+			}
+			res = new GroupReader(h, r)
+		} else if (type == StreamType.Object) {
+			const h = {
+				type,
+				sub: await r.u62(),
+				track: await r.u62(),
+				group: await r.u53(),
+				object: await r.u53(),
+				priority: await r.u53(),
+			}
+
+			res = new ObjectReader(h, r)
 		} else {
 			throw new Error("unknown stream type")
 		}
+
+		console.trace("receive object", res.header)
+
+		return res
 	}
 }
 
 export class TrackWriter {
-	stream: WritableStream<Uint8Array>
+	constructor(
+		public header: TrackHeader,
+		public stream: Writer,
+	) {}
 
-	constructor(stream: WritableStream<Uint8Array>) {
-		this.stream = stream
-	}
-
-	async header(h: TrackHeader) {
-		const w = new Writer(this.stream)
-		await w.u53(h.type)
-		await w.u62(h.sub)
-		await w.u62(h.track)
-		await w.u53(h.priority)
-	}
-
-	async chunk(c: TrackChunk) {
-		const w = new Writer(this.stream)
-		await w.u53(c.group)
-		await w.u53(c.object)
-		await w.u53(c.payload.byteLength)
-		await w.write(c.payload)
+	async write(c: TrackChunk) {
+		await this.stream.u53(c.group)
+		await this.stream.u53(c.object)
+		await this.stream.u53(c.payload.byteLength)
+		await this.stream.write(c.payload)
 	}
 
 	async close() {
@@ -126,26 +165,15 @@ export class TrackWriter {
 }
 
 export class GroupWriter {
-	stream: WritableStream<Uint8Array>
+	constructor(
+		public header: GroupHeader,
+		public stream: Writer,
+	) {}
 
-	constructor(stream: WritableStream<Uint8Array>) {
-		this.stream = stream
-	}
-
-	async header(h: GroupHeader) {
-		const w = new Writer(this.stream)
-		await w.u53(h.type)
-		await w.u62(h.sub)
-		await w.u62(h.track)
-		await w.u53(h.group)
-		await w.u53(h.priority)
-	}
-
-	async chunk(c: GroupChunk) {
-		const w = new Writer(this.stream)
-		await w.u53(c.object)
-		await w.u53(c.payload.byteLength)
-		await w.write(c.payload)
+	async write(c: GroupChunk) {
+		await this.stream.u53(c.object)
+		await this.stream.u53(c.payload.byteLength)
+		await this.stream.write(c.payload)
 	}
 
 	async close() {
@@ -154,25 +182,13 @@ export class GroupWriter {
 }
 
 export class ObjectWriter {
-	stream: WritableStream<Uint8Array>
+	constructor(
+		public header: ObjectHeader,
+		public stream: Writer,
+	) {}
 
-	constructor(stream: WritableStream<Uint8Array>) {
-		this.stream = stream
-	}
-
-	async header(h: ObjectHeader) {
-		const w = new Writer(this.stream)
-		await w.u53(h.type)
-		await w.u62(h.sub)
-		await w.u62(h.track)
-		await w.u53(h.group)
-		await w.u53(h.object)
-		await w.u53(h.priority)
-	}
-
-	async chunk(chunk: ObjectChunk) {
-		const w = new Writer(this.stream)
-		await w.write(chunk.payload)
+	async write(c: ObjectChunk) {
+		await this.stream.write(c.payload)
 	}
 
 	async close() {
@@ -181,28 +197,16 @@ export class ObjectWriter {
 }
 
 export class TrackReader {
-	stream: ReadableStream<Uint8Array>
+	constructor(
+		public header: TrackHeader,
+		public stream: Reader,
+	) {}
 
-	constructor(stream: ReadableStream<Uint8Array>) {
-		this.stream = stream
-	}
-
-	async header(): Promise<TrackHeader> {
-		const r = new Reader(this.stream)
-		return {
-			type: StreamType.Track,
-			sub: await r.u62(),
-			track: await r.u62(),
-			priority: await r.u53(),
-		}
-	}
-
-	async chunk(): Promise<TrackChunk> {
-		const r = new Reader(this.stream)
-		const group = await r.u53()
-		const object = await r.u53()
-		const size = await r.u53()
-		const payload = await r.readExact(size)
+	async read(): Promise<TrackChunk> {
+		const group = await this.stream.u53()
+		const object = await this.stream.u53()
+		const size = await this.stream.u53()
+		const payload = await this.stream.read(size)
 
 		return {
 			group,
@@ -212,33 +216,20 @@ export class TrackReader {
 	}
 
 	async close() {
-		await this.stream.cancel()
+		await this.stream.close()
 	}
 }
 
 export class GroupReader {
-	stream: ReadableStream<Uint8Array>
+	constructor(
+		public header: GroupHeader,
+		public stream: Reader,
+	) {}
 
-	constructor(stream: ReadableStream<Uint8Array>) {
-		this.stream = stream
-	}
-
-	async header(): Promise<GroupHeader> {
-		const r = new Reader(this.stream)
-		return {
-			type: StreamType.Group,
-			sub: await r.u62(),
-			track: await r.u62(),
-			group: await r.u53(),
-			priority: await r.u53(),
-		}
-	}
-
-	async chunk(): Promise<GroupChunk> {
-		const r = new Reader(this.stream)
-		const object = await r.u53()
-		const size = await r.u53()
-		const payload = await r.readExact(size)
+	async read(): Promise<GroupChunk> {
+		const object = await this.stream.u53()
+		const size = await this.stream.u53()
+		const payload = await this.stream.read(size)
 
 		return {
 			object,
@@ -247,37 +238,23 @@ export class GroupReader {
 	}
 
 	async close() {
-		await this.stream.cancel()
+		await this.stream.close()
 	}
 }
 
 export class ObjectReader {
-	stream: ReadableStream<Uint8Array>
+	constructor(
+		public header: ObjectHeader,
+		public stream: Reader,
+	) {}
 
-	constructor(stream: ReadableStream<Uint8Array>) {
-		this.stream = stream
-	}
-
-	async header(): Promise<ObjectHeader> {
-		const r = new Reader(this.stream)
+	async read(): Promise<ObjectChunk> {
 		return {
-			type: StreamType.Object,
-			sub: await r.u62(),
-			track: await r.u62(),
-			group: await r.u53(),
-			object: await r.u53(),
-			priority: await r.u53(),
-		}
-	}
-
-	async chunk(): Promise<ObjectChunk> {
-		const r = new Reader(this.stream)
-		return {
-			payload: await r.readAll(),
+			payload: await this.stream.readAll(),
 		}
 	}
 
 	async close() {
-		await this.stream.cancel()
+		await this.stream.close()
 	}
 }
