@@ -187,12 +187,10 @@ export class SubscribeRecv {
 		this.#state = "closed"
 
 		return this.#control.send({
-			kind: Control.Msg.SubscribeReset,
+			kind: Control.Msg.SubscribeDone,
 			id: this.#id,
 			code,
 			reason,
-			final_group: 0, // TODO
-			final_object: 0, // TODO
 		})
 	}
 

@@ -34,12 +34,10 @@ export class Subscriber {
 			this.recvUnannounce(msg)
 		} else if (msg.kind == Control.Msg.SubscribeOk) {
 			this.recvSubscribeOk(msg)
-		} else if (msg.kind == Control.Msg.SubscribeReset) {
-			await this.recvSubscribeReset(msg)
 		} else if (msg.kind == Control.Msg.SubscribeError) {
 			await this.recvSubscribeError(msg)
-		} else if (msg.kind == Control.Msg.SubscribeFin) {
-			await this.recvSubscribeFin(msg)
+		} else if (msg.kind == Control.Msg.SubscribeDone) {
+			await this.recvSubscribeDone(msg)
 		} else {
 			throw new Error(`unknown control message`) // impossible
 		}
@@ -92,15 +90,6 @@ export class Subscriber {
 		subscribe.onOk()
 	}
 
-	async recvSubscribeReset(msg: Control.SubscribeReset) {
-		const subscribe = this.#subscribe.get(msg.id)
-		if (!subscribe) {
-			throw new Error(`subscribe error for unknown id: ${msg.id}`)
-		}
-
-		await subscribe.onError(msg.code, msg.reason)
-	}
-
 	async recvSubscribeError(msg: Control.SubscribeError) {
 		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
@@ -110,13 +99,13 @@ export class Subscriber {
 		await subscribe.onError(msg.code, msg.reason)
 	}
 
-	async recvSubscribeFin(msg: Control.SubscribeFin) {
+	async recvSubscribeDone(msg: Control.SubscribeDone) {
 		const subscribe = this.#subscribe.get(msg.id)
 		if (!subscribe) {
 			throw new Error(`subscribe error for unknown id: ${msg.id}`)
 		}
 
-		await subscribe.onError(0n, "fin")
+		await subscribe.onError(msg.code, msg.reason)
 	}
 
 	async recvObject(reader: TrackReader | GroupReader | ObjectReader) {

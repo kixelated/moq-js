@@ -12,14 +12,13 @@ export function isSubscriber(m: Message): m is Subscriber {
 }
 
 // Sent by publisher
-export type Publisher = SubscribeOk | SubscribeReset | SubscribeError | SubscribeFin | Announce | Unannounce
+export type Publisher = SubscribeOk | SubscribeError | SubscribeDone | Announce | Unannounce
 
 export function isPublisher(m: Message): m is Publisher {
 	return (
 		m.kind == Msg.SubscribeOk ||
-		m.kind == Msg.SubscribeReset ||
 		m.kind == Msg.SubscribeError ||
-		m.kind == Msg.SubscribeFin ||
+		m.kind == Msg.SubscribeDone ||
 		m.kind == Msg.Announce ||
 		m.kind == Msg.Unannounce
 	)
@@ -33,8 +32,7 @@ export enum Msg {
 	Subscribe = "subscribe",
 	SubscribeOk = "subscribe_ok",
 	SubscribeError = "subscribe_error",
-	SubscribeReset = "subscribe_reset",
-	SubscribeFin = "subscribe_fin",
+	SubscribeDone = "subscribe_done",
 	Unsubscribe = "unsubscribe",
 	Announce = "announce",
 	AnnounceOk = "announce_ok",
@@ -51,8 +49,7 @@ enum Id {
 	Subscribe = 0x3,
 	SubscribeOk = 0x4,
 	SubscribeError = 0x5,
-	SubscribeReset = 0xc,
-	SubscribeFin = 0xb,
+	SubscribeDone = 0xc,
 	Unsubscribe = 0xa,
 	Announce = 0x6,
 	AnnounceOk = 0x7,
@@ -88,22 +85,15 @@ export interface SubscribeOk {
 	kind: Msg.SubscribeOk
 	id: bigint
 	expires: bigint
+	latest?: [number, number]
 }
 
-export interface SubscribeReset {
-	kind: Msg.SubscribeReset
+export interface SubscribeDone {
+	kind: Msg.SubscribeDone
 	id: bigint
 	code: bigint
 	reason: string
-	final_group: number
-	final_object: number
-}
-
-export interface SubscribeFin {
-	kind: Msg.SubscribeFin
-	id: bigint
-	final_group: number
-	final_object: number
+	final?: [number, number]
 }
 
 export interface SubscribeError {
@@ -201,10 +191,8 @@ export class Decoder {
 				return Msg.Subscribe
 			case Id.SubscribeOk:
 				return Msg.SubscribeOk
-			case Id.SubscribeReset:
-				return Msg.SubscribeReset
-			case Id.SubscribeFin:
-				return Msg.SubscribeFin
+			case Id.SubscribeDone:
+				return Msg.SubscribeDone
 			case Id.SubscribeError:
 				return Msg.SubscribeError
 			case Id.Unsubscribe:
@@ -231,12 +219,10 @@ export class Decoder {
 				return this.subscribe()
 			case Msg.SubscribeOk:
 				return this.subscribe_ok()
-			case Msg.SubscribeReset:
-				return this.subscribe_reset()
 			case Msg.SubscribeError:
 				return this.subscribe_error()
-			case Msg.SubscribeFin:
-				return this.subscribe_fin()
+			case Msg.SubscribeDone:
+				return this.subscribe_done()
 			case Msg.Unsubscribe:
 				return this.unsubscribe()
 			case Msg.Announce:
@@ -304,30 +290,46 @@ export class Decoder {
 	}
 
 	private async subscribe_ok(): Promise<SubscribeOk> {
+		const id = await this.r.u62()
+		const expires = await this.r.u62()
+
+		let latest: [number, number] | undefined
+
+		const flag = await this.r.u8()
+		if (flag === 1) {
+			latest = [await this.r.u53(), await this.r.u53()]
+		} else if (flag !== 0) {
+			throw new Error(`invalid final flag: ${flag}`)
+		}
+
 		return {
 			kind: Msg.SubscribeOk,
-			id: await this.r.u62(),
-			expires: await this.r.u62(),
+			id,
+			expires,
+			latest,
 		}
 	}
 
-	private async subscribe_reset(): Promise<SubscribeReset> {
-		return {
-			kind: Msg.SubscribeReset,
-			id: await this.r.u62(),
-			code: await this.r.u62(),
-			reason: await this.r.string(),
-			final_group: await this.r.u53(),
-			final_object: await this.r.u53(),
-		}
-	}
+	private async subscribe_done(): Promise<SubscribeDone> {
+		const id = await this.r.u62()
+		const code = await this.r.u62()
+		const reason = await this.r.string()
 
-	private async subscribe_fin(): Promise<SubscribeFin> {
+		let final: [number, number] | undefined
+
+		const flag = await this.r.u8()
+		if (flag === 1) {
+			final = [await this.r.u53(), await this.r.u53()]
+		} else if (flag !== 0) {
+			throw new Error(`invalid final flag: ${flag}`)
+		}
+
 		return {
-			kind: Msg.SubscribeFin,
-			id: await this.r.u62(),
-			final_group: await this.r.u53(),
-			final_object: await this.r.u53(),
+			kind: Msg.SubscribeDone,
+			id,
+			code,
+			reason,
+			final,
 		}
 	}
 
@@ -394,12 +396,10 @@ export class Encoder {
 				return this.subscribe(m)
 			case Msg.SubscribeOk:
 				return this.subscribe_ok(m)
-			case Msg.SubscribeReset:
-				return this.subscribe_reset(m)
 			case Msg.SubscribeError:
 				return this.subscribe_error(m)
-			case Msg.SubscribeFin:
-				return this.subscribe_fin(m)
+			case Msg.SubscribeDone:
+				return this.subscribe_done(m)
 			case Msg.Unsubscribe:
 				return this.unsubscribe(m)
 			case Msg.Announce:
@@ -459,22 +459,29 @@ export class Encoder {
 		await this.w.u53(Id.SubscribeOk)
 		await this.w.u62(s.id)
 		await this.w.u62(s.expires)
+
+		if (s.latest !== undefined) {
+			await this.w.u8(1)
+			await this.w.u53(s.latest[0])
+			await this.w.u53(s.latest[1])
+		} else {
+			await this.w.u8(0)
+		}
 	}
 
-	async subscribe_reset(s: SubscribeReset) {
-		await this.w.u53(Id.SubscribeReset)
+	async subscribe_done(s: SubscribeDone) {
+		await this.w.u53(Id.SubscribeDone)
 		await this.w.u62(s.id)
 		await this.w.u62(s.code)
 		await this.w.string(s.reason)
-		await this.w.u53(s.final_group)
-		await this.w.u53(s.final_object)
-	}
 
-	async subscribe_fin(s: SubscribeFin) {
-		await this.w.u53(Id.SubscribeFin)
-		await this.w.u62(s.id)
-		await this.w.u53(s.final_group)
-		await this.w.u53(s.final_object)
+		if (s.final !== undefined) {
+			await this.w.u8(1)
+			await this.w.u53(s.final[0])
+			await this.w.u53(s.final[1])
+		} else {
+			await this.w.u8(0)
+		}
 	}
 
 	async subscribe_error(s: SubscribeError) {
