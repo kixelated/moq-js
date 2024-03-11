@@ -7,6 +7,7 @@ export enum Version {
 	DRAFT_00 = 0xff000000,
 	DRAFT_01 = 0xff000001,
 	DRAFT_02 = 0xff000002,
+	DRAFT_03 = 0xff000003,
 	KIXEL_00 = 0xbad00,
 	KIXEL_01 = 0xbad01,
 }
