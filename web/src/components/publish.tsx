@@ -97,14 +97,14 @@ export default function Publish() {
 		return tracks[0].getSettings() as VideoTrackSettings
 	})
 
-	const id = crypto.randomUUID()
-	let watchUrl = `/watch/${id}`
+	const name = crypto.randomUUID()
+	let watchUrl = `/watch/${name}`
 	if (server != import.meta.env.PUBLIC_RELAY_HOST) {
 		watchUrl = `${watchUrl}?server=${server}`
 	}
 
 	createEffect(() => {
-		const url = `https://${server}/${id}`
+		const url = `https://${server}`
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
@@ -145,6 +145,7 @@ export default function Publish() {
 			media: d,
 			audio: a,
 			video: v,
+			namespace: name,
 		})
 	}
 

@@ -7,6 +7,7 @@ import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
+	namespace: string
 	connection: Connection
 	media: MediaStream
 
@@ -31,7 +32,7 @@ export class Broadcast {
 	constructor(config: BroadcastConfig) {
 		this.connection = config.connection
 		this.config = config
-		this.catalog = new Catalog()
+		this.catalog = new Catalog(config.namespace)
 
 		for (const media of this.config.media.getTracks()) {
 			const track = new Track(media, config)
