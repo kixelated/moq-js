@@ -3,7 +3,12 @@ import { asError } from "../../common/error"
 
 // JSON encoded catalog
 export class Catalog {
+	namespace: string
 	tracks = new Array<Track>()
+
+	constructor(namespace: string) {
+		this.namespace = namespace
+	}
 
 	encode(): Uint8Array {
 		const encoder = new TextEncoder()
@@ -11,26 +16,22 @@ export class Catalog {
 		return encoder.encode(str)
 	}
 
-	static decode(raw: Uint8Array): Catalog {
+	decode(raw: Uint8Array) {
 		const decoder = new TextDecoder()
 		const str = decoder.decode(raw)
 
 		try {
-			const catalog = new Catalog()
-			catalog.tracks = JSON.parse(str).tracks
-
-			if (!isCatalog(catalog)) {
+			this.tracks = JSON.parse(str).tracks
+			if (!isCatalog(this)) {
 				throw new Error("invalid catalog")
 			}
-
-			return catalog
 		} catch (e) {
 			throw new Error("invalid catalog")
 		}
 	}
 
-	static async fetch(connection: Connection): Promise<Catalog> {
-		const subscribe = await connection.subscribe("", ".catalog")
+	async fetch(connection: Connection) {
+		const subscribe = await connection.subscribe(this.namespace, ".catalog")
 		try {
 			const segment = await subscribe.data()
 			if (!segment) throw new Error("no catalog data")
@@ -41,7 +42,7 @@ export class Catalog {
 			await segment.close()
 			await subscribe.close() // we done
 
-			return Catalog.decode(chunk.payload)
+			this.decode(chunk.payload)
 		} catch (e) {
 			const err = asError(e)
 

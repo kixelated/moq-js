@@ -15,6 +15,7 @@ export type Timeline = Message.Timeline
 
 export interface PlayerConfig {
 	url: string
+	namespace: string
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	element: HTMLCanvasElement | HTMLVideoElement
 }
@@ -53,7 +54,8 @@ export class Player {
 		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
 		const connection = await client.connect()
 
-		const catalog = await Catalog.fetch(connection)
+		const catalog = new Catalog(config.namespace)
+		await catalog.fetch(connection)
 
 		let backend
 
@@ -94,7 +96,7 @@ export class Player {
 	}
 
 	async #runInit(name: string) {
-		const sub = await this.#connection.subscribe("", name)
+		const sub = await this.#connection.subscribe(this.#catalog.namespace, name)
 		try {
 			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
@@ -114,7 +116,7 @@ export class Player {
 			throw new Error(`unknown track kind: ${track.kind}`)
 		}
 
-		const sub = await this.#connection.subscribe("", track.data_track)
+		const sub = await this.#connection.subscribe(this.#catalog.namespace, track.data_track)
 		try {
 			for (;;) {
 				const segment = await Promise.race([sub.data(), this.#running])
