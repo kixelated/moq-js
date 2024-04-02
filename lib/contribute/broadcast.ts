@@ -92,6 +92,8 @@ export class Broadcast {
 	}
 
 	async #run() {
+		await this.connection.announce(this.catalog.namespace)
+
 		for (;;) {
 			const subscriber = await this.connection.subscribed()
 			if (!subscriber) break
