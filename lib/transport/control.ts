@@ -497,6 +497,7 @@ export class Encoder {
 	async announce(a: Announce) {
 		await this.w.u53(Id.Announce)
 		await this.w.string(a.namespace)
+		await this.w.u53(0) // parameters
 	}
 
 	async announce_ok(a: AnnounceOk) {
