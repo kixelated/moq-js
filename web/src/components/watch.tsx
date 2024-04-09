@@ -3,7 +3,7 @@ import { Player } from "@kixelated/moq/playback"
 
 import { IndexedDBObjectStores } from "@kixelated/moq/playback/webcodecs/worker"
 
-import Plot from "./chart"
+import Plot from "./bitChart"
 
 import Fail from "./fail"
 
@@ -20,8 +20,13 @@ export interface IndexedDBFramesSchema {
 	timestamp: number
 }
 
+export interface IndexedDBFBitRateWithTimestampSchema {
+	bitrate: number
+	timestamp: number
+}
+
 // Data update rate in milliseconds
-const DATA_UPDATE_RATE = 2000
+const DATA_UPDATE_RATE = 500
 
 // Helper function to nicely display large numbers
 function formatNumber(number: number): string {
@@ -109,6 +114,7 @@ export default function Watch(props: { name: string }) {
 	const [currentTime, setCurrentTime] = createSignal<Date>(new Date())
 	const [totalAmountRecvBytes, setTotalAmountRecvBytes] = createSignal<number>(0)
 	const [frames, setFrames] = createSignal<IndexedDBFramesSchema[]>([])
+	const [bitratePlotData, setBitratePlotData] = createSignal<IndexedDBFBitRateWithTimestampSchema[]>([])
 	const [videoStartTime, setVideoStartTime] = createSignal<number>(0)
 	const [timeString, setTimeString] = createSignal<string>("00:00:00:000")
 	const [bitRate, setBitRate] = createSignal<number>(0.0)
@@ -118,7 +124,6 @@ export default function Watch(props: { name: string }) {
 	const updateDataInterval = setInterval(() => {
 		setCurrentTime(new Date())
 
-		// Better than below?
 		const totalMilliseconds = currentTime().getTime() - videoStartTime()
 
 		const hours = Math.floor(totalMilliseconds / 3600000) // 1 hour = 3600000 milliseconds
@@ -151,6 +156,8 @@ export default function Watch(props: { name: string }) {
 			seconds,
 		).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`
 		setTimeString(formattedTime)
+
+		setBitratePlotData(bitratePlotData().concat([{ bitrate: bitRate(), timestamp: totalMilliseconds - 3600000 }]))
 	}, DATA_UPDATE_RATE)
 
 	// We create a new element each time the mode changes, to avoid SolidJS caching.
@@ -202,7 +209,7 @@ export default function Watch(props: { name: string }) {
 
 			<h3>Charts</h3>
 
-			<Plot frames={frames()} />
+			<Plot bitrateWithTimestamp={bitratePlotData()} />
 
 			<h3>Meta Data</h3>
 			<div class="flex items-center">
