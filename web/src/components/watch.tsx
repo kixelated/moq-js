@@ -14,7 +14,7 @@ interface IndexedDBByteAmountSchema {
 	value: number
 }
 
-export interface IndexedDBByteFramesSchema {
+export interface IndexedDBFramesSchema {
 	number: number
 	size: number
 	timestamp: number
@@ -69,7 +69,7 @@ function retrieveByteAmountFromIndexedDB(): Promise<IndexedDBByteAmountSchema> {
 }
 
 // Function to retrieve all stored values from IndexedDB
-function retrieveFramesFromIndexedDB(): Promise<IndexedDBByteFramesSchema[]> {
+function retrieveFramesFromIndexedDB(): Promise<IndexedDBFramesSchema[]> {
 	return new Promise((resolve, reject) => {
 		if (!db) {
 			reject(new Error("IndexedDB is not initialized."))
@@ -82,7 +82,7 @@ function retrieveFramesFromIndexedDB(): Promise<IndexedDBByteFramesSchema[]> {
 
 		// Handle the success event when the values are retrieved successfully
 		getRequest.onsuccess = (event) => {
-			const storedValues = (event.target as IDBRequest).result as IndexedDBByteFramesSchema[]
+			const storedValues = (event.target as IDBRequest).result as IndexedDBFramesSchema[]
 			resolve(storedValues)
 		}
 
@@ -108,7 +108,7 @@ export default function Watch(props: { name: string }) {
 	// Various dynamic meta data to be displayed next to the video
 	const [currentTime, setCurrentTime] = createSignal<Date>(new Date())
 	const [totalAmountRecvBytes, setTotalAmountRecvBytes] = createSignal<number>(0)
-	const [frames, setFrames] = createSignal<IndexedDBByteFramesSchema[]>([])
+	const [frames, setFrames] = createSignal<IndexedDBFramesSchema[]>([])
 	const [videoStartTime, setVideoStartTime] = createSignal<number>(0)
 	const [timeString, setTimeString] = createSignal<string>("00:00:00:000")
 	const [bitRate, setBitRate] = createSignal<number>(0.0)
