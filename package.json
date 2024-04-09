@@ -11,5 +11,8 @@
 		"build": "npm run build --workspaces",
 		"lint": "npm run lint --workspaces",
 		"fmt": "npm run fmt --workspaces"
+	},
+	"dependencies": {
+		"chart.js": "^3.9.1"
 	}
 }
