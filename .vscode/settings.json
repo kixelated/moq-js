@@ -8,7 +8,7 @@
 	],
 	"eslint.run": "onSave",
 	"editor.codeActionsOnSave": {
-		"source.fixAll": true
+		"source.fixAll": "explicit"
 	},
 	"editor.formatOnSave": true, // Tell VSCode to format files on save
 	"editor.defaultFormatter": "esbenp.prettier-vscode",

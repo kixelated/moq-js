@@ -1,12 +1,11 @@
-import * as Message from "./webcodecs/message"
+import * as Message from "./worker/message"
 
 import { Connection } from "../transport/connection"
-import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
+import { Catalog, isMp4Track, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
 
-// We support two different playback implementations:
-import Webcodecs from "./webcodecs"
-import MSE from "./mse"
+import Backend from "./backend"
+
 import { Client } from "../transport/client"
 import { GroupReader } from "../transport/objects"
 
@@ -17,12 +16,12 @@ export interface PlayerConfig {
 	url: string
 	namespace: string
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
-	element: HTMLCanvasElement | HTMLVideoElement
+	canvas: HTMLCanvasElement
 }
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
-	#backend: Webcodecs | MSE
+	#backend: Backend
 
 	// A periodically updated timeline
 	//#timeline = new Watch<Timeline | undefined>(undefined)
@@ -36,7 +35,7 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog, backend: Webcodecs | MSE) {
+	private constructor(connection: Connection, catalog: Catalog, backend: Backend) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
@@ -57,14 +56,8 @@ export class Player {
 		const catalog = new Catalog(config.namespace)
 		await catalog.fetch(connection)
 
-		let backend
-
-		if (config.element instanceof HTMLCanvasElement) {
-			const element = config.element.transferControlToOffscreen()
-			backend = new Webcodecs({ element, catalog })
-		} else {
-			backend = new MSE({ element: config.element })
-		}
+		const canvas = config.canvas.transferControlToOffscreen()
+		const backend = new Backend({ canvas, catalog })
 
 		return new Player(connection, catalog, backend)
 	}
@@ -76,11 +69,6 @@ export class Player {
 		for (const track of this.#catalog.tracks) {
 			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
-			}
-
-			if (isAudioTrack(track) && this.#backend instanceof MSE) {
-				// TODO temporary hack to disable audio in MSE
-				continue
 			}
 
 			inits.add(track.init_track)
@@ -173,8 +161,8 @@ export class Player {
 	}
 	*/
 
-	async play() {
-		await this.#backend.play()
+	play() {
+		this.#backend.play()
 	}
 
 	/*
