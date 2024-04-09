@@ -116,21 +116,13 @@ export default function Watch(props: { name: string }) {
 	const [frames, setFrames] = createSignal<IndexedDBFramesSchema[]>([])
 	const [bitratePlotData, setBitratePlotData] = createSignal<IndexedDBFBitRateWithTimestampSchema[]>([])
 	const [videoStartTime, setVideoStartTime] = createSignal<number>(0)
+	const [currentVideoTime, setCurrentVideoTime] = createSignal<number>(0)
 	const [timeString, setTimeString] = createSignal<string>("00:00:00:000")
 	const [bitRate, setBitRate] = createSignal<number>(0.0)
 	const [framesPerSecond, setFramesPerSecond] = createSignal<number>(0.0)
 
 	// Define a function to update the data every second
 	const updateDataInterval = setInterval(() => {
-		setCurrentTime(new Date())
-
-		const totalMilliseconds = currentTime().getTime() - videoStartTime()
-
-		const hours = Math.floor(totalMilliseconds / 3600000) // 1 hour = 3600000 milliseconds
-		const minutes = Math.floor((totalMilliseconds % 3600000) / 60000) // 1 minute = 60000 milliseconds
-		const seconds = Math.floor((totalMilliseconds % 60000) / 1000) // 1 second = 1000 milliseconds
-		const milliseconds = Math.floor(totalMilliseconds % 1000) // Remaining milliseconds
-
 		// Function to retrieve data from the IndexedDB
 		const retrieveData = async () => {
 			const byteAmount = await retrieveByteAmountFromIndexedDB()
@@ -145,11 +137,24 @@ export default function Watch(props: { name: string }) {
 
 			setTotalAmountRecvBytes(byteAmount.value)
 			setFrames(frames)
+
+			setCurrentVideoTime(frames[frames.length - 1].timestamp)
 		}
+
 		retrieveData().then(setError).catch(setError)
 
-		setBitRate(parseFloat(((totalAmountRecvBytes() * 8) / seconds).toFixed(2)))
-		setFramesPerSecond(parseFloat((frames().length / seconds).toFixed(2)))
+		setCurrentTime(new Date())
+
+		const totalMilliseconds = currentVideoTime() - videoStartTime()
+		const totalSeconds = Math.floor(totalMilliseconds / 1000)
+
+		const hours = Math.floor(totalMilliseconds / 3600000) // 1 hour = 3600000 milliseconds
+		const minutes = Math.floor((totalMilliseconds % 3600000) / 60000) // 1 minute = 60000 milliseconds
+		const seconds = Math.floor((totalMilliseconds % 60000) / 1000) // 1 second = 1000 milliseconds
+		const milliseconds = Math.floor(totalMilliseconds % 1000) // Remaining milliseconds
+
+		setBitRate(parseFloat(((totalAmountRecvBytes() * 8) / totalSeconds).toFixed(2)))
+		setFramesPerSecond(parseFloat((frames().length / totalSeconds).toFixed(2)))
 
 		// Format the time
 		const formattedTime = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
