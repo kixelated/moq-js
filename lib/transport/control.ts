@@ -49,7 +49,7 @@ enum Id {
 	Subscribe = 0x3,
 	SubscribeOk = 0x4,
 	SubscribeError = 0x5,
-	SubscribeDone = 0xc,
+	SubscribeDone = 0xb,
 	Unsubscribe = 0xa,
 	Announce = 0x6,
 	AnnounceOk = 0x7,
