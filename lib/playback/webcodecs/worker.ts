@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 import { Timeline } from "./timeline"
 
 import * as Audio from "./audio"
@@ -9,9 +10,9 @@ import { asError } from "../../common/error"
 import { Deferred } from "../../common/async"
 import { GroupReader, Reader } from "../../transport/objects"
 
-enum IndexedDBKeys {
-	TOTAL_AMOUNT_RECV_BYTES = 1,
-	FRAME_COUNTER = 2,
+export enum IndexedDBObjectStores {
+	TOTAL_AMOUNT_RECV_BYTES = "BytesAmount",
+	FRAMES = "Frames",
 }
 
 // Listen and answer to main thread (replaced by IndexedDB, maybe needed later)
@@ -31,8 +32,7 @@ enum IndexedDBKeys {
 let db: IDBDatabase // Declare db variable at the worker scope
 
 // Open or create a database
-// TODO: Why 2?
-const openRequest = indexedDB.open("myStore", 2)
+const openRequest = indexedDB.open("IndexedDB", 1)
 
 // Handle the success event when the database is successfully opened
 openRequest.onsuccess = (event) => {
@@ -46,19 +46,20 @@ openRequest.onerror = (event) => {
 	console.error("Error opening database:", (event.target as IDBOpenDBRequest).error)
 }
 
-// Handle the upgrade needed event to create or upgrade the database schema (maybe needed later)
-/* openRequest.onupgradeneeded = (event) => {
-
+// Handle the upgrade needed event to create or upgrade the database schema
+openRequest.onupgradeneeded = (event) => {
 	db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
 	// Check if the object store already exists
-	if (!db.objectStoreNames.contains("myStore")) {
+	if (!db.objectStoreNames.contains(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES)) {
 		// Create an object store (similar to a table in SQL databases)
-		const objectStore = db.createObjectStore("myStore", { keyPath: "id" })
-
-		// Create an index on the object store
-		objectStore.createIndex("valueIndex", "value")
+		db.createObjectStore(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES, { keyPath: "id" })
 	}
-} */
+
+	if (!db.objectStoreNames.contains(IndexedDBObjectStores.FRAMES)) {
+		// Create an object store (similar to a table in SQL databases)
+		db.createObjectStore(IndexedDBObjectStores.FRAMES, { autoIncrement: true })
+	}
+}
 
 // Function to initialize the current value in IndexedDB
 function initializeIndexedDB() {
@@ -67,30 +68,40 @@ function initializeIndexedDB() {
 		return
 	}
 
-	const transaction = db.transaction(["myStore"], "readwrite")
-	const objectStore = transaction.objectStore("myStore")
-	const initialValue = 0
-	const initByteAmount = objectStore.put({ id: IndexedDBKeys.TOTAL_AMOUNT_RECV_BYTES, initialValue })
-	const initFrameCounter = objectStore.put({ id: IndexedDBKeys.FRAME_COUNTER, initialValue })
+	for (const objectStoreName of db.objectStoreNames) {
+		const transaction = db.transaction(objectStoreName, "readwrite")
 
-	// Handle the success event when the value is stored successfully
-	initByteAmount.onsuccess = () => {
-		console.log("Initial Byte Amount stored successfully:", initialValue)
-	}
+		const objectStore = transaction.objectStore(objectStoreName)
 
-	// Handle any errors that occur during value storage
-	initByteAmount.onerror = (event) => {
-		console.error("Error storing value:", (event.target as IDBRequest).error)
-	}
+		if (objectStoreName === IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES) {
+			const initialByteAmount = 0
 
-	// Handle the success event when the value is stored successfully
-	initFrameCounter.onsuccess = () => {
-		console.log("Initial Frame Count stored successfully:", initialValue)
-	}
+			const initByteAmount = objectStore.put({ id: 1, initialByteAmount })
 
-	// Handle any errors that occur during value storage
-	initFrameCounter.onerror = (event) => {
-		console.error("Error storing value:", (event.target as IDBRequest).error)
+			// Handle the success event when the value is stored successfully
+			initByteAmount.onsuccess = () => {
+				console.log("Initial Byte Amount stored successfully:", initialByteAmount)
+			}
+
+			// Handle any errors that occur during value storage
+			initByteAmount.onerror = (event) => {
+				console.error("Error storing value:", (event.target as IDBRequest).error)
+			}
+		}
+
+		if (objectStore.name === IndexedDBObjectStores.FRAMES) {
+			const initFrames = objectStore.clear()
+
+			// Handle the success event when the value is stored successfully
+			initFrames.onsuccess = () => {
+				console.log("Frames successfully reset")
+			}
+
+			// Handle any errors that occur during value storage
+			initFrames.onerror = (event) => {
+				console.error("Error storing value:", (event.target as IDBRequest).error)
+			}
+		}
 	}
 }
 
@@ -101,20 +112,20 @@ function increaseTotalByteAmount(newValue: number) {
 		return
 	}
 
-	const transaction = db.transaction(["myStore"], "readwrite")
-	const objectStore = transaction.objectStore("myStore")
-	const getRequest = objectStore.get(IndexedDBKeys.TOTAL_AMOUNT_RECV_BYTES) // Get the current byte amount from the database
+	const transaction = db.transaction(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES, "readwrite")
+	const objectStore = transaction.objectStore(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES)
+	const getRequest = objectStore.get(1) // Get the current byte amount from the database
 
 	// Handle the success event when the current value is retrieved successfully
 	getRequest.onsuccess = (event) => {
 		const currentValue = (event.target as IDBRequest).result?.value ?? 0 // Retrieve the current value (default to 0 if not found)
 		const updatedValue = currentValue + newValue // Calculate the updated value
 
-		const putRequest = objectStore.put({ id: IndexedDBKeys.TOTAL_AMOUNT_RECV_BYTES, value: updatedValue }) // Store the updated value back into the database
+		const putRequest = objectStore.put({ id: 1, value: updatedValue }) // Store the updated value back into the database
 
 		// Handle the success event when the updated value is stored successfully
 		putRequest.onsuccess = () => {
-			console.log("Byte Amount increased successfully. New value:", updatedValue)
+			// console.log("Byte Amount increased successfully. New value:", updatedValue)
 		}
 
 		// Handle any errors that occur during value storage
@@ -130,37 +141,28 @@ function increaseTotalByteAmount(newValue: number) {
 }
 
 // Function to increase the current value with a new value in IndexedDB
-function increaseFrameCounter() {
+function addFrame(frame: MP4.Frame) {
 	if (!db) {
 		console.error("IndexedDB is not initialized.")
 		return
 	}
 
-	const transaction = db.transaction(["myStore"], "readwrite")
-	const objectStore = transaction.objectStore("myStore")
-	const getRequest = objectStore.get(IndexedDBKeys.FRAME_COUNTER) // Get the current frame count from the database
+	const transaction = db.transaction(IndexedDBObjectStores.FRAMES, "readwrite")
+	const objectStore = transaction.objectStore(IndexedDBObjectStores.FRAMES)
+	const addRequest = objectStore.add({
+		number: frame.sample.number,
+		size: frame.sample.size,
+		timestamp: new Date().getTime(),
+	})
 
-	// Handle the success event when the current value is retrieved successfully
-	getRequest.onsuccess = (event) => {
-		const currentValue = (event.target as IDBRequest).result?.value ?? 0 // Retrieve the current value (default to 0 if not found)
-		const updatedValue = currentValue + 1 // Calculate the updated value
-
-		const putRequest = objectStore.put({ id: IndexedDBKeys.FRAME_COUNTER, value: updatedValue }) // Store the updated value back into the database
-
-		// Handle the success event when the updated value is stored successfully
-		putRequest.onsuccess = () => {
-			console.log("Number of Frames increased successfully. New value:", updatedValue)
-		}
-
-		// Handle any errors that occur during value storage
-		putRequest.onerror = (event) => {
-			console.error("Error storing updated value:", (event.target as IDBRequest).error)
-		}
+	// Handle the success event when the updated value is stored successfully
+	addRequest.onsuccess = () => {
+		// console.log("Frame added successfully. New frame:", frame)
 	}
 
 	// Handle any errors that occur during value retrieval
-	getRequest.onerror = (event) => {
-		console.error("Error retrieving current value:", (event.target as IDBRequest).error)
+	addRequest.onerror = (event) => {
+		console.error("Error adding current frame:", (event.target as IDBRequest).error)
 	}
 }
 
@@ -235,12 +237,12 @@ class Worker {
 		})
 		segments.releaseLock()
 
-		console.log("GROUP_READER", reader)
+		// console.log("GROUP_READER", reader)
 
 		// Read each chunk, decoding the MP4 frames and adding them to the queue.
 		for (;;) {
 			const chunk = await reader.read()
-			console.log("GROUP_CHUNK", chunk)
+			// console.log("GROUP_CHUNK", chunk)
 
 			if (!chunk) {
 				break
@@ -251,9 +253,9 @@ class Worker {
 
 			const frames = container.decode(chunk.payload)
 			for (const frame of frames) {
-				console.log("FRAME")
+				// console.log("FRAME", frame)
 
-				increaseFrameCounter()
+				addFrame(frame)
 
 				await segment.write(frame)
 			}
