@@ -1,14 +1,27 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
 
+import { IndexedDBObjectStores } from "@kixelated/moq/playback/webcodecs/worker"
+
+import Plot from "./chart"
+
 import Fail from "./fail"
 
 import { createEffect, createMemo, createSelector, createSignal, onCleanup } from "solid-js"
 
-interface IndexedDBSchema {
+interface IndexedDBByteAmountSchema {
 	id: number
 	value: number
 }
+
+export interface IndexedDBByteFramesSchema {
+	number: number
+	size: number
+	timestamp: number
+}
+
+// Data update rate in milliseconds
+const DATA_UPDATE_RATE = 2000
 
 // Helper function to nicely display large numbers
 function formatNumber(number: number): string {
@@ -19,32 +32,10 @@ function formatNumber(number: number): string {
 	return scaledNumber.toFixed(2) + suffix
 }
 
-// Only for testing the reactive UI, can be removed later
-function useCurrentTime() {
-	const [currentTime, setCurrentTime] = createSignal<string>(getCurrentTime())
-
-	// Update the current time every second
-	const intervalId = setInterval(() => {
-		setCurrentTime(getCurrentTime())
-	}, 1000)
-
-	// Clean up the interval when the component unmounts
-	onCleanup(() => {
-		clearInterval(intervalId)
-	})
-
-	return currentTime
-}
-
-function getCurrentTime(): string {
-	const now = new Date()
-	return now.toLocaleTimeString()
-}
-
 let db: IDBDatabase // Declare db variable at the worker scope
 
 // Open or create a database
-const openRequest = indexedDB.open("myStore", 2)
+const openRequest = indexedDB.open("IndexedDB", 1)
 
 // Handle the success event when the database is successfully opened
 openRequest.onsuccess = (event) => {
@@ -52,20 +43,46 @@ openRequest.onsuccess = (event) => {
 }
 
 // Function to retrieve all stored values from IndexedDB
-function retrieveDataFromIndexedDB(): Promise<IndexedDBSchema[]> {
+function retrieveByteAmountFromIndexedDB(): Promise<IndexedDBByteAmountSchema> {
 	return new Promise((resolve, reject) => {
 		if (!db) {
 			reject(new Error("IndexedDB is not initialized."))
 			return
 		}
 
-		const transaction = db.transaction(["myStore"], "readonly")
-		const objectStore = transaction.objectStore("myStore")
+		const transaction = db.transaction(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES, "readonly")
+		const objectStore = transaction.objectStore(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES)
+		const getRequest = objectStore.get(1) // Get all stored values from the database
+
+		// Handle the success event when the values are retrieved successfully
+		getRequest.onsuccess = (event) => {
+			const storedValues = (event.target as IDBRequest).result as IndexedDBByteAmountSchema
+			resolve(storedValues)
+		}
+
+		// Handle any errors that occur during value retrieval
+		getRequest.onerror = (event) => {
+			console.error("Error retrieving value:", (event.target as IDBRequest).error)
+			reject((event.target as IDBRequest).error)
+		}
+	})
+}
+
+// Function to retrieve all stored values from IndexedDB
+function retrieveFramesFromIndexedDB(): Promise<IndexedDBByteFramesSchema[]> {
+	return new Promise((resolve, reject) => {
+		if (!db) {
+			reject(new Error("IndexedDB is not initialized."))
+			return
+		}
+
+		const transaction = db.transaction(IndexedDBObjectStores.FRAMES, "readonly")
+		const objectStore = transaction.objectStore(IndexedDBObjectStores.FRAMES)
 		const getRequest = objectStore.getAll() // Get all stored values from the database
 
 		// Handle the success event when the values are retrieved successfully
 		getRequest.onsuccess = (event) => {
-			const storedValues = (event.target as IDBRequest).result as IndexedDBSchema[]
+			const storedValues = (event.target as IDBRequest).result as IndexedDBByteFramesSchema[]
 			resolve(storedValues)
 		}
 
@@ -89,47 +106,52 @@ export default function Watch(props: { name: string }) {
 	const isMode = createSelector(mode)
 
 	// Various dynamic meta data to be displayed next to the video
-	const currentTime = useCurrentTime()
-
+	const [currentTime, setCurrentTime] = createSignal<Date>(new Date())
 	const [totalAmountRecvBytes, setTotalAmountRecvBytes] = createSignal<number>(0)
-	const [frameCounter, setFrameCounter] = createSignal<number>(0)
-	const [secondSignal, setSecondSignal] = createSignal<number>(0)
-	const [timeString, setTimeString] = createSignal<string>("00:00:00")
+	const [frames, setFrames] = createSignal<IndexedDBByteFramesSchema[]>([])
+	const [videoStartTime, setVideoStartTime] = createSignal<number>(0)
+	const [timeString, setTimeString] = createSignal<string>("00:00:00:000")
 	const [bitRate, setBitRate] = createSignal<number>(0.0)
 	const [framesPerSecond, setFramesPerSecond] = createSignal<number>(0.0)
 
 	// Define a function to update the data every second
-	function updateDataCallback() {
-		setSecondSignal(secondSignal() + 1)
+	const updateDataInterval = setInterval(() => {
+		setCurrentTime(new Date())
+
+		// Better than below?
+		const totalMilliseconds = currentTime().getTime() - videoStartTime()
+
+		const hours = Math.floor(totalMilliseconds / 3600000) // 1 hour = 3600000 milliseconds
+		const minutes = Math.floor((totalMilliseconds % 3600000) / 60000) // 1 minute = 60000 milliseconds
+		const seconds = Math.floor((totalMilliseconds % 60000) / 1000) // 1 second = 1000 milliseconds
+		const milliseconds = Math.floor(totalMilliseconds % 1000) // Remaining milliseconds
 
 		// Function to retrieve data from the IndexedDB
 		const retrieveData = async () => {
-			const data = await retrieveDataFromIndexedDB()
-			setTotalAmountRecvBytes(data[0].value)
-			setFrameCounter(data[1].value)
+			const byteAmount = await retrieveByteAmountFromIndexedDB()
+			const frames = await retrieveFramesFromIndexedDB()
+
+			// Set the video start time initially
+			if (videoStartTime() === 0 && frames.length > 0) {
+				console.log("SET_VIDEO_START_TIME", frames[0].timestamp)
+
+				setVideoStartTime(frames[0].timestamp)
+			}
+
+			setTotalAmountRecvBytes(byteAmount.value)
+			setFrames(frames)
 		}
 		retrieveData().then(setError).catch(setError)
 
-		setBitRate(parseFloat(((totalAmountRecvBytes() * 8) / secondSignal()).toFixed(2)))
-		setFramesPerSecond(parseFloat((frameCounter() / secondSignal()).toFixed(2)))
+		setBitRate(parseFloat(((totalAmountRecvBytes() * 8) / seconds).toFixed(2)))
+		setFramesPerSecond(parseFloat((frames().length / seconds).toFixed(2)))
 
-		const hours = Math.floor(secondSignal() / 3600) // 1 hour = 3600000 milliseconds
-		const minutes = Math.floor((secondSignal() % 3600) / 60) // 1 minute = 60000 milliseconds
-		const seconds = Math.floor(secondSignal() % 60) // 1 second = 1000 milliseconds
 		// Format the time
 		const formattedTime = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
 			seconds,
-		).padStart(2, "0")}`
+		).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`
 		setTimeString(formattedTime)
-	}
-
-	// Start the timer
-	const updateDataInterval = setInterval(updateDataCallback, 1000) // 1000 milliseconds = 1 second
-
-	// Close all intervals
-	setTimeout(() => {
-		clearInterval(updateDataInterval)
-	}, 30000)
+	}, DATA_UPDATE_RATE)
 
 	// We create a new element each time the mode changes, to avoid SolidJS caching.
 	const useElement = createMemo(() => {
@@ -164,7 +186,10 @@ export default function Watch(props: { name: string }) {
 		const player = usePlayer()
 		if (!player) return
 
-		onCleanup(() => player.close())
+		onCleanup(() => {
+			player.close().then(setError).catch(setError)
+			clearInterval(updateDataInterval)
+		})
 		player.closed().then(setError).catch(setError)
 	})
 
@@ -175,10 +200,18 @@ export default function Watch(props: { name: string }) {
 			<Fail error={error()} />
 			{useElement()}
 
+			<h3>Charts</h3>
+
+			<Plot frames={frames()} />
+
 			<h3>Meta Data</h3>
 			<div class="flex items-center">
 				<span>Current Time: &nbsp;</span>
-				<p>{currentTime()}</p>
+				<p>
+					{currentTime().toLocaleTimeString() +
+						"." +
+						currentTime().getMilliseconds().toString().padStart(3, "0")}
+				</p>
 			</div>
 
 			<div class="flex items-center">
@@ -198,7 +231,7 @@ export default function Watch(props: { name: string }) {
 
 			<div class="flex items-center">
 				<span>Total Number of Frames Received: &nbsp;</span>
-				<p>{formatNumber(frameCounter())}</p>
+				<p>{frames().length}</p>
 			</div>
 
 			<div class="flex items-center">
