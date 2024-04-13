@@ -49,7 +49,7 @@ enum Id {
 	Subscribe = 0x3,
 	SubscribeOk = 0x4,
 	SubscribeError = 0x5,
-	SubscribeDone = 0xc,
+	SubscribeDone = 0xb,
 	Unsubscribe = 0xa,
 	Announce = 0x6,
 	AnnounceOk = 0x7,
@@ -497,6 +497,7 @@ export class Encoder {
 	async announce(a: Announce) {
 		await this.w.u53(Id.Announce)
 		await this.w.string(a.namespace)
+		await this.w.u53(0) // parameters
 	}
 
 	async announce_ok(a: AnnounceOk) {
