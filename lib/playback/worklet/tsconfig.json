@@ -1,5 +1,5 @@
 {
-	"extends": "../../../tsconfig.json",
+	"extends": "../../tsconfig.json",
 	"include": ["."],
 	"exclude": ["./index"],
 	"compilerOptions": {
@@ -8,7 +8,7 @@
 	},
 	"references": [
 		{
-			"path": "../../../common"
+			"path": "../../common"
 		}
 	]
 }

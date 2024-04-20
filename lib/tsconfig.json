@@ -24,7 +24,7 @@
 			"path": "./playback"
 		},
 		{
-			"path": "./playback/webcodecs/worklet"
+			"path": "./playback/worklet"
 		},
 		{
 			"path": "./contribute"
