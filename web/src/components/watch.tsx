@@ -35,12 +35,14 @@ export default function Watch(props: { name: string }) {
 		player.closed().then(setError).catch(setError)
 	})
 
+	const play = () => usePlayer()?.play()
+
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
 			<Fail error={error()} />
-			<canvas ref={canvas} class="aspect-video w-full rounded-lg" />
+			<canvas ref={canvas} onClick={play} class="aspect-video w-full rounded-lg" />
 		</>
 	)
 }

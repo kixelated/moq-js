@@ -7,7 +7,7 @@ import * as Message from "./worker/message"
 import workletURL from "./worklet?url"
 
 // NOTE: This must be on the main thread
-export class Context {
+export class Audio {
 	context: AudioContext
 	worklet: Promise<AudioWorkletNode>
 
@@ -46,13 +46,5 @@ export class Context {
 
 	private on(_event: MessageEvent) {
 		// TODO
-	}
-
-	async resume() {
-		await this.context.resume()
-	}
-
-	async close() {
-		await this.context.close()
 	}
 }

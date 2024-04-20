@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 import * as Message from "./worker/message"
-import { Context } from "./context"
+import { Audio } from "./audio"
 
 import MediaWorker from "./worker?worker"
 import { RingShared } from "../common/ring"
@@ -22,7 +22,7 @@ export default class Backend {
 	#worker: Worker
 
 	// The audio context, which must be created on the main thread.
-	#context?: Context
+	#audio?: Audio
 
 	constructor(config: PlayerConfig) {
 		// TODO does this block the main thread? If so, make this async
@@ -54,7 +54,7 @@ export default class Backend {
 				ring: new RingShared(2, sampleRate / 20), // 50ms
 			}
 
-			this.#context = new Context(msg.audio)
+			this.#audio = new Audio(msg.audio)
 		}
 
 		// TODO only send the canvas if we have a video track
@@ -65,8 +65,9 @@ export default class Backend {
 		this.send({ config: msg }, msg.video.canvas)
 	}
 
-	// TODO initialize context now since the user clicked
-	play() {}
+	async play() {
+		await this.#audio?.context.resume()
+	}
 
 	init(init: Init) {
 		this.send({ init })
@@ -78,7 +79,7 @@ export default class Backend {
 
 	async close() {
 		this.#worker.terminate()
-		await this.#context?.close()
+		await this.#audio?.context.close()
 	}
 
 	// Enforce we're sending valid types to the worker
