@@ -216,6 +216,8 @@ export default function Publish() {
 		// Compute the absolute URL
 		const absolute = new URL(relative, window.location.href).href
 
+		window.open(absolute, "_blank")
+
 		navigator.clipboard
 			.writeText(absolute)
 			.then(() => setCopied(true))
@@ -229,10 +231,40 @@ export default function Publish() {
 		onCleanup(() => clearTimeout(timeout))
 	})
 
+	// Stop streaming
+	const stopStreaming = function () {
+		const conn = connection()
+		if (!conn) return
+
+		conn.close()
+		conn.closed().then(setError, setError)
+
+		const b = broadcast()
+		if (!b) return
+
+		// Close the broadcast on teardown
+		b.close()
+
+		// Wait until the broadcast is closed.
+		b.closed()
+			.then(setError, setError)
+			.finally(() => {
+				setBroadcast(undefined)
+				setActive(false)
+			})
+
+		setDevice(undefined)
+	}
+
 	return (
 		<>
 			<form onSubmit={(e) => e.preventDefault()}>
-				<Device setError={setError} setDevice={setDevice} setDeviceLoading={setDeviceLoading} />
+				<Device
+					setError={setError}
+					setDevice={setDevice}
+					setDeviceLoading={setDeviceLoading}
+					stopStream={stopStreaming}
+				/>
 
 				<Show when={videoTrack()}>
 					{(track) => (
@@ -294,7 +326,7 @@ export default function Publish() {
 
 					<Show when={broadcast()}>
 						<a href={watchUrl} onClick={copyShare} class="form-button">
-							Share
+							Watch & Share
 						</a>
 					</Show>
 
@@ -311,6 +343,7 @@ function Device(props: {
 	setError: (err: Error) => void
 	setDevice: (input: MediaStream) => void
 	setDeviceLoading: (ok: boolean) => void
+	stopStream: () => void
 }) {
 	const [mode, setMode] = createSignal<"user" | "display" | "none">("none")
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
@@ -410,9 +443,19 @@ function Device(props: {
 
 	const isMode = createSelector(mode)
 
+	// Stop streaming
+	const stopStreaming = function (event: MouseEvent) {
+		event.preventDefault()
+
+		props.stopStream()
+
+		setMode("none")
+		setDevice(undefined)
+	}
+
 	return (
 		<>
-			<h2>Source</h2>
+			{/* <h2>Source</h2> */}
 
 			<div>Choose an input device:</div>
 			<button
@@ -451,6 +494,9 @@ function Device(props: {
 					videoDeviceId={videoDeviceId()}
 					audioDeviceId={audioDeviceId()}
 				/>
+				<button onClick={stopStreaming} class="form-button bg-red-600">
+					Stop Streaming
+				</button>
 			</Show>
 
 			<Show when={device()}>
