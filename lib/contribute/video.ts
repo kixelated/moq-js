@@ -4,6 +4,30 @@ const SUPPORTED = [
 	// "av01", // TDOO support AV1
 ]
 
+export enum IndexedDBObjectStores {
+	TOTAL_AMOUNT_RECV_BYTES = "BytesAmount",
+	FRAMES = "Frames",
+}
+
+export interface IndexedDBFramesSchema {
+	_1_rawVideoTimestamp: number
+	_2_containerizationTime: number
+	_3_createMP4FrameTimestamp: number
+	_4_propagationTime: number
+	_5_receiveMp4FrameTimestamp: number
+	_6_renderFrameTime: number
+	_7_renderFrameTimestamp: number
+	_8_totalTime: number
+	_9_originalTimestampAttribute: number
+	_10_encodedTimestampAttribute: number
+	_11_decodedTimestampAttribute: number
+	_12_renderTimestampAttribute: number
+	_13_sentBytes: number
+	_14_receivedBytes: number
+}
+
+let db: IDBDatabase
+
 export interface EncoderSupported {
 	codecs: string[]
 }
@@ -22,7 +46,36 @@ export class Encoder {
 	// Converts raw rames to encoded frames.
 	frames: TransformStream<VideoFrame, VideoDecoderConfig | EncodedVideoChunk>
 
+	#frameID = 0
+
 	constructor(config: VideoEncoderConfig) {
+		// Open IndexedDB
+		const openRequest = indexedDB.open("IndexedDB", 1)
+
+		// Handle the success event when the database is successfully opened
+		openRequest.onsuccess = (event) => {
+			db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
+
+			this.initializeIndexedDB()
+		}
+
+		// Handle the upgrade needed event to create or upgrade the database schema
+		openRequest.onupgradeneeded = (event) => {
+			console.log("UPGRADE_NEEDED")
+
+			db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
+			// Check if the object store already exists
+			if (!db.objectStoreNames.contains(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES)) {
+				// Create an object store (similar to a table in SQL databases)
+				db.createObjectStore(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES, { keyPath: "id" })
+			}
+
+			if (!db.objectStoreNames.contains(IndexedDBObjectStores.FRAMES)) {
+				// Create an object store (similar to a table in SQL databases)
+				db.createObjectStore(IndexedDBObjectStores.FRAMES, { autoIncrement: true })
+			}
+		}
+
 		config.bitrateMode ??= "constant"
 		config.latencyMode ??= "realtime"
 
@@ -33,6 +86,76 @@ export class Encoder {
 			transform: this.#transform.bind(this),
 			flush: this.#flush.bind(this),
 		})
+	}
+
+	// Function to initialize the IndexedDB
+	initializeIndexedDB() {
+		if (!db) {
+			console.error("IndexedDB is not initialized.")
+			return
+		}
+
+		for (const objectStoreName of db.objectStoreNames) {
+			const transaction = db.transaction(objectStoreName, "readwrite")
+
+			const objectStore = transaction.objectStore(objectStoreName)
+
+			if (objectStoreName === (IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES as string)) {
+				const initialByteAmount = 0
+
+				const initByteAmount = objectStore.put({ id: 1, initialByteAmount })
+
+				// Handle the success event when the value is stored successfully
+				initByteAmount.onsuccess = () => {
+					console.log("Initial Byte Amount stored successfully:", initialByteAmount)
+				}
+
+				// Handle any errors that occur during value storage
+				initByteAmount.onerror = (event) => {
+					console.error("Error storing value:", (event.target as IDBRequest).error)
+				}
+			}
+
+			if (objectStore.name === (IndexedDBObjectStores.FRAMES as string)) {
+				const initFrames = objectStore.clear()
+
+				// Handle the success event when the value is stored successfully
+				initFrames.onsuccess = () => {
+					console.log("Frames successfully reset")
+				}
+
+				// Handle any errors that occur during value storage
+				initFrames.onerror = (event) => {
+					console.error("Error storing value:", (event.target as IDBRequest).error)
+				}
+			}
+		}
+	}
+
+	// Function to add the time of creation for each frame in IndexedDB
+	addRawVideoFrameTimestamp(frame: VideoFrame, frameID: number, currentTimeInMilliseconds: number) {
+		if (!db) {
+			console.error("IndexedDB is not initialized.")
+			return
+		}
+
+		const transaction = db.transaction(IndexedDBObjectStores.FRAMES, "readwrite")
+		const objectStore = transaction.objectStore(IndexedDBObjectStores.FRAMES)
+		const newFrame = {
+			_1_rawVideoTimestamp: currentTimeInMilliseconds,
+			_9_originalTimestampAttribute: frame.timestamp,
+		} as IndexedDBFramesSchema
+		const addRequest = objectStore.add(newFrame, frameID)
+
+		// Handle the success event when the updated value is stored successfully
+		addRequest.onsuccess = () => {
+			// console.log("Frame added successfully. New frame:", newFrame, frameID)
+		}
+
+		// Handle any errors that occur during value retrieval
+		addRequest.onerror = (event) => {
+			console.error("Error adding current frame:", (event.target as IDBRequest).error)
+		}
 	}
 
 	static async isSupported(config: VideoEncoderConfig) {
@@ -69,9 +192,13 @@ export class Encoder {
 	#transform(frame: VideoFrame) {
 		const encoder = this.#encoder
 
+		this.addRawVideoFrameTimestamp(frame, this.#frameID, Date.now())
+
 		// Set keyFrame to undefined when we're not sure so the encoder can decide.
 		encoder.encode(frame, { keyFrame: this.#keyframeNext })
 		this.#keyframeNext = undefined
+
+		this.#frameID++
 
 		frame.close()
 	}
