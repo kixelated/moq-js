@@ -1,7 +1,7 @@
 import * as MP4 from "../media/mp4"
 import { Chunk } from "./chunk"
 
-import { IndexedDBObjectStores, IndexedDBFramesSchema } from "./video"
+import { IndexedDBObjectStores, IndexedDBFramesSchema, IndexedDatabaseName } from "./video"
 
 type DecoderConfig = AudioDecoderConfig | VideoDecoderConfig
 type EncodedChunk = EncodedAudioChunk | EncodedVideoChunk
@@ -21,7 +21,7 @@ export class Container {
 
 	constructor() {
 		// Open IndexedDB
-		const openRequest = indexedDB.open("IndexedDB", 1)
+		const openRequest = indexedDB.open(IndexedDatabaseName, 1)
 
 		// Handle the success event when the database is successfully opened
 		openRequest.onsuccess = (event) => {

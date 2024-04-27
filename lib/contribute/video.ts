@@ -4,8 +4,10 @@ const SUPPORTED = [
 	// "av01", // TDOO support AV1
 ]
 
+export const IndexedDatabaseName = "IndexedDB"
+
 export enum IndexedDBObjectStores {
-	TOTAL_AMOUNT_RECV_BYTES = "BytesAmount",
+	START_STREAM_TIME = "StartStreamTime",
 	FRAMES = "Frames",
 }
 
@@ -50,30 +52,11 @@ export class Encoder {
 
 	constructor(config: VideoEncoderConfig) {
 		// Open IndexedDB
-		const openRequest = indexedDB.open("IndexedDB", 1)
+		const openRequest = indexedDB.open(IndexedDatabaseName, 1)
 
 		// Handle the success event when the database is successfully opened
 		openRequest.onsuccess = (event) => {
 			db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
-
-			this.initializeIndexedDB()
-		}
-
-		// Handle the upgrade needed event to create or upgrade the database schema
-		openRequest.onupgradeneeded = (event) => {
-			console.log("UPGRADE_NEEDED")
-
-			db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
-			// Check if the object store already exists
-			if (!db.objectStoreNames.contains(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES)) {
-				// Create an object store (similar to a table in SQL databases)
-				db.createObjectStore(IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES, { keyPath: "id" })
-			}
-
-			if (!db.objectStoreNames.contains(IndexedDBObjectStores.FRAMES)) {
-				// Create an object store (similar to a table in SQL databases)
-				db.createObjectStore(IndexedDBObjectStores.FRAMES, { autoIncrement: true })
-			}
 		}
 
 		config.bitrateMode ??= "constant"
@@ -86,50 +69,6 @@ export class Encoder {
 			transform: this.#transform.bind(this),
 			flush: this.#flush.bind(this),
 		})
-	}
-
-	// Function to initialize the IndexedDB
-	initializeIndexedDB() {
-		if (!db) {
-			console.error("IndexedDB is not initialized.")
-			return
-		}
-
-		for (const objectStoreName of db.objectStoreNames) {
-			const transaction = db.transaction(objectStoreName, "readwrite")
-
-			const objectStore = transaction.objectStore(objectStoreName)
-
-			if (objectStoreName === (IndexedDBObjectStores.TOTAL_AMOUNT_RECV_BYTES as string)) {
-				const initialByteAmount = 0
-
-				const initByteAmount = objectStore.put({ id: 1, initialByteAmount })
-
-				// Handle the success event when the value is stored successfully
-				initByteAmount.onsuccess = () => {
-					console.log("Initial Byte Amount stored successfully:", initialByteAmount)
-				}
-
-				// Handle any errors that occur during value storage
-				initByteAmount.onerror = (event) => {
-					console.error("Error storing value:", (event.target as IDBRequest).error)
-				}
-			}
-
-			if (objectStore.name === (IndexedDBObjectStores.FRAMES as string)) {
-				const initFrames = objectStore.clear()
-
-				// Handle the success event when the value is stored successfully
-				initFrames.onsuccess = () => {
-					console.log("Frames successfully reset")
-				}
-
-				// Handle any errors that occur during value storage
-				initFrames.onerror = (event) => {
-					console.error("Error storing value:", (event.target as IDBRequest).error)
-				}
-			}
-		}
 	}
 
 	// Function to add the time of creation for each frame in IndexedDB

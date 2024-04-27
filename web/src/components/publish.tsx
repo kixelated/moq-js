@@ -1,9 +1,81 @@
-import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
+import {
+	Broadcast,
+	VideoEncoder,
+	AudioEncoder,
+	IndexedDBObjectStores,
+	IndexedDatabaseName,
+} from "@kixelated/moq/contribute"
 import { Client, Connection } from "@kixelated/moq/transport"
 
 import { createSignal, createEffect, onCleanup, createMemo, Show, For, createSelector, Switch, Match } from "solid-js"
 
 import Fail from "./fail"
+
+let db: IDBDatabase
+
+// Function to initialize the IndexedDB
+const initializeIndexedDB = () => {
+	if (!db) {
+		console.error("IndexedDB is not initialized.")
+		return
+	}
+
+	for (const objectStoreName of db.objectStoreNames) {
+		const transaction = db.transaction(objectStoreName, "readwrite")
+
+		const objectStore = transaction.objectStore(objectStoreName)
+
+		if (objectStoreName === (IndexedDBObjectStores.START_STREAM_TIME as string)) {
+			const initStartTime = objectStore.clear()
+
+			// Handle the success event when the value is stored successfully
+			initStartTime.onsuccess = () => {
+				console.log("Start time successfully reset")
+			}
+
+			// Handle any errors that occur during value storage
+			initStartTime.onerror = (event) => {
+				console.error("Error storing value:", (event.target as IDBRequest).error)
+			}
+		}
+
+		if (objectStore.name === (IndexedDBObjectStores.FRAMES as string)) {
+			const initFrames = objectStore.clear()
+
+			// Handle the success event when the value is stored successfully
+			initFrames.onsuccess = () => {
+				console.log("Frames successfully reset")
+			}
+
+			// Handle any errors that occur during value storage
+			initFrames.onerror = (event) => {
+				console.error("Error storing value:", (event.target as IDBRequest).error)
+			}
+		}
+	}
+}
+
+// Function to add the start time of the stream in IndexedDB
+const addStreamStartTime = (currentTimeInMilliseconds: number) => {
+	if (!db) {
+		console.error("IndexedDB is not initialized.")
+		return
+	}
+
+	const transaction = db.transaction(IndexedDBObjectStores.START_STREAM_TIME, "readwrite")
+	const objectStore = transaction.objectStore(IndexedDBObjectStores.START_STREAM_TIME)
+	const addRequest = objectStore.add(currentTimeInMilliseconds, 1)
+
+	// Handle the success event when the updated value is stored successfully
+	addRequest.onsuccess = () => {
+		console.log("Start time successfully set:", currentTimeInMilliseconds)
+	}
+
+	// Handle any errors that occur during value retrieval
+	addRequest.onerror = (event) => {
+		console.error("Error adding start time:", (event.target as IDBRequest).error)
+	}
+}
 
 const AUDIO_CODECS = [
 	"Opus",
@@ -69,12 +141,41 @@ const DEFAULT_HEIGHT = 480
 const DEFAULT_FPS = 30
 
 export default function Publish() {
+	// Open IndexedDB
+	const openRequest = indexedDB.open(IndexedDatabaseName, 1)
+
+	// Handle the success event when the database is successfully opened
+	openRequest.onsuccess = (event) => {
+		db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
+
+		initializeIndexedDB()
+	}
+
+	// Handle the upgrade needed event to create or upgrade the database schema
+	openRequest.onupgradeneeded = (event) => {
+		console.log("UPGRADE_NEEDED")
+
+		db = (event.target as IDBOpenDBRequest).result // Assign db when database is opened
+		// Check if the object store already exists
+		if (!db.objectStoreNames.contains(IndexedDBObjectStores.START_STREAM_TIME)) {
+			// Create an object store (similar to a table in SQL databases)
+			db.createObjectStore(IndexedDBObjectStores.START_STREAM_TIME)
+		}
+
+		if (!db.objectStoreNames.contains(IndexedDBObjectStores.FRAMES)) {
+			// Create an object store (similar to a table in SQL databases)
+			db.createObjectStore(IndexedDBObjectStores.FRAMES, { autoIncrement: true })
+		}
+	}
+
 	// Use query params to allow overriding environment variables.
 	const urlSearchParams = new URLSearchParams(window.location.search)
 	const params = Object.fromEntries(urlSearchParams.entries())
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
 
+	const [streamStartTime, setStreamStartTime] = createSignal<number>()
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
+	const [videoElement, setVideoElement] = createSignal<HTMLVideoElement>()
 	const [deviceLoading, setDeviceLoading] = createSignal(false)
 	const [audio, setAudio] = createSignal<AudioEncoderConfig | undefined>()
 	const [video, setVideo] = createSignal<VideoEncoderConfig | undefined>()
@@ -119,6 +220,62 @@ export default function Publish() {
 		client.connect().then(setConnection).catch(setError)
 	})
 
+	const getCaptureFrameTime = (videoElement: HTMLVideoElement) => {
+		// const videoElement = document.createElement("video")
+		const canvas = document.createElement("canvas")
+		const ctx = canvas.getContext("2d")
+		/* const captureTimes: { "cap-cb": number; "cap-re": number; "cb-re": number } = {
+			"cap-cb": 0,
+			"cap-re": 0,
+			"cb-re": 0,
+		} */
+		let numOfCalls = 0
+		const streamStartTimeValue = streamStartTime()
+		let firstFrameCaptureOffset: number
+
+		const updateCanvas: VideoFrameRequestCallback = function (
+			now: number,
+			metadata: {
+				captureTime?: number
+				expectedDisplayTime: number
+				height: number
+				mediaTime: number
+				presentationTime: number
+				presentedFrames: number
+				width: number
+			},
+		) {
+			numOfCalls++
+
+			if (numOfCalls === 1) {
+				// First frame received by callback function
+				firstFrameCaptureOffset = metadata.captureTime ? metadata.captureTime : 0
+			}
+
+			if (metadata.captureTime && streamStartTimeValue) {
+				const captureTimeInMilliseconds = metadata.captureTime - firstFrameCaptureOffset + streamStartTimeValue
+				console.log("CALLBACKF", metadata.mediaTime * 1000000, captureTimeInMilliseconds.toFixed())
+				/* captureTimes["cap-cb"] += now - metadata.captureTime
+				captureTimes["cap-re"] += metadata.expectedDisplayTime - metadata.captureTime
+				captureTimes["cb-re"] += metadata.expectedDisplayTime - now
+				numOfCalls++
+
+				console.log({
+					"cap-cb-avg": captureTimes["cap-cb"] / numOfCalls,
+					"cap-re-avg": captureTimes["cap-re"] / numOfCalls,
+					"cb-re": captureTimes["cb-re"] / numOfCalls,
+				}) */
+			}
+
+			if (!ctx) throw new Error("failed to get canvas context")
+			ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
+
+			videoElement.requestVideoFrameCallback(updateCanvas)
+		}
+
+		videoElement.requestVideoFrameCallback(updateCanvas)
+	}
+
 	const createBroadcast = function () {
 		const d = device()
 		if (!d) {
@@ -139,6 +296,13 @@ export default function Publish() {
 		if (!v && videoTrack()) {
 			throw new Error("no supported video codec")
 		}
+
+		const e = videoElement()
+		if (!e) {
+			throw new Error("no video element")
+		}
+
+		getCaptureFrameTime(e)
 
 		return new Broadcast({
 			connection: c,
@@ -262,6 +426,7 @@ export default function Publish() {
 				<Device
 					setError={setError}
 					setDevice={setDevice}
+					setVideoElement={setVideoElement}
 					setDeviceLoading={setDeviceLoading}
 					stopStream={stopStreaming}
 				/>
@@ -289,6 +454,9 @@ export default function Publish() {
 							e.preventDefault()
 
 							if (isStatus("ready")) {
+								const startTime = Date.now()
+								setStreamStartTime(startTime)
+								addStreamStartTime(startTime)
 								setActive(true)
 							}
 						}}
@@ -342,6 +510,7 @@ export default function Publish() {
 function Device(props: {
 	setError: (err: Error) => void
 	setDevice: (input: MediaStream) => void
+	setVideoElement: (input: HTMLVideoElement) => void
 	setDeviceLoading: (ok: boolean) => void
 	stopStream: () => void
 }) {
@@ -434,7 +603,10 @@ function Device(props: {
 		const d = device()
 		if (!d) return
 
-		if (preview) preview.srcObject = d
+		if (preview) {
+			preview.srcObject = d
+			props.setVideoElement(preview)
+		}
 		props.setDevice(d)
 
 		// Stop on cleanup

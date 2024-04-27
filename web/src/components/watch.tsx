@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
 
-import { IndexedDBObjectStores } from "@kixelated/moq/contribute"
+import { IndexedDatabaseName, IndexedDBObjectStores } from "@kixelated/moq/contribute"
 import type { IndexedDBFramesSchema } from "@kixelated/moq/contribute"
 
 import Plot from "./bitChart"
@@ -51,7 +51,7 @@ function downloadData(data: IndexedDBFramesSchema[]): void {
 let db: IDBDatabase // Declare db variable at the worker scope
 
 // Open or create a database
-const openRequest = indexedDB.open("IndexedDB", 1)
+const openRequest = indexedDB.open(IndexedDatabaseName, 1)
 
 // Handle the success event when the database is successfully opened
 openRequest.onsuccess = (event) => {
