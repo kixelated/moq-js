@@ -27,6 +27,21 @@ function formatNumber(number: number): string {
 	return scaledNumber.toFixed(2) + suffix
 }
 
+// Helper function to nicely display time strings
+function createTimeString(millisecondsInput: number): string {
+	const hours = Math.floor(millisecondsInput / 3600000) // 1 hour = 3600000 milliseconds
+	const minutes = Math.floor((millisecondsInput % 3600000) / 60000) // 1 minute = 60000 milliseconds
+	const seconds = Math.floor((millisecondsInput % 60000) / 1000) // 1 second = 1000 milliseconds
+	const milliseconds = Math.floor(millisecondsInput % 1000) // Remaining milliseconds
+
+	// Format the time
+	const formattedTime = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
+		seconds,
+	).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`
+
+	return formattedTime
+}
+
 // Utility function to download collected data.
 function downloadData(data: IndexedDBFramesSchema[]): void {
 	const jsonData = JSON.stringify(data)
@@ -84,6 +99,33 @@ function retrieveFramesFromIndexedDB(): Promise<IndexedDBFramesSchema[]> {
 	})
 }
 
+// Function to get the start time of the stream in IndexedDB
+const getStreamStartTime = (): Promise<number> => {
+	return new Promise((resolve, reject) => {
+		if (!db) {
+			console.error("IndexedDB is not initialized.")
+			return
+		}
+
+		const transaction = db.transaction(IndexedDBObjectStores.START_STREAM_TIME, "readonly")
+		const objectStore = transaction.objectStore(IndexedDBObjectStores.START_STREAM_TIME)
+		const getRequest = objectStore.get(1)
+
+		// Handle the success event when the updated value is stored successfully
+		getRequest.onsuccess = (event) => {
+			const startTime = (event.target as IDBRequest).result as number
+			console.log("Start time successfully retrieved:", startTime)
+			resolve(startTime)
+		}
+
+		// Handle any errors that occur during value retrieval
+		getRequest.onerror = (event) => {
+			console.error("Error adding start time:", (event.target as IDBRequest).error)
+			reject((event.target as IDBRequest).error)
+		}
+	})
+}
+
 export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
 	const urlSearchParams = new URLSearchParams(window.location.search)
@@ -96,7 +138,8 @@ export default function Watch(props: { name: string }) {
 	const isMode = createSelector(mode)
 
 	// Various dynamic meta data to be displayed next to the video
-	const [currentTime, setCurrentTime] = createSignal<Date>(new Date())
+	const [streamStartTime, setStreamStartTime] = createSignal<number>(0)
+	const [streamWatchTime, setStreamWatchTime] = createSignal<number>(0)
 	const [totalAmountRecvBytes, setTotalAmountRecvBytes] = createSignal<number>(0)
 	const [allFrames, setAllFrames] = createSignal<IndexedDBFramesSchema[]>([])
 	const [receivedFrames, setReceivedFrames] = createSignal<IndexedDBFramesSchema[]>([])
@@ -116,8 +159,6 @@ export default function Watch(props: { name: string }) {
 	const [maxTotalTime, setMaxTotalTime] = createSignal<number>(0)
 	const [avgTotalTime, setAvgTotalTime] = createSignal<number>(0.0)
 	const [bitratePlotData, setBitratePlotData] = createSignal<IndexedDBFBitRateWithTimestampSchema[]>([])
-	const [watchTime, setWatchTime] = createSignal<number>(0)
-	const [timeString, setTimeString] = createSignal<string>("00:00:00:000")
 	const [bitRate, setBitRate] = createSignal<number>(0.0)
 	const [framesPerSecond, setFramesPerSecond] = createSignal<number>(0.0)
 
@@ -125,6 +166,8 @@ export default function Watch(props: { name: string }) {
 	const updateDataInterval = setInterval(() => {
 		// Function to retrieve data from the IndexedDB
 		const retrieveData = async () => {
+			setStreamStartTime(Date.now() - (await getStreamStartTime()))
+
 			const frames = await retrieveFramesFromIndexedDB()
 
 			// Ignore first few frames since none of these frames will acutally be received
@@ -227,25 +270,12 @@ export default function Watch(props: { name: string }) {
 
 		retrieveData().then(setError).catch(setError)
 
-		setCurrentTime(new Date())
-
-		const totalMillisecondsWatched = watchTime() + DATA_UPDATE_RATE
-		setWatchTime(totalMillisecondsWatched)
+		const totalMillisecondsWatched = streamWatchTime() + DATA_UPDATE_RATE
+		setStreamWatchTime(totalMillisecondsWatched)
 		const totalSeconds = Math.floor(totalMillisecondsWatched / 1000)
 
 		setBitRate(parseFloat(((totalAmountRecvBytes() * 8) / totalSeconds).toFixed(2)))
 		setFramesPerSecond(parseFloat((receivedFrames().length / totalSeconds).toFixed(2)))
-
-		const hours = Math.floor(totalMillisecondsWatched / 3600000) // 1 hour = 3600000 milliseconds
-		const minutes = Math.floor((totalMillisecondsWatched % 3600000) / 60000) // 1 minute = 60000 milliseconds
-		const seconds = Math.floor((totalMillisecondsWatched % 60000) / 1000) // 1 second = 1000 milliseconds
-		const milliseconds = Math.floor(totalMillisecondsWatched % 1000) // Remaining milliseconds
-
-		// Format the time
-		const formattedTime = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
-			seconds,
-		).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`
-		setTimeString(formattedTime)
 
 		// setBitratePlotData(bitratePlotData().concat([{ bitrate: bitRate(), timestamp: totalMilliseconds - 3600000 }]))
 	}, DATA_UPDATE_RATE)
@@ -304,17 +334,13 @@ export default function Watch(props: { name: string }) {
 			<h3>Meta Data</h3>
 			<div class="flex">
 				<div class="mr-20 flex items-center">
-					<span>Current Time: &nbsp;</span>
-					<p>
-						{currentTime().toLocaleTimeString() +
-							"." +
-							currentTime().getMilliseconds().toString().padStart(3, "0")}
-					</p>
+					<span>Stream live since: &nbsp;</span>
+					<p>{createTimeString(streamStartTime())}</p>
 				</div>
 
 				<div class="flex items-center">
-					<span>Time Watching: &nbsp;</span>
-					<p>{timeString()}</p>
+					<span>Watching since: &nbsp;</span>
+					<p>{createTimeString(streamWatchTime())}</p>
 				</div>
 			</div>
 
