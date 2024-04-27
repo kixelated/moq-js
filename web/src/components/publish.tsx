@@ -252,10 +252,10 @@ export default function Publish() {
 				firstFrameCaptureOffset = metadata.captureTime ? metadata.captureTime : 0
 			}
 
-			if (metadata.captureTime && streamStartTimeValue) {
+			/* if (metadata.captureTime && streamStartTimeValue) {
 				const captureTimeInMilliseconds = metadata.captureTime - firstFrameCaptureOffset + streamStartTimeValue
 				console.log("CALLBACKF", metadata.mediaTime * 1000000, captureTimeInMilliseconds.toFixed())
-				/* captureTimes["cap-cb"] += now - metadata.captureTime
+				captureTimes["cap-cb"] += now - metadata.captureTime
 				captureTimes["cap-re"] += metadata.expectedDisplayTime - metadata.captureTime
 				captureTimes["cb-re"] += metadata.expectedDisplayTime - now
 				numOfCalls++
@@ -264,8 +264,8 @@ export default function Publish() {
 					"cap-cb-avg": captureTimes["cap-cb"] / numOfCalls,
 					"cap-re-avg": captureTimes["cap-re"] / numOfCalls,
 					"cb-re": captureTimes["cb-re"] / numOfCalls,
-				}) */
-			}
+				})
+			} */
 
 			if (!ctx) throw new Error("failed to get canvas context")
 			ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
