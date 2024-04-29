@@ -255,16 +255,19 @@ export default function Publish() {
 			/* if (metadata.captureTime && streamStartTimeValue) {
 				const captureTimeInMilliseconds = metadata.captureTime - firstFrameCaptureOffset + streamStartTimeValue
 				console.log("CALLBACKF", metadata.mediaTime * 1000000, captureTimeInMilliseconds.toFixed())
+				console.log("METADATA", metadata)
 				captureTimes["cap-cb"] += now - metadata.captureTime
 				captureTimes["cap-re"] += metadata.expectedDisplayTime - metadata.captureTime
 				captureTimes["cb-re"] += metadata.expectedDisplayTime - now
 				numOfCalls++
 
-				console.log({
-					"cap-cb-avg": captureTimes["cap-cb"] / numOfCalls,
-					"cap-re-avg": captureTimes["cap-re"] / numOfCalls,
-					"cb-re": captureTimes["cb-re"] / numOfCalls,
-				})
+				if (metadata.presentedFrames % 100 === 0) {
+					console.log({
+						"cap-cb-avg": captureTimes["cap-cb"] / numOfCalls,
+						"cap-re-avg": captureTimes["cap-re"] / numOfCalls,
+						"cb-re": captureTimes["cb-re"] / numOfCalls,
+					})
+				}
 			} */
 
 			if (!ctx) throw new Error("failed to get canvas context")
