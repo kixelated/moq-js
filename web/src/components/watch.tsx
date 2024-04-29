@@ -18,6 +18,9 @@ export interface IndexedDBFBitRateWithTimestampSchema {
 // Data update rate in milliseconds
 const DATA_UPDATE_RATE = 500
 
+// The time interval for the latest data in seconds
+const LATEST_DATA_DISPLAY_INTERVAL = 3
+
 // Helper function to nicely display large numbers
 function formatNumber(number: number): string {
 	const suffixes = ["", "k", "M", "B", "T"] // Add more suffixes as needed
@@ -139,13 +142,15 @@ export default function Watch(props: { name: string }) {
 
 	// Various dynamic meta data to be displayed next to the video
 	const [streamStartTime, setStreamStartTime] = createSignal<number>(0)
+	const [streamRunningTime, setStreamRunningTime] = createSignal<number>(0)
 	const [streamWatchTime, setStreamWatchTime] = createSignal<number>(0)
 	const [totalAmountRecvBytes, setTotalAmountRecvBytes] = createSignal<number>(0)
 	const [allFrames, setAllFrames] = createSignal<IndexedDBFramesSchema[]>([])
 	const [receivedFrames, setReceivedFrames] = createSignal<IndexedDBFramesSchema[]>([])
-	const [firstReceviedFrameIndex, setFirstReceivedFrameIndex] = createSignal<number>(0)
-	const [lastReceviedFrameIndex, setLastReceivedFrameIndex] = createSignal<number>(0)
+	const [firstReceivedFrameIndex, setFirstReceivedFrameIndex] = createSignal<number>(0)
+	const [lastReceivedFrameIndex, setLastReceivedFrameIndex] = createSignal<number>(0)
 	const [percentageReceivedFrames, setPercentageReceivedFrames] = createSignal<number>(0.0)
+
 	const [minContainerizationTime, setMinContainerizationTime] = createSignal<number>(0)
 	const [maxContainerizationTime, setMaxContainerizationTime] = createSignal<number>(0)
 	const [avgContainerizationTime, setAvgContainerizationTime] = createSignal<number>(0.0)
@@ -158,6 +163,25 @@ export default function Watch(props: { name: string }) {
 	const [minTotalTime, setMinTotalTime] = createSignal<number>(0)
 	const [maxTotalTime, setMaxTotalTime] = createSignal<number>(0)
 	const [avgTotalTime, setAvgTotalTime] = createSignal<number>(0.0)
+
+	const [minLatestContainerizationTime, setMinLatestContainerizationTime] = createSignal<number>(0)
+	const [maxLatestContainerizationTime, setMaxLatestContainerizationTime] = createSignal<number>(0)
+	const [avgLatestContainerizationTime, setAvgLatestContainerizationTime] = createSignal<number>(0.0)
+	const [minLatestPropagationTime, setMinLatestPropagationTime] = createSignal<number>(0)
+	const [maxLatestPropagationTime, setMaxLatestPropagationTime] = createSignal<number>(0)
+	const [avgLatestPropagationTime, setAvgLatestPropagationTime] = createSignal<number>(0.0)
+	const [minLatestRenderTime, setMinLatestRenderTime] = createSignal<number>(0)
+	const [maxLatestRenderTime, setMaxLatestRenderTime] = createSignal<number>(0)
+	const [avgLatestRenderTime, setAvgLatestRenderTime] = createSignal<number>(0.0)
+	const [minLatestTotalTime, setMinLatestTotalTime] = createSignal<number>(0)
+	const [maxLatestTotalTime, setMaxLatestTotalTime] = createSignal<number>(0)
+	const [avgLatestTotalTime, setAvgLatestTotalTime] = createSignal<number>(0.0)
+
+	const [lastRenderedFrameContainerizationTime, setLastRenderedFrameContainerizationTime] = createSignal<number>(0)
+	const [lastRenderedFramePropagationTime, setLastRenderedFramePropagationTime] = createSignal<number>(0)
+	const [lastRenderedFrameRenderTime, setLastRenderedFrameRenderTime] = createSignal<number>(0)
+	const [lastRenderedFrameTotalTime, setLastRenderedFrameTotalTime] = createSignal<number>(0)
+
 	const [bitratePlotData, setBitratePlotData] = createSignal<IndexedDBFBitRateWithTimestampSchema[]>([])
 	const [bitRate, setBitRate] = createSignal<number>(0.0)
 	const [framesPerSecond, setFramesPerSecond] = createSignal<number>(0.0)
@@ -166,28 +190,32 @@ export default function Watch(props: { name: string }) {
 	const updateDataInterval = setInterval(() => {
 		// Function to retrieve data from the IndexedDB
 		const retrieveData = async () => {
-			setStreamStartTime(Date.now() - (await getStreamStartTime()))
+			if (streamStartTime() === 0) {
+				setStreamStartTime(await getStreamStartTime())
+			}
 
 			const frames = await retrieveFramesFromIndexedDB()
 
 			// Ignore first few frames since none of these frames will acutally be received
-			const firstReceviedFrame =
+			const firstReceivedFrameIndex =
 				frames.slice(10).findIndex((frame) => frame._5_receiveMp4FrameTimestamp !== undefined) + 10
 			// console.log("FIRST_RECEVIED_FRAME_INDEX", firstReceviedFrame)
 
-			const lastReceviedFrame =
+			const lastReceivedFrameIndex =
 				frames.slice(10).findLastIndex((frame) => frame._5_receiveMp4FrameTimestamp !== undefined) + 10
-			// console.log("LAST_RECEVIED_FRAME_INDEX", lastReceviedFrame)
+			// console.log("LAST_RECEVIED_FRAME_INDEX", lastReceivedFrame)
 
 			const allReceivedFrames = frames
-				.slice(firstReceviedFrame)
+				.slice(firstReceivedFrameIndex)
 				.filter((frame) => frame._5_receiveMp4FrameTimestamp !== undefined)
+
+			// ALL FRAMES
 
 			setAllFrames(frames)
 			setReceivedFrames(allReceivedFrames)
-			setFirstReceivedFrameIndex(firstReceviedFrame)
-			setLastReceivedFrameIndex(lastReceviedFrame)
-			setPercentageReceivedFrames(allReceivedFrames.length / frames.slice(firstReceviedFrame).length)
+			setFirstReceivedFrameIndex(firstReceivedFrameIndex)
+			setLastReceivedFrameIndex(lastReceivedFrameIndex)
+			setPercentageReceivedFrames(allReceivedFrames.length / frames.slice(firstReceivedFrameIndex).length)
 
 			let totalAmountRecvBytes = 0
 			let minContainerizationTime = Number.MAX_SAFE_INTEGER
@@ -266,9 +294,102 @@ export default function Watch(props: { name: string }) {
 			setMinTotalTime(minTotalTime)
 			setMaxTotalTime(maxTotalTime)
 			setAvgTotalTime(sumTotalTime / allReceivedFrames.length)
+
+			// LATEST FRAMES
+
+			const latestFrames = frames
+				.slice(firstReceivedFrameIndex)
+				.filter((frame) => Date.now() - frame._1_rawVideoTimestamp < LATEST_DATA_DISPLAY_INTERVAL * 1000)
+
+			let maxLatestContainerizationTime = Number.MIN_SAFE_INTEGER
+			let minLatestContainerizationTime = Number.MAX_SAFE_INTEGER
+			let sumLatestContainerizationTime = 0
+			let minLatestPropagationTime = Number.MAX_SAFE_INTEGER
+			let maxLatestPropagationTime = Number.MIN_SAFE_INTEGER
+			let sumLatestPropagationTime = 0
+			let minLatestRenderTime = Number.MAX_SAFE_INTEGER
+			let maxLatestRenderTime = Number.MIN_SAFE_INTEGER
+			let sumLatestRenderTime = 0
+			let minLatestTotalTime = Number.MAX_SAFE_INTEGER
+			let maxLatestTotalTime = Number.MIN_SAFE_INTEGER
+			let sumLatestTotalTime = 0
+			latestFrames.forEach((frame) => {
+				const frameContainerizationTime = frame._2_containerizationTime
+				if (frameContainerizationTime < minLatestContainerizationTime) {
+					minLatestContainerizationTime = frameContainerizationTime
+				}
+				if (frameContainerizationTime > maxLatestContainerizationTime) {
+					maxLatestContainerizationTime = frameContainerizationTime
+				}
+				if (frameContainerizationTime) {
+					sumLatestContainerizationTime += frameContainerizationTime
+				}
+
+				const framePropagationTime = frame._4_propagationTime
+				if (framePropagationTime < minLatestPropagationTime) {
+					minLatestPropagationTime = framePropagationTime
+				}
+				if (framePropagationTime > maxLatestPropagationTime) {
+					maxLatestPropagationTime = framePropagationTime
+				}
+				if (framePropagationTime) {
+					sumLatestPropagationTime += framePropagationTime
+				}
+
+				const frameRenderTime = frame._6_renderFrameTime
+				if (frameRenderTime < minLatestRenderTime) {
+					minLatestRenderTime = frameRenderTime
+				}
+				if (frameRenderTime > maxLatestRenderTime) {
+					maxLatestRenderTime = frameRenderTime
+				}
+				if (frameRenderTime) {
+					sumLatestRenderTime += frameRenderTime
+				}
+
+				const frameTotalTime = frame._8_totalTime
+				if (frameTotalTime < minLatestTotalTime) {
+					minLatestTotalTime = frameTotalTime
+				}
+				if (frameTotalTime > maxLatestTotalTime) {
+					maxLatestTotalTime = frameTotalTime
+				}
+				if (frameTotalTime) {
+					sumLatestTotalTime += frameTotalTime
+				}
+			})
+
+			setMinLatestContainerizationTime(minLatestContainerizationTime)
+			setMaxLatestContainerizationTime(maxLatestContainerizationTime)
+			setAvgLatestContainerizationTime(sumLatestContainerizationTime / latestFrames.length)
+
+			setMinLatestPropagationTime(minLatestPropagationTime)
+			setMaxLatestPropagationTime(maxLatestPropagationTime)
+			setAvgLatestPropagationTime(sumLatestPropagationTime / latestFrames.length)
+
+			setMinLatestRenderTime(minLatestRenderTime)
+			setMaxLatestRenderTime(maxLatestRenderTime)
+			setAvgLatestRenderTime(sumLatestRenderTime / latestFrames.length)
+
+			setMinLatestTotalTime(minLatestTotalTime)
+			setMaxLatestTotalTime(maxLatestTotalTime)
+			setAvgLatestTotalTime(sumLatestTotalTime / latestFrames.length)
+
+			// LAST FRAME
+
+			const lastRenderedFrame = frames.findLast((frame) => frame._7_renderFrameTimestamp !== undefined)
+
+			if (lastRenderedFrame) {
+				setLastRenderedFrameContainerizationTime(lastRenderedFrame._2_containerizationTime)
+				setLastRenderedFramePropagationTime(lastRenderedFrame._4_propagationTime)
+				setLastRenderedFrameRenderTime(lastRenderedFrame._6_renderFrameTime)
+				setLastRenderedFrameTotalTime(lastRenderedFrame._8_totalTime)
+			}
 		}
 
 		retrieveData().then(setError).catch(setError)
+
+		setStreamRunningTime(Date.now() - streamStartTime())
 
 		const totalMillisecondsWatched = streamWatchTime() + DATA_UPDATE_RATE
 		setStreamWatchTime(totalMillisecondsWatched)
@@ -335,7 +456,7 @@ export default function Watch(props: { name: string }) {
 			<div class="flex">
 				<div class="mr-20 flex items-center">
 					<span>Stream live since: &nbsp;</span>
-					<p>{createTimeString(streamStartTime())}</p>
+					<p>{createTimeString(streamRunningTime())}</p>
 				</div>
 
 				<div class="flex items-center">
@@ -398,6 +519,40 @@ export default function Watch(props: { name: string }) {
 				<div class="p-5 text-center">{minTotalTime()}</div>
 				<div class="p-5 text-center">{maxTotalTime()}</div>
 				<div class="p-5 text-center">{avgTotalTime().toFixed(2)}</div>
+			</div>
+
+			<h3>Last {LATEST_DATA_DISPLAY_INTERVAL} Seconds</h3>
+
+			<div class="grid grid-cols-5 gap-6 border">
+				<div class="p-5 text-center" />
+				<div class="p-5 text-center">Min</div>
+				<div class="p-5 text-center">Max</div>
+				<div class="p-5 text-center">Last</div>
+				<div class="p-5 text-center">Avg</div>
+
+				<div class="p-5 text-center">Containerization Time:</div>
+				<div class="p-5 text-center">{minLatestContainerizationTime()}</div>
+				<div class="p-5 text-center">{maxLatestContainerizationTime()}</div>
+				<div class="p-5 text-center">{lastRenderedFrameContainerizationTime()}</div>
+				<div class="p-5 text-center">{avgLatestContainerizationTime().toFixed(2)}</div>
+
+				<div class="p-5 text-center">Propagation Time:</div>
+				<div class="p-5 text-center">{minLatestPropagationTime()}</div>
+				<div class="p-5 text-center">{maxLatestPropagationTime()}</div>
+				<div class="p-5 text-center">{lastRenderedFramePropagationTime()}</div>
+				<div class="p-5 text-center">{avgLatestPropagationTime().toFixed(2)}</div>
+
+				<div class="p-5 text-center">Render Time:</div>
+				<div class="p-5 text-center">{minLatestRenderTime()}</div>
+				<div class="p-5 text-center">{maxLatestRenderTime()}</div>
+				<div class="p-5 text-center">{lastRenderedFrameRenderTime()}</div>
+				<div class="p-5 text-center">{avgLatestRenderTime().toFixed(2)}</div>
+
+				<div class="p-5 text-center">Total Time:</div>
+				<div class="p-5 text-center">{minLatestTotalTime()}</div>
+				<div class="p-5 text-center">{maxLatestTotalTime()}</div>
+				<div class="p-5 text-center">{lastRenderedFrameTotalTime()}</div>
+				<div class="p-5 text-center">{avgLatestTotalTime().toFixed(2)}</div>
 			</div>
 
 			<button class="bg-cyan-600" onClick={() => downloadData(allFrames())}>
