@@ -48,8 +48,6 @@ export class Encoder {
 	// Converts raw rames to encoded frames.
 	frames: TransformStream<VideoFrame, VideoDecoderConfig | EncodedVideoChunk>
 
-	#frameID = 0
-
 	constructor(config: VideoEncoderConfig) {
 		// Open IndexedDB
 		const openRequest = indexedDB.open(IndexedDatabaseName, 1)
@@ -72,7 +70,7 @@ export class Encoder {
 	}
 
 	// Function to add the time of creation for each frame in IndexedDB
-	addRawVideoFrameTimestamp(frame: VideoFrame, frameID: number, currentTimeInMilliseconds: number) {
+	addRawVideoFrameTimestamp(frame: VideoFrame, currentTimeInMilliseconds: number) {
 		if (!db) {
 			console.error("IndexedDB is not initialized.")
 			return
@@ -84,7 +82,7 @@ export class Encoder {
 			_1_rawVideoTimestamp: currentTimeInMilliseconds,
 			_9_originalTimestampAttribute: frame.timestamp,
 		} as IndexedDBFramesSchema
-		const addRequest = objectStore.add(newFrame, frameID)
+		const addRequest = objectStore.add(newFrame, frame.timestamp)
 
 		// Handle the success event when the updated value is stored successfully
 		addRequest.onsuccess = () => {
@@ -131,13 +129,11 @@ export class Encoder {
 	#transform(frame: VideoFrame) {
 		const encoder = this.#encoder
 
-		this.addRawVideoFrameTimestamp(frame, this.#frameID, Date.now())
+		this.addRawVideoFrameTimestamp(frame, Date.now())
 
 		// Set keyFrame to undefined when we're not sure so the encoder can decide.
 		encoder.encode(frame, { keyFrame: this.#keyframeNext })
 		this.#keyframeNext = undefined
-
-		this.#frameID++
 
 		frame.close()
 	}

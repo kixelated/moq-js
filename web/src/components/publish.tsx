@@ -173,7 +173,6 @@ export default function Publish() {
 	const params = Object.fromEntries(urlSearchParams.entries())
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
 
-	const [streamStartTime, setStreamStartTime] = createSignal<number>()
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
 	const [videoElement, setVideoElement] = createSignal<HTMLVideoElement>()
 	const [deviceLoading, setDeviceLoading] = createSignal(false)
@@ -220,18 +219,10 @@ export default function Publish() {
 		client.connect().then(setConnection).catch(setError)
 	})
 
-	const getCaptureFrameTime = (videoElement: HTMLVideoElement) => {
+	/* const getCaptureFrameTime = (videoElement: HTMLVideoElement) => {
 		// const videoElement = document.createElement("video")
 		const canvas = document.createElement("canvas")
 		const ctx = canvas.getContext("2d")
-		/* const captureTimes: { "cap-cb": number; "cap-re": number; "cb-re": number } = {
-			"cap-cb": 0,
-			"cap-re": 0,
-			"cb-re": 0,
-		} */
-		let numOfCalls = 0
-		const streamStartTimeValue = streamStartTime()
-		let firstFrameCaptureOffset: number
 
 		const updateCanvas: VideoFrameRequestCallback = function (
 			now: number,
@@ -245,39 +236,19 @@ export default function Publish() {
 				width: number
 			},
 		) {
-			numOfCalls++
-
-			if (numOfCalls === 1) {
-				// First frame received by callback function
-				firstFrameCaptureOffset = metadata.captureTime ? metadata.captureTime : 0
+			if (metadata.captureTime) {
+				console.log("CALLBACKF", (metadata.mediaTime * 1000000).toFixed(), metadata.captureTime.toFixed())
+				// addRawVideoFrameTimestamp(Math.round(metadata.mediaTime * 1000000), metadata.captureTime)
 			}
 
-			/* if (metadata.captureTime && streamStartTimeValue) {
-				const captureTimeInMilliseconds = metadata.captureTime - firstFrameCaptureOffset + streamStartTimeValue
-				console.log("CALLBACKF", metadata.mediaTime * 1000000, captureTimeInMilliseconds.toFixed())
-				console.log("METADATA", metadata)
-				captureTimes["cap-cb"] += now - metadata.captureTime
-				captureTimes["cap-re"] += metadata.expectedDisplayTime - metadata.captureTime
-				captureTimes["cb-re"] += metadata.expectedDisplayTime - now
-				numOfCalls++
-
-				if (metadata.presentedFrames % 100 === 0) {
-					console.log({
-						"cap-cb-avg": captureTimes["cap-cb"] / numOfCalls,
-						"cap-re-avg": captureTimes["cap-re"] / numOfCalls,
-						"cb-re": captureTimes["cb-re"] / numOfCalls,
-					})
-				}
-			} */
-
 			if (!ctx) throw new Error("failed to get canvas context")
-			ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
+			// ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
 
 			videoElement.requestVideoFrameCallback(updateCanvas)
 		}
 
 		videoElement.requestVideoFrameCallback(updateCanvas)
-	}
+	} */
 
 	const createBroadcast = function () {
 		const d = device()
@@ -300,12 +271,12 @@ export default function Publish() {
 			throw new Error("no supported video codec")
 		}
 
-		const e = videoElement()
+		/* const e = videoElement()
 		if (!e) {
 			throw new Error("no video element")
 		}
 
-		getCaptureFrameTime(e)
+		getCaptureFrameTime(e) */
 
 		return new Broadcast({
 			connection: c,
@@ -458,7 +429,6 @@ export default function Publish() {
 
 							if (isStatus("ready")) {
 								const startTime = Date.now()
-								setStreamStartTime(startTime)
 								addStreamStartTime(startTime)
 								setActive(true)
 							}

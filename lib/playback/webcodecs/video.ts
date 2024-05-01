@@ -84,7 +84,7 @@ function addRenderFrameTimestamp(frame: VideoFrame, currentTimeInMilliseconds: n
 			_7_renderFrameTimestamp: currentTimeInMilliseconds,
 			_8_totalTime: currentTimeInMilliseconds - currentFrame._1_rawVideoTimestamp,
 			_12_renderTimestampAttribute: frame.timestamp,
-		} as IndexedDBFramesSchema // Calculate the updated value
+		} as IndexedDBFramesSchema
 
 		const putRequest = objectStore.put(updatedFrame, frame.duration!) // Store the updated value back into the database
 

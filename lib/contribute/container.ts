@@ -14,9 +14,6 @@ export class Container {
 	#track?: number
 	#segment = 0
 
-	// For some reason there is already one frame being containerized, so we start with 1 instead of 0
-	#frameID = 1
-
 	encode: TransformStream<DecoderConfig | EncodedChunk, Chunk>
 
 	constructor() {
@@ -43,7 +40,7 @@ export class Container {
 	}
 
 	// Function to add the time of mp4 containerization for each frame in IndexedDB
-	addFrameContainerizationTimestamp(frame: EncodedChunk, frameID: number, currentTimeInMilliseconds: number) {
+	addFrameContainerizationTimestamp(frame: EncodedChunk, currentDateTime: number) {
 		if (!db) {
 			console.error("IndexedDB is not initialized.")
 			return
@@ -51,21 +48,21 @@ export class Container {
 
 		const transaction = db.transaction(IndexedDBObjectStores.FRAMES, "readwrite")
 		const objectStore = transaction.objectStore(IndexedDBObjectStores.FRAMES)
-		const updateRequest = objectStore.get(frameID)
+		const updateRequest = objectStore.get(frame.timestamp)
 
 		// Handle the success event when the current value is retrieved successfully
 		updateRequest.onsuccess = (event) => {
-			const currentFrame: IndexedDBFramesSchema = (event.target as IDBRequest).result ?? {} // Retrieve the current value (default to 0 if not found)
+			const currentFrame: IndexedDBFramesSchema = (event.target as IDBRequest).result ?? {} // Retrieve the current value
 
 			const updatedFrame = {
 				...currentFrame,
-				_2_containerizationTime: currentTimeInMilliseconds - currentFrame._1_rawVideoTimestamp,
-				_3_createMP4FrameTimestamp: currentTimeInMilliseconds,
+				_2_containerizationTime: currentDateTime - currentFrame._1_rawVideoTimestamp,
+				_3_createMP4FrameTimestamp: currentDateTime,
 				_10_encodedTimestampAttribute: frame.timestamp,
 				_13_sentBytes: frame.byteLength,
-			} as IndexedDBFramesSchema // Calculate the updated value
+			} as IndexedDBFramesSchema
 
-			const putRequest = objectStore.put(updatedFrame, frameID) // Store the updated value back into the database
+			const putRequest = objectStore.put(updatedFrame, frame.timestamp) // Store the updated value back into the database
 
 			// Handle the success event when the updated value is stored successfully
 			putRequest.onsuccess = () => {
@@ -167,7 +164,7 @@ export class Container {
 
 		// Add the sample to the container
 		this.#mp4.addSample(this.#track, buffer, {
-			duration: this.#frameID - 1, // TODO: Don't manipulate the duration field in order to add a frame ID
+			duration: this.#frame.timestamp, // TODO: Don't manipulate the duration field in order to add a frame ID
 			dts: this.#frame.timestamp,
 			cts: this.#frame.timestamp, // Static values here lead to these values on the receiving side: 4293440496 4274800177 4293040498 4293176284
 			is_sync: this.#frame.type == "key",
@@ -201,10 +198,8 @@ export class Container {
 
 		// Check whether the frame is a video frame
 		if (frame.duration === 0) {
-			this.addFrameContainerizationTimestamp(frame, this.#frameID, Date.now())
+			this.addFrameContainerizationTimestamp(frame, Date.now())
 		}
-
-		this.#frameID++
 
 		this.#frame = frame
 	}
