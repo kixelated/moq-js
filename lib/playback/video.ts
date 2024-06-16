@@ -1,17 +1,21 @@
 import { Frame, Component } from "./timeline"
-import * as MP4 from "../../media/mp4"
-import * as Message from "./message"
+import * as MP4 from "../media/mp4"
+
+export interface Config {
+	canvas: HTMLCanvasElement
+	timeline: Component
+}
 
 export class Renderer {
-	#canvas: OffscreenCanvas
+	#canvas: HTMLCanvasElement
 	#timeline: Component
 
 	#decoder!: VideoDecoder
 	#queue: TransformStream<Frame, VideoFrame>
 
-	constructor(config: Message.ConfigVideo, timeline: Component) {
+	constructor(config: Config) {
 		this.#canvas = config.canvas
-		this.#timeline = timeline
+		this.#timeline = config.timeline
 
 		this.#queue = new TransformStream({
 			start: this.#start.bind(this),
@@ -19,6 +23,10 @@ export class Renderer {
 		})
 
 		this.#run().catch(console.error)
+	}
+
+	close() {
+		// TODO
 	}
 
 	async #run() {

@@ -1,14 +1,13 @@
-import { Connection, SubscribeRecv } from "../transport"
-import { asError } from "../common/error"
-import { Segment } from "./segment"
-import { Track } from "./track"
-import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../media/catalog"
+import * as Transfork from "../transfork"
+import * as Catalog from "../media/catalog"
+import * as Audio from "./audio"
+import * as Video from "./video"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
-	namespace: string
-	connection: Connection
+	broadcast: string
+	connection: Transfork.Connection
 	media: MediaStream
 
 	audio?: AudioEncoderConfig
@@ -21,32 +20,35 @@ export interface BroadcastConfigTrack {
 }
 
 export class Broadcast {
-	#tracks = new Map<string, Track>()
-
-	readonly config: BroadcastConfig
-	readonly catalog: Catalog
-	readonly connection: Connection
-
-	#running: Promise<void>
+	#config: BroadcastConfig
+	#catalog: Catalog.Broadcast
+	#connection: Transfork.Connection
+	#broadcast: Transfork.Broadcast
 
 	constructor(config: BroadcastConfig) {
-		this.connection = config.connection
-		this.config = config
-		this.catalog = new Catalog(config.namespace)
+		this.#connection = config.connection
+		this.#config = config
+		this.#catalog = new Catalog.Broadcast(config.broadcast)
+		this.#broadcast = new Transfork.Broadcast(config.broadcast)
 
-		for (const media of this.config.media.getTracks()) {
-			const track = new Track(media, config)
-			this.#tracks.set(track.name, track)
+		for (const media of this.#config.media.getTracks()) {
+			const priority = media.kind === "video" ? 2 : 1
+
+			// TODO support multiple tracks of the same kind
+			const name = media.kind
+			const init = this.#broadcast.create(`${name}.mp4`, 0)
+			const data = this.#broadcast.create(`${name}.m4s`, priority)
 
 			const settings = media.getSettings()
 
-			let catalog: CatalogTrack
+			let catalog: Catalog.Track
 
-			const mp4Catalog: Mp4Track = {
+			const mp4Catalog: Catalog.Mp4Track = {
 				container: "mp4",
 				kind: media.kind,
-				init_track: `${track.name}.mp4`,
-				data_track: `${track.name}.m4s`,
+				init_track: init.name,
+				data_track: data.name,
+				priority,
 			}
 
 			if (isVideoTrackSettings(settings)) {
@@ -54,7 +56,11 @@ export class Broadcast {
 					throw new Error("no video configuration provided")
 				}
 
-				const videoCatalog: VideoTrack = {
+				const encoder = new Video.Encoder(config.video)
+				const packer = new Video.Packer(media as MediaStreamVideoTrack, encoder, init, data)
+				packer.run().catch(console.error) // TODO handle error
+
+				const videoCatalog: Catalog.VideoTrack = {
 					...mp4Catalog,
 					kind: "video",
 					codec: config.video.codec,
@@ -70,7 +76,11 @@ export class Broadcast {
 					throw new Error("no audio configuration provided")
 				}
 
-				const audioCatalog: AudioTrack = {
+				const encoder = new Audio.Encoder(config.audio)
+				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, init, data)
+				packer.run().catch(console.error) // TODO handle error
+
+				const audioCatalog: Catalog.AudioTrack = {
 					...mp4Catalog,
 					kind: "audio",
 					codec: config.audio.codec,
@@ -85,145 +95,26 @@ export class Broadcast {
 				throw new Error(`unknown track type: ${media.kind}`)
 			}
 
-			this.catalog.tracks.push(catalog)
+			this.#catalog.tracks.push(catalog)
 		}
 
-		this.#running = this.#run()
-	}
+		const catalog = this.#broadcast.create(".catalog", 0)
+		catalog.append().writeAll(this.#catalog.encode())
 
-	async #run() {
-		await this.connection.announce(this.catalog.namespace)
-
-		for (;;) {
-			const subscriber = await this.connection.subscribed()
-			if (!subscriber) break
-
-			// Run an async task to serve each subscription.
-			this.#serveSubscribe(subscriber).catch((e) => {
-				const err = asError(e)
-				console.warn("failed to serve subscribe", err)
-			})
-		}
-	}
-
-	async #serveSubscribe(subscriber: SubscribeRecv) {
-		try {
-			const [base, ext] = splitExt(subscriber.track)
-			if (ext === "catalog") {
-				await this.#serveCatalog(subscriber, base)
-			} else if (ext === "mp4") {
-				await this.#serveInit(subscriber, base)
-			} else if (ext === "m4s") {
-				await this.#serveTrack(subscriber, base)
-			} else {
-				throw new Error(`unknown subscription: ${subscriber.track}`)
-			}
-		} catch (e) {
-			const err = asError(e)
-			await subscriber.close(1n, `failed to process subscribe: ${err.message}`)
-		} finally {
-			// TODO we can't close subscribers because there's no support for clean termination
-			// await subscriber.close()
-		}
-	}
-
-	async #serveCatalog(subscriber: SubscribeRecv, name: string) {
-		// We only support ".catalog"
-		if (name !== "") throw new Error(`unknown catalog: ${name}`)
-
-		const bytes = this.catalog.encode()
-
-		// Send a SUBSCRIBE_OK
-		await subscriber.ack()
-
-		const stream = await subscriber.group({ group: 0 })
-		await stream.write({ object: 0, payload: bytes })
-		await stream.close()
-	}
-
-	async #serveInit(subscriber: SubscribeRecv, name: string) {
-		const track = this.#tracks.get(name)
-		if (!track) throw new Error(`no track with name ${subscriber.track}`)
-
-		// Send a SUBSCRIBE_OK
-		await subscriber.ack()
-
-		const init = await track.init()
-
-		const stream = await subscriber.group({ group: 0 })
-		await stream.write({ object: 0, payload: init })
-		await stream.close()
-	}
-
-	async #serveTrack(subscriber: SubscribeRecv, name: string) {
-		const track = this.#tracks.get(name)
-		if (!track) throw new Error(`no track with name ${subscriber.track}`)
-
-		// Send a SUBSCRIBE_OK
-		await subscriber.ack()
-
-		const segments = track.segments().getReader()
-
-		for (;;) {
-			const { value: segment, done } = await segments.read()
-			if (done) break
-
-			// Serve the segment and log any errors that occur.
-			this.#serveSegment(subscriber, segment).catch((e) => {
-				const err = asError(e)
-				console.warn("failed to serve segment", err)
-			})
-		}
-	}
-
-	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
-		// Create a new stream for each segment.
-		const stream = await subscriber.group({
-			group: segment.id,
-			priority: 0, // TODO
-		})
-
-		let object = 0
-
-		// Pipe the segment to the stream.
-		const chunks = segment.chunks().getReader()
-		for (;;) {
-			const { value, done } = await chunks.read()
-			if (done) break
-
-			await stream.write({
-				object,
-				payload: value,
-			})
-
-			object += 1
-		}
-
-		await stream.close()
+		this.#connection.announce(this.#broadcast)
 	}
 
 	// Attach the captured video stream to the given video element.
 	attach(video: HTMLVideoElement) {
-		video.srcObject = this.config.media
+		video.srcObject = this.#config.media
 	}
 
 	close() {
 		// TODO implement publish close
 	}
 
-	// Returns the error message when the connection is closed
-	async closed(): Promise<Error> {
-		try {
-			await this.#running
-			return new Error("closed") // clean termination
-		} catch (e) {
-			return asError(e)
-		}
+	async closed() {
+		// TODO make this better
+		return this.#connection.closed()
 	}
-}
-
-function splitExt(s: string): [string, string] {
-	const i = s.lastIndexOf(".")
-	if (i < 0) throw new Error(`no extension found`)
-	return [s.substring(0, i), s.substring(i + 1)]
 }

@@ -1,9 +1,11 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
+import { Broadcast } from "@kixelated/moq/media/catalog"
 
 import Fail from "./fail"
 
-import { createEffect, createSignal, onCleanup } from "solid-js"
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js"
+import { Client, Connection } from "@kixelated/moq/transfork"
 
 export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
@@ -15,16 +17,35 @@ export default function Watch(props: { name: string }) {
 
 	let canvas!: HTMLCanvasElement
 
+	const [useCatalog, setCatalog] = createSignal<Broadcast | undefined>()
+	const [useConnection, setConnection] = createSignal<Connection | undefined>()
+
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
-	createEffect(() => {
-		const namespace = props.name
+	onMount(() => {
 		const url = `https://${server}`
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
 		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
-		Player.create({ url, fingerprint, canvas, namespace }).then(setPlayer).catch(setError)
+		const client = new Client({ url, fingerprint, role: "both" })
+		client.connect().then(setConnection).catch(setError)
+	})
+
+	createEffect(() => {
+		const connection = useConnection()
+		if (!connection) return
+
+		const catalog = new Broadcast(props.name)
+		catalog.fetch(connection).then(setCatalog).catch(setError)
+	})
+
+	createEffect(() => {
+		const connection = useConnection()
+		const catalog = useCatalog()
+		if (!connection || !catalog) return setPlayer(undefined)
+
+		setPlayer(new Player({ connection, catalog, canvas }))
 	})
 
 	createEffect(() => {

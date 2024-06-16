@@ -1,14 +1,12 @@
-import * as Stream from "./stream"
-import * as Setup from "./setup"
-import * as Control from "./control"
-import { Objects } from "./objects"
+import { Stream } from "./stream"
+import * as Message from "./message"
 import { Connection } from "./connection"
 
 export interface ClientConfig {
 	url: string
 
 	// Parameters used to create the MoQ session
-	role: Setup.Role
+	role: Message.Role
 
 	// If set, the server fingerprint will be fetched from this URL.
 	// This is required to use self-signed certificates with Chrome (May 2023)
@@ -40,27 +38,19 @@ export class Client {
 		await quic.ready
 
 		const stream = await quic.createBidirectionalStream()
+		const session = new Stream(stream)
 
-		const writer = new Stream.Writer(stream.writable)
-		const reader = new Stream.Reader(new Uint8Array(), stream.readable)
+		const client = new Message.SessionClient([Message.Version.FORK_00], this.config.role)
+		await client.encode(session.writer)
 
-		const setup = new Setup.Stream(reader, writer)
-
-		// Send the setup message.
-		await setup.send.client({ versions: [Setup.Version.DRAFT_03], role: this.config.role })
-
-		// Receive the setup message.
-		// TODO verify the SETUP response.
-		const server = await setup.recv.server()
-
-		if (server.version != Setup.Version.DRAFT_03) {
+		const server = await Message.SessionServer.decode(session.reader)
+		if (server.version != Message.Version.FORK_00) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
 
-		const control = new Control.Stream(reader, writer)
-		const objects = new Objects(quic)
+		// TODO use the returned server.role
 
-		return new Connection(quic, control, objects)
+		return new Connection(quic, client.role, session)
 	}
 
 	async #fetchFingerprint(url?: string): Promise<WebTransportHash | undefined> {

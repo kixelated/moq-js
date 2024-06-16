@@ -1,4 +1,4 @@
-import type { Frame } from "../../media/mp4"
+import type { Frame } from "../media/mp4"
 export type { Frame }
 
 export interface Range {

@@ -1,3 +1,8 @@
+import { Group, Track } from "../transfork"
+import { Closed } from "../transfork/error"
+import { Chunk } from "./chunk"
+import { Container } from "./container"
+
 const SUPPORTED = [
 	"avc1", // H.264
 	"hev1", // HEVC (aka h.265)
@@ -6,6 +11,63 @@ const SUPPORTED = [
 
 export interface EncoderSupported {
 	codecs: string[]
+}
+
+export class Packer {
+	#source: MediaStreamTrackProcessor<VideoFrame>
+	#encoder: Encoder
+	#container = new Container()
+	#init: Track
+
+	#data: Track
+	#current?: Group
+
+	constructor(track: MediaStreamVideoTrack, encoder: Encoder, init: Track, data: Track) {
+		this.#source = new MediaStreamTrackProcessor({ track })
+		this.#encoder = encoder
+		this.#init = init
+		this.#data = data
+	}
+
+	async run() {
+		const output = new WritableStream({
+			write: (chunk) => this.#write(chunk),
+			close: () => this.#close(),
+			abort: (e) => this.#close(e),
+		})
+
+		return this.#source.readable
+			.pipeThrough(this.#encoder.frames)
+			.pipeThrough(this.#container.encode)
+			.pipeTo(output)
+	}
+
+	#write(chunk: Chunk) {
+		if (chunk.type === "init") {
+			this.#init.append().writeAll(chunk.data)
+			return
+		}
+
+		if (!this.#current || chunk.type === "key") {
+			if (this.#current) {
+				this.#current.close()
+			}
+
+			this.#current = this.#data.append()
+		}
+
+		this.#current.write(chunk.data)
+	}
+
+	#close(err?: any) {
+		const closed = Closed.from(err)
+		if (this.#current) {
+			this.#current.close(closed)
+		}
+
+		this.#init.close(closed)
+		this.#data.close(closed)
+	}
 }
 
 export class Encoder {

@@ -5,6 +5,16 @@ const MAX_U31 = Math.pow(2, 31) - 1
 const MAX_U53 = Number.MAX_SAFE_INTEGER
 const MAX_U62: bigint = 2n ** 62n - 1n
 
+export class Stream {
+	reader: Reader
+	writer: Writer
+
+	constructor(props: { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }) {
+		this.writer = new Writer(props.writable)
+		this.reader = new Reader(props.readable)
+	}
+}
+
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 // Unfortunately we can't use a BYOB reader because it's not supported with WebTransport+WebWorkers yet.
 export class Reader {
@@ -12,7 +22,7 @@ export class Reader {
 	#stream: ReadableStream<Uint8Array>
 	#reader: ReadableStreamDefaultReader<Uint8Array>
 
-	constructor(buffer: Uint8Array, stream: ReadableStream<Uint8Array>) {
+	constructor(stream: ReadableStream<Uint8Array>, buffer = new Uint8Array()) {
 		this.#buffer = buffer
 		this.#stream = stream
 		this.#reader = this.#stream.getReader()
@@ -130,9 +140,13 @@ export class Reader {
 		return !(await this.#fill())
 	}
 
-	async close() {
+	async stop(code: number) {
 		this.#reader.releaseLock()
-		await this.#stream.cancel()
+		await this.#stream.cancel(code)
+	}
+
+	async closed() {
+		return this.#reader.closed
 	}
 
 	release(): [Uint8Array, ReadableStream<Uint8Array>] {
@@ -200,6 +214,11 @@ export class Writer {
 	async close() {
 		this.#writer.releaseLock()
 		await this.#stream.close()
+	}
+
+	async reset(code: number) {
+		this.#writer.releaseLock()
+		await this.#stream.abort(code)
 	}
 
 	release(): WritableStream<Uint8Array> {

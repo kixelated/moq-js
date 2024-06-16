@@ -1,5 +1,5 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
-import { Client, Connection } from "@kixelated/moq/transport"
+import { Client, Connection } from "@kixelated/moq/transfork"
 
 import { createSignal, createEffect, onCleanup, createMemo, Show, For, createSelector, Switch, Match } from "solid-js"
 
@@ -145,7 +145,7 @@ export default function Publish() {
 			media: d,
 			audio: a,
 			video: v,
-			namespace: name,
+			broadcast: name,
 		})
 	}
 

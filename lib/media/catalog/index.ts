@@ -1,13 +1,12 @@
-import { Connection } from "../../transport"
-import { asError } from "../../common/error"
+import { Connection, Track as TTrack } from "../../transfork"
 
 // JSON encoded catalog
-export class Catalog {
-	namespace: string
+export class Broadcast {
+	broadcast: string
 	tracks = new Array<Track>()
 
-	constructor(namespace: string) {
-		this.namespace = namespace
+	constructor(broadcast: string) {
+		this.broadcast = broadcast
 	}
 
 	encode(): Uint8Array {
@@ -22,7 +21,7 @@ export class Catalog {
 
 		try {
 			this.tracks = JSON.parse(str).tracks
-			if (!isCatalog(this)) {
+			if (!Broadcast.is(this)) {
 				throw new Error("invalid catalog")
 			}
 		} catch (e) {
@@ -31,37 +30,34 @@ export class Catalog {
 	}
 
 	async fetch(connection: Connection) {
-		const subscribe = await connection.subscribe(this.namespace, ".catalog")
+		const track = connection.subscribe(new TTrack(this.broadcast, ".catalog", 0))
 		try {
-			const segment = await subscribe.data()
-			if (!segment) throw new Error("no catalog data")
+			const group = await track.next()
+			if (!group) throw new Error("no catalog data")
 
-			const chunk = await segment.read()
-			if (!chunk) throw new Error("no catalog chunk")
+			try {
+				const chunk = await group.read()
+				if (!chunk) throw new Error("no catalog chunk")
 
-			await segment.close()
-			await subscribe.close() // we done
-
-			this.decode(chunk.payload)
-		} catch (e) {
-			const err = asError(e)
-
-			// Close the subscription after we're done.
-			await subscribe.close(1n, err.message)
-
-			throw err
+				this.decode(chunk)
+			} finally {
+				group.close()
+			}
+		} finally {
+			track.close()
 		}
 	}
-}
 
-export function isCatalog(catalog: any): catalog is Catalog {
-	if (!Array.isArray(catalog.tracks)) return false
-	return catalog.tracks.every((track: any) => isTrack(track))
+	static is(catalog: any): catalog is Broadcast {
+		if (!Array.isArray(catalog.tracks)) return false
+		return catalog.tracks.every((track: any) => isTrack(track))
+	}
 }
 
 export interface Track {
 	kind: string
 	container: string
+	priority: number
 }
 
 export interface Mp4Track extends Track {
