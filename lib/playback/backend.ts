@@ -35,12 +35,12 @@ export default class Backend {
 
 		for (const track of config.catalog.tracks) {
 			if (isAudioTrack(track)) {
-				if (sampleRate && track.sample_rate !== sampleRate) {
+				if (sampleRate && track.selectionParams.sample_rate !== sampleRate) {
 					throw new Error(`TODO multiple audio tracks with different sample rates`)
 				}
 
-				sampleRate = track.sample_rate
-				channels = Math.max(track.channel_count, channels ?? 0)
+				sampleRate = track.selectionParams.sample_rate
+				channels = Math.max(track.selectionParams.channel_count, channels ?? 0)
 			}
 		}
 

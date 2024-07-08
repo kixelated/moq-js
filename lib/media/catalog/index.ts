@@ -21,6 +21,7 @@ export class Catalog {
 		const str = decoder.decode(raw)
 
 		try {
+			if (typeof JSON.parse(str).packaging !== "string") throw new Error("invalid catalog")
 			this.tracks = JSON.parse(str).tracks
 			if (!isCatalog(this)) {
 				throw new Error("invalid catalog")
@@ -60,42 +61,47 @@ export function isCatalog(catalog: any): catalog is Catalog {
 }
 
 export interface Track {
-	kind: string
-	container: string
+	name: string
 }
 
 export interface Mp4Track extends Track {
-	container: "mp4"
 	init_track: string
 	data_track: string
 }
 
-export interface AudioTrack extends Track {
-	kind: "audio"
-	codec: string
-	channel_count: number
-	sample_rate: number
-	sample_size: number
-	bit_rate?: number
-}
-
-export interface VideoTrack extends Track {
-	kind: "video"
-	codec: string
-	width: number
-	height: number
+export interface SelectionParamsVideo {
+	codec: string;
+	height: number;
+	width: number;
 	frame_rate: number
 	bit_rate?: number
 }
 
+export interface SelectionParamsAudio {
+	bit_rate: number;
+	channel_count: number;
+	codec: string;
+	sample_rate: number;
+	sample_size: number;
+}
+
+
+export interface AudioTrack extends Track {
+	name: "audio"
+	selectionParams: SelectionParamsAudio;
+}
+
+export interface VideoTrack extends Track {
+	name: "video"
+	selectionParams: SelectionParamsVideo;
+}
+
 export function isTrack(track: any): track is Track {
-	if (typeof track.kind !== "string") return false
-	if (typeof track.container !== "string") return false
+	if (typeof track.name !== "string") return false
 	return true
 }
 
 export function isMp4Track(track: any): track is Mp4Track {
-	if (track.container !== "mp4") return false
 	if (typeof track.init_track !== "string") return false
 	if (typeof track.data_track !== "string") return false
 	if (!isTrack(track)) return false
@@ -103,20 +109,20 @@ export function isMp4Track(track: any): track is Mp4Track {
 }
 
 export function isVideoTrack(track: any): track is VideoTrack {
-	if (track.kind !== "video") return false
-	if (typeof track.codec !== "string") return false
-	if (typeof track.width !== "number") return false
-	if (typeof track.height !== "number") return false
+	if (!(track.name.toLowerCase().includes("video"))) return false
+	if (typeof track.selectionParams.codec !== "string") return false
+	if (typeof track.selectionParams.width !== "number") return false
+	if (typeof track.selectionParams.height !== "number") return false
 	if (!isTrack(track)) return false
 	return true
 }
 
 export function isAudioTrack(track: any): track is AudioTrack {
-	if (track.kind !== "audio") return false
-	if (typeof track.codec !== "string") return false
-	if (typeof track.channel_count !== "number") return false
-	if (typeof track.sample_rate !== "number") return false
-	if (typeof track.sample_size !== "number") return false
+	if (!(track.name.toLowerCase().includes("audio"))) return false
+	if (typeof track.selectionParams.codec !== "string") return false
+	if (typeof track.selectionParams.channel_count !== "number") return false
+	if (typeof track.selectionParams.sample_rate !== "number") return false
+	if (typeof track.selectionParams.sample_size !== "number") return false
 	if (!isTrack(track)) return false
 	return true
 }
