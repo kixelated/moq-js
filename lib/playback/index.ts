@@ -100,8 +100,8 @@ export class Player {
 	}
 
 	async #runTrack(track: Mp4Track) {
-		if (track.kind !== "audio" && track.kind !== "video") {
-			throw new Error(`unknown track kind: ${track.kind}`)
+		if (!(track.name.toLowerCase().includes("audio")) && !(track.name.toLowerCase().includes("video"))) {
+			throw new Error(`unknown track name: ${track.name}`)
 		}
 
 		const sub = await this.#connection.subscribe(this.#catalog.namespace, track.data_track)
@@ -118,7 +118,7 @@ export class Player {
 
 				this.#backend.segment({
 					init: track.init_track,
-					kind: track.kind,
+					kind: track.name,
 					header: segment.header,
 					buffer,
 					stream,
