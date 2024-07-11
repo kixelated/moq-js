@@ -1,16 +1,33 @@
 import { Connection } from "../../transport"
 import { asError } from "../../common/error"
 
+export interface CommonTrackFields {
+  namespace: string;
+  packaging?: string;
+  renderGroup?: number;
+  altGroup?: number;
+}
+export interface CatalogRoot {
+  version: number;
+  streamingFormat: number;
+  streamingFormatVersion: number;
+  supportsDeltaUpdates: bool;
+  commonTrackFields?: CommonTrackFields;
+  tracks: Track[];
+}
+
+
 // JSON encoded catalog
 export class Catalog {
 	namespace: string
-	tracks = new Array<Track>()
+	catalog: CatalogRoot | null = null;
 
 	constructor(namespace: string) {
 		this.namespace = namespace
 	}
 
 	encode(): Uint8Array {
+		if (!this.catalog) throw new Error("No catalog to encode");
 		const encoder = new TextEncoder()
 		const str = JSON.stringify(this)
 		return encoder.encode(str)
@@ -21,11 +38,12 @@ export class Catalog {
 		const str = decoder.decode(raw)
 
 		try {
-			if (typeof JSON.parse(str).packaging !== "string") throw new Error("invalid catalog")
-			this.tracks = JSON.parse(str).tracks
-			if (!isCatalog(this)) {
+			const parsedcatalog = JSON.parse(str);
+			if (!isCatalog(parsedcatalog)) {
 				throw new Error("invalid catalog")
 			}
+			this.catalog = parsedcatalog;
+			this.tracks = this.catalog.tracks;
 		} catch (e) {
 			throw new Error("invalid catalog")
 		}
@@ -56,44 +74,48 @@ export class Catalog {
 }
 
 export function isCatalog(catalog: any): catalog is Catalog {
+	if (!isPackagingValid(catalog)) return false
 	if (!Array.isArray(catalog.tracks)) return false
 	return catalog.tracks.every((track: any) => isTrack(track))
 }
 
 export interface Track {
-	name: string
+	name: string;
+	depends?: any[];
+	packaging?: string;
+	renderGroup?: number;
+	selectionParams?: SelectionParams;
 }
 
 export interface Mp4Track extends Track {
-	init_track: string
-	data_track: string
+	initTrack?: string;
+	initData?: string;
 }
 
-export interface SelectionParamsVideo {
-	codec: string;
-	height: number;
-	width: number;
-	frame_rate: number
-	bit_rate?: number
-}
-
-export interface SelectionParamsAudio {
-	bit_rate: number;
-	channel_count: number;
-	codec: string;
-	sample_rate: number;
-	sample_size: number;
+export interface SelectionParams {
+	codec?: string;
+	mimeType?: string;
+	framerate?: number;
+	bitrate?: number;
+	width?: number;
+	height?: number;
+	samplerate?: number;
+	channelConfig?: number;
+	displayWidth?: number;
+	displayHeight?: number;
+	lang?: string;
 }
 
 
 export interface AudioTrack extends Track {
-	name: "audio"
-	selectionParams: SelectionParamsAudio;
+	name: string;
 }
 
 export interface VideoTrack extends Track {
-	name: "video"
-	selectionParams: SelectionParamsVideo;
+	name: string;
+	temporalId?: number;
+	spatialId?: number;
+	altGroup?: number;
 }
 
 export function isTrack(track: any): track is Track {
@@ -102,8 +124,8 @@ export function isTrack(track: any): track is Track {
 }
 
 export function isMp4Track(track: any): track is Mp4Track {
-	if (typeof track.init_track !== "string") return false
-	if (typeof track.data_track !== "string") return false
+	if (typeof track.initTrack !== "string") return false
+	if (typeof track.initData !== "string") return false
 	if (!isTrack(track)) return false
 	return true
 }
@@ -113,16 +135,53 @@ export function isVideoTrack(track: any): track is VideoTrack {
 	if (typeof track.selectionParams.codec !== "string") return false
 	if (typeof track.selectionParams.width !== "number") return false
 	if (typeof track.selectionParams.height !== "number") return false
-	if (!isTrack(track)) return false
 	return true
 }
 
 export function isAudioTrack(track: any): track is AudioTrack {
 	if (!(track.name.toLowerCase().includes("audio"))) return false
 	if (typeof track.selectionParams.codec !== "string") return false
-	if (typeof track.selectionParams.channel_count !== "number") return false
-	if (typeof track.selectionParams.sample_rate !== "number") return false
-	if (typeof track.selectionParams.sample_size !== "number") return false
-	if (!isTrack(track)) return false
+	if (typeof track.selectionParams.channelConfig !== "number") return false
+	if (typeof track.selectionParams.samplerate !== "number") return false
 	return true
 }
+
+function isPackagingValid(catalog: any): boolean {
+        //packaging if common would be listed in commonTrackFields but if fields
+        //in commonTrackFields are mentiond in Tracks , the fields in Tracks precedes
+	
+	function isValidPackagingType(packaging: any): boolean {
+		return packaging === "cmaf" || packaging === "loc";
+	}
+
+	if ( catalog.commonTrackFields.packaging !== undefined && !isValidPackagingType(catalog.commonTrackFields.packaging)) {
+		return false;
+	}
+
+	for (const track of catalog.tracks) {
+		if (track.packaging !== undefined && !isValidPackagingType(track.packaging)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+export function isMediaTrack(track: any): track is Track {
+        if (track.name.toLowerCase().includes("audio") || track.name.toLowerCase().includes("video")) {
+                return true;
+        }
+
+	if (track.selectionParams && track.selectionParams.codec) {
+		const codec = track.selectionParams.codec.toLowerCase();
+		const acceptedCodecs = ["mp4a", "avc1"];
+
+		for (const acceptedCodec of acceptedCodecs) {
+			if (codec.includes(acceptedCodec)) {
+				return true;
+			}
+		}
+	}
+        return false
+}
+
