@@ -1,7 +1,7 @@
 import * as Message from "./worker/message"
 
 import { Connection } from "../transport/connection"
-import { Catalog, isMp4Track, Mp4Track } from "../media/catalog"
+import { Catalog, isMp4Track, Mp4Track, isMediaTrack } from "../media/catalog"
 import { asError } from "../common/error"
 
 import Backend from "./backend"
@@ -71,7 +71,7 @@ export class Player {
 				throw new Error(`expected CMAF track`)
 			}
 
-			inits.add(track.init_track)
+			inits.add(track.initTrack)
 			tracks.push(track)
 		}
 
@@ -100,12 +100,11 @@ export class Player {
 	}
 
 	async #runTrack(track: Mp4Track) {
-		if (!(track.name.toLowerCase().includes("audio")) && !(track.name.toLowerCase().includes("video"))) {
-			throw new Error(`unknown track name: ${track.name}`)
-		}
-
-		const sub = await this.#connection.subscribe(this.#catalog.namespace, track.data_track)
-		try {
+		try{
+			if (!isMediaTrack(track)){
+				throw new Error(`unknown track kind: ${track.name}`)
+			}			
+			const sub = await this.#connection.subscribe(this.#catalog.namespace, track.initData)
 			for (;;) {
 				const segment = await Promise.race([sub.data(), this.#running])
 				if (!segment) break
@@ -117,13 +116,15 @@ export class Player {
 				const [buffer, stream] = segment.stream.release()
 
 				this.#backend.segment({
-					init: track.init_track,
+					init: track.initTrack,
 					kind: track.name,
 					header: segment.header,
 					buffer,
 					stream,
 				})
 			}
+		} catch (error) {
+			console.error('Error in #runTrack:', error);
 		} finally {
 			await sub.close()
 		}
