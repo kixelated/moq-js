@@ -1,17 +1,4 @@
-import { Reader, Writer } from "./stream"
-
-export enum StreamBi {
-	Session = 0x0,
-	Announce = 0x1,
-	Subscribe = 0x2,
-	Datagrams = 0x3,
-	Fetch = 0x4,
-	Info = 0x5,
-}
-
-export enum StreamUni {
-	Group = 0x0,
-}
+import { Reader, Stream, Writer } from "./stream"
 
 export type Role = "publisher" | "subscriber" | "both"
 
@@ -83,6 +70,8 @@ export class SessionClient {
 	versions: Version[]
 	role: Role
 	params: Params
+
+	static StreamID = 0x0
 
 	constructor(versions: Version[], role: Role, params = new Params()) {
 		this.versions = versions
@@ -170,6 +159,8 @@ export class SessionInfo {
 export class Announce {
 	broadcast: string
 
+	static StreamID = 0x1
+
 	constructor(broadcast: string) {
 		this.broadcast = broadcast
 	}
@@ -250,6 +241,8 @@ export class Subscribe extends SubscribeUpdate {
 	broadcast: string
 	track: string
 
+	static StreamID = 0x2
+
 	constructor(id: bigint, broadcast: string, track: string, priority: number) {
 		super(priority)
 
@@ -281,25 +274,31 @@ export class Subscribe extends SubscribeUpdate {
 	}
 }
 
+export class Datagrams extends Subscribe {
+	static StreamID = 0x3
+}
+
 export class Info {
-	latest?: number
 	priority: number
-	order = Order.Any
+	order = Order.Descending
+	expires = 0
+	latest?: number
 
 	constructor(priority: number) {
 		this.priority = priority
 	}
 
 	async encode(w: Writer) {
-		await w.u53(this.latest ? this.latest + 1 : 0)
 		await w.u53(this.priority)
 		await w.u53(this.order)
+		await w.u53(this.expires)
+		await w.u53(this.latest ? this.latest + 1 : 0)
 	}
 
 	static async decode(r: Reader): Promise<Info> {
-		const latest = await r.u53()
 		const priority = await r.u53()
 		const order = await r.u53()
+		const latest = await r.u53()
 
 		const info = new Info(priority)
 		info.latest = latest == 0 ? undefined : latest - 1
@@ -312,6 +311,8 @@ export class Info {
 export class InfoRequest {
 	broadcast: string
 	track: string
+
+	static StreamID = 0x5
 
 	constructor(broadcast: string, track: string) {
 		this.broadcast = broadcast
@@ -352,6 +353,8 @@ export class FetchUpdate {
 export class Fetch extends FetchUpdate {
 	broadcast: string
 	track: string
+
+	static StreamID = 0x4
 
 	constructor(broadcast: string, track: string, priority: number) {
 		super(priority)
@@ -449,4 +452,35 @@ function decodeRole(raw: Uint8Array | undefined): Role {
 		default:
 			throw new Error(`invalid role: ${raw[0]}`)
 	}
+}
+
+type Initial = SessionClient | Announce | Subscribe | Datagrams | Fetch | Info
+
+export async function accept(stream: Stream): Promise<Initial> {
+	const typ = await stream.reader.u8()
+
+	switch (typ) {
+		case SessionClient.StreamID:
+			return await SessionClient.decode(stream.reader)
+		case Announce.StreamID:
+			return await Announce.decode(stream.reader)
+		case Subscribe.StreamID:
+			return await Subscribe.decode(stream.reader)
+		case Datagrams.StreamID:
+			return await Datagrams.decode(stream.reader)
+		case Fetch.StreamID:
+			return await Fetch.decode(stream.reader)
+		case InfoRequest.StreamID:
+			return await InfoRequest.decode(stream.reader)
+		default:
+			throw new Error("unknown stream type: " + typ)
+	}
+}
+
+export async function open(stream: Stream, message: Initial) {
+	await stream.writer.u8((message.constructor as HasStreamID).StreamID)
+}
+
+interface HasStreamID {
+	StreamID: number
 }

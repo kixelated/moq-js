@@ -42,7 +42,7 @@ export class Renderer {
 			transform: this.#transform.bind(this),
 		})
 
-		this.#run().catch(console.error)
+		this.#run().catch((err) => console.error("failed to run audio renderer: ", err))
 	}
 
 	private async load(config: Config): Promise<AudioWorkletNode> {
@@ -74,11 +74,11 @@ export class Renderer {
 	}
 
 	play() {
-		this.#context.resume().catch(console.error)
+		this.#context.resume().catch((err) => console.warn("failed to resume audio context: ", err))
 	}
 
 	close() {
-		this.#context.close().catch(console.error)
+		this.#context.close().catch((err) => console.warn("failed to close audio context: ", err))
 	}
 
 	#start(controller: TransformStreamDefaultController) {

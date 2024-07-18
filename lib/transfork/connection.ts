@@ -43,7 +43,11 @@ export class Connection {
 	}
 
 	async #run(): Promise<void> {
-		await Promise.all([this.#runSession(), this.#runBidis(), this.#runUnis()])
+		const session = this.#runSession().catch((err) => new Error("failed to run session: ", err))
+		const bidis = this.#runBidis().catch((err) => new Error("failed to run bidis: ", err))
+		const unis = this.#runUnis().catch((err) => new Error("failed to run unis: ", err))
+
+		await Promise.all([session, bidis, unis])
 	}
 
 	announce(broadcast: Broadcast): Announce {

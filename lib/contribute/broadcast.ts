@@ -58,7 +58,9 @@ export class Broadcast {
 
 				const encoder = new Video.Encoder(config.video)
 				const packer = new Video.Packer(media as MediaStreamVideoTrack, encoder, init, data)
-				packer.run().catch(console.error) // TODO handle error
+
+				// TODO handle error
+				packer.run().catch((err) => console.error("failed to run video packer: ", err))
 
 				const videoCatalog: Catalog.VideoTrack = {
 					...mp4Catalog,
@@ -78,7 +80,7 @@ export class Broadcast {
 
 				const encoder = new Audio.Encoder(config.audio)
 				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, init, data)
-				packer.run().catch(console.error) // TODO handle error
+				packer.run().catch((err) => console.error("failed to run audio packer: ", err)) // TODO handle error
 
 				const audioCatalog: Catalog.AudioTrack = {
 					...mp4Catalog,

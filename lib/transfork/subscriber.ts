@@ -42,7 +42,7 @@ export class Subscriber {
 		const id = this.#subscribeNext++
 
 		const subscribe = new Subscribe(id, track)
-		this.runSubscribe(subscribe).catch(console.error)
+		this.runSubscribe(subscribe).catch((err) => console.warn("failed to run subscribe", err))
 
 		return track.reader()
 	}

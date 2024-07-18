@@ -24,7 +24,7 @@ export class Publisher {
 		}
 
 		const announce = new Announce(broadcast.reader())
-		this.#runAnnounce(announce).catch(console.error)
+		this.#runAnnounce(announce).catch((err) => console.warn("failed to announce: ", err))
 
 		return announce
 	}
@@ -65,7 +65,7 @@ export class Publisher {
 		const subscribe = new Subscribed(msg, track, this.#quic)
 
 		// TODO close the stream when done
-		subscribe.run().catch(console.error)
+		subscribe.run().catch((err) => console.warn("failed to run subscribe: ", err))
 
 		try {
 			const info = new Message.Info(track.priority)
@@ -164,7 +164,7 @@ class Subscribed {
 			if (done) return
 			if (!group) break
 
-			this.#runGroup(group).catch(console.error)
+			this.#runGroup(group).catch((err) => console.warn("failed to run group: ", err))
 		}
 
 		// TODO wait until all groups are done

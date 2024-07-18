@@ -22,7 +22,7 @@ export class Renderer {
 			transform: this.#transform.bind(this),
 		})
 
-		this.#run().catch(console.error)
+		this.#run().catch((err) => console.error("failed to run video renderer: ", err))
 	}
 
 	close() {

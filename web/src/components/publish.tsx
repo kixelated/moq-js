@@ -113,10 +113,9 @@ export default function Publish() {
 		const client = new Client({
 			url,
 			fingerprint,
-			role: "publisher",
 		})
 
-		client.connect().then(setConnection).catch(setError)
+		client.connect("publisher").then(setConnection).catch(setError)
 	})
 
 	const createBroadcast = function () {
@@ -219,7 +218,7 @@ export default function Publish() {
 		navigator.clipboard
 			.writeText(absolute)
 			.then(() => setCopied(true))
-			.catch((err) => console.error("Failed to copy link:", err))
+			.catch((err) => console.error("failed to copy link:", err))
 	}
 
 	// Hide the copied message after a few seconds

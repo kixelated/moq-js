@@ -131,7 +131,7 @@ export class Player {
 				if (!group) break
 
 				this.#runGroup(track, group)
-					.catch(console.error)
+					.catch((err) => console.warn("failed to run group: ", err))
 					.finally(() => group.close())
 			}
 		} finally {
@@ -184,12 +184,8 @@ export class Player {
 		this.#video?.close()
 	}
 
-	async closed(): Promise<Error | undefined> {
-		try {
-			await this.#running
-		} catch (e) {
-			return asError(e)
-		}
+	async closed(): Promise<void> {
+		await this.#running
 	}
 
 	play() {

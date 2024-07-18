@@ -5,9 +5,6 @@ import { Connection } from "./connection"
 export interface ClientConfig {
 	url: string
 
-	// Parameters used to create the MoQ session
-	role: Message.Role
-
 	// If set, the server fingerprint will be fetched from this URL.
 	// This is required to use self-signed certificates with Chrome (May 2023)
 	fingerprint?: string
@@ -27,7 +24,7 @@ export class Client {
 		})
 	}
 
-	async connect(): Promise<Connection> {
+	async connect(role: Message.Role = "both"): Promise<Connection> {
 		// Helper function to make creating a promise easier
 		const options: WebTransportOptions = {}
 
@@ -40,13 +37,18 @@ export class Client {
 		const stream = await quic.createBidirectionalStream()
 		const session = new Stream(stream)
 
-		const client = new Message.SessionClient([Message.Version.FORK_00], this.config.role)
+		const client = new Message.SessionClient([Message.Version.FORK_00], role)
+		await session.writer.u8(Message.StreamBi.Session)
 		await client.encode(session.writer)
 
 		const server = await Message.SessionServer.decode(session.reader)
 		if (server.version != Message.Version.FORK_00) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
+
+		console.log(
+			`established connection: version=${server.version} client_role=${client.role} server_role=${server.role}`,
+		)
 
 		// TODO use the returned server.role
 

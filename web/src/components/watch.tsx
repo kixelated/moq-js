@@ -28,8 +28,11 @@ export default function Watch(props: { name: string }) {
 		// TODO remove this when WebTransport correctly supports self-signed certificates
 		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
-		const client = new Client({ url, fingerprint, role: "both" })
-		client.connect().then(setConnection).catch(setError)
+		const client = new Client({ url, fingerprint })
+		client
+			.connect("subscriber")
+			.then(setConnection)
+			.catch((err) => setError(new Error(`failed to connect to server: ${err}`)))
 	})
 
 	createEffect(() => {
@@ -37,7 +40,10 @@ export default function Watch(props: { name: string }) {
 		if (!connection) return
 
 		const catalog = new Broadcast(props.name)
-		catalog.fetch(connection).then(setCatalog).catch(setError)
+		catalog
+			.fetch(connection)
+			.then(setCatalog)
+			.catch((err) => setError(new Error(`failed to fetch catalog: ${err}`)))
 	})
 
 	createEffect(() => {
@@ -53,7 +59,7 @@ export default function Watch(props: { name: string }) {
 		if (!player) return
 
 		onCleanup(() => player.close())
-		player.closed().then(setError).catch(setError)
+		player.closed().catch((err) => setError(new Error(`player closed: ${err}`)))
 	})
 
 	const play = () => usePlayer()?.play()
