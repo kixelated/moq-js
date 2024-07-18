@@ -5,12 +5,12 @@ import { Audio } from "./audio"
 
 import MediaWorker from "./worker?worker"
 import { RingShared } from "../common/ring"
-import { Catalog, isAudioTrack } from "../media/catalog"
+import { Root, isAudioTrack } from "../media/catalog"
 import { GroupHeader } from "../transport/objects"
 
 export interface PlayerConfig {
 	canvas: OffscreenCanvas
-	catalog: Catalog
+	catalog: Root
 }
 
 // This is a non-standard way of importing worklet/workers.
@@ -40,7 +40,9 @@ export default class Backend {
 				}
 
 				sampleRate = track.selectionParams.samplerate
-				channels = Math.max(track.selectionParams.channelConfig, channels ?? 0)
+
+				// TODO properly handle weird channel configs
+				channels = Math.max(+track.selectionParams.channelConfig, channels ?? 0)
 			}
 		}
 

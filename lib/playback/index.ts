@@ -1,7 +1,7 @@
 import * as Message from "./worker/message"
 
 import { Connection } from "../transport/connection"
-import { Catalog, isMp4Track, Mp4Track, isMediaTrack } from "../media/catalog"
+import * as Catalog from "../media/catalog"
 import { asError } from "../common/error"
 
 import Backend from "./backend"
@@ -27,7 +27,7 @@ export class Player {
 	//#timeline = new Watch<Timeline | undefined>(undefined)
 
 	#connection: Connection
-	#catalog: Catalog
+	#catalog: Catalog.Root
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -35,7 +35,7 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog, backend: Backend) {
+	private constructor(connection: Connection, catalog: Catalog.Root, backend: Backend) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
@@ -53,8 +53,7 @@ export class Player {
 		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
 		const connection = await client.connect()
 
-		const catalog = new Catalog(config.namespace)
-		await catalog.fetch(connection)
+		const catalog = await Catalog.fetch(connection, config.namespace)
 
 		const canvas = config.canvas.transferControlToOffscreen()
 		const backend = new Backend({ canvas, catalog })
@@ -63,28 +62,24 @@ export class Player {
 	}
 
 	async #run() {
-		const inits = new Set<string>()
-		const tracks = new Array<Mp4Track>()
+		const inits = new Set<[string, string]>()
+		const tracks = new Array<Catalog.Track>()
 
 		for (const track of this.#catalog.tracks) {
-			if (!isMp4Track(track)) {
-				throw new Error(`expected CMAF track`)
-			}
-
-			inits.add(track.initTrack)
+			if (track.initTrack) inits.add([track.namespace, track.initTrack])
 			tracks.push(track)
 		}
 
 		// Call #runInit on each unique init track
 		// TODO do this in parallel with #runTrack to remove a round trip
-		await Promise.all(Array.from(inits).map((init) => this.#runInit(init)))
+		await Promise.all(Array.from(inits).map((init) => this.#runInit(...init)))
 
 		// Call #runTrack on each track
 		await Promise.all(tracks.map((track) => this.#runTrack(track)))
 	}
 
-	async #runInit(name: string) {
-		const sub = await this.#connection.subscribe(this.#catalog.namespace, name)
+	async #runInit(namespace: string, name: string) {
+		const sub = await this.#connection.subscribe(namespace, name)
 		try {
 			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
@@ -99,32 +94,39 @@ export class Player {
 		}
 	}
 
-	async #runTrack(track: Mp4Track) {
-		try{
-			if (!isMediaTrack(track)){
-				throw new Error(`unknown track kind: ${track.name}`)
-			}			
-			const sub = await this.#connection.subscribe(this.#catalog.namespace, track.initData)
+	async #runTrack(track: Catalog.Track) {
+		const sub = await this.#connection.subscribe(track.namespace, track.name)
+
+		try {
 			for (;;) {
 				const segment = await Promise.race([sub.data(), this.#running])
 				if (!segment) break
 
 				if (!(segment instanceof GroupReader)) {
-					throw new Error(`expected group reader for segment: ${track.data_track}`)
+					throw new Error(`expected group reader for segment: ${track.name}`)
+				}
+
+				const kind = Catalog.isVideoTrack(track) ? "video" : Catalog.isAudioTrack(track) ? "audio" : "unknown"
+				if (kind == "unknown") {
+					throw new Error(`unknown track kind: ${track.name}`)
+				}
+
+				if (!track.initTrack) {
+					throw new Error(`no init track for segment: ${track.name}`)
 				}
 
 				const [buffer, stream] = segment.stream.release()
 
 				this.#backend.segment({
 					init: track.initTrack,
-					kind: track.name,
+					kind,
 					header: segment.header,
 					buffer,
 					stream,
 				})
 			}
 		} catch (error) {
-			console.error('Error in #runTrack:', error);
+			console.error("Error in #runTrack:", error)
 		} finally {
 			await sub.close()
 		}
@@ -162,8 +164,8 @@ export class Player {
 	}
 	*/
 
-	play() {
-		this.#backend.play()
+	async play() {
+		await this.#backend.play()
 	}
 
 	/*
