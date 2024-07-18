@@ -161,8 +161,8 @@ export class Player {
 	}
 	*/
 
-	play() {
-		this.#backend.play()
+	async play() {
+		await this.#backend.play()
 	}
 
 	/*
