@@ -95,7 +95,7 @@ export class Player {
 	}
 
 	async #runTrack(track: Catalog.Track) {
-		const sub = await this.#connection.subscribe(track.namespace, track.name)
+		const sub = await this.#connection.subscribe(track.namespace, track.initData)
 
 		try {
 			for (;;) {
