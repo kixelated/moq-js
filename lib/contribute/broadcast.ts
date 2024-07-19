@@ -43,8 +43,6 @@ export class Broadcast {
 
 			const settings = media.getSettings()
 
-			const tracks: Catalog.Track[] = []
-
 			if (isVideoTrackSettings(settings)) {
 				if (!config.video) {
 					throw new Error("no video configuration provided")
@@ -54,6 +52,7 @@ export class Broadcast {
 					namespace: this.namespace,
 					name: track.name,
 					initTrack: `${track.name}.mp4`,
+					initData: `${track.name}.m4s`,
 					selectionParams: {
 						mimeType: "video/mp4",
 						codec: config.video.codec,
@@ -73,8 +72,10 @@ export class Broadcast {
 				const audio: Catalog.AudioTrack = {
 					namespace: this.namespace,
 					name: track.name,
+					initTrack: `${track.name}.mp4`,
+					initData: `${track.name}.m4s`,
 					selectionParams: {
-						mimeType: "video/mp4",
+						mimeType: "audio/ogg",
 						codec: config.audio.codec,
 						samplerate: settings.sampleRate,
 						//sampleSize: settings.sampleSize,
