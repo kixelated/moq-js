@@ -1,4 +1,4 @@
-import { Reader, Stream, Writer } from "./stream"
+import { Reader, Writer } from "./stream"
 
 export type Role = "publisher" | "subscriber" | "both"
 
@@ -382,6 +382,8 @@ export class Group {
 	subscribe: bigint
 	sequence: number
 
+	static StreamID = 0x0
+
 	constructor(subscribe: bigint, sequence: number) {
 		this.subscribe = subscribe
 		this.sequence = sequence
@@ -454,33 +456,5 @@ function decodeRole(raw: Uint8Array | undefined): Role {
 	}
 }
 
-type Initial = SessionClient | Announce | Subscribe | Datagrams | Fetch | Info
-
-export async function accept(stream: Stream): Promise<Initial> {
-	const typ = await stream.reader.u8()
-
-	switch (typ) {
-		case SessionClient.StreamID:
-			return await SessionClient.decode(stream.reader)
-		case Announce.StreamID:
-			return await Announce.decode(stream.reader)
-		case Subscribe.StreamID:
-			return await Subscribe.decode(stream.reader)
-		case Datagrams.StreamID:
-			return await Datagrams.decode(stream.reader)
-		case Fetch.StreamID:
-			return await Fetch.decode(stream.reader)
-		case InfoRequest.StreamID:
-			return await InfoRequest.decode(stream.reader)
-		default:
-			throw new Error("unknown stream type: " + typ)
-	}
-}
-
-export async function open(stream: Stream, message: Initial) {
-	await stream.writer.u8((message.constructor as HasStreamID).StreamID)
-}
-
-interface HasStreamID {
-	StreamID: number
-}
+export type Bi = SessionClient | Announce | Subscribe | Datagrams | Fetch | InfoRequest
+export type Uni = Group

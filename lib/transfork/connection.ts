@@ -94,84 +94,76 @@ export class Connection {
 	}
 
 	async #runBidis() {
-		const streams = this.#quic.incomingBidirectionalStreams.getReader()
-
 		for (;;) {
-			const { value, done } = await streams.read()
-			if (done) break
+			const next = await Stream.accept(this.#quic)
+			if (!next) {
+				break
+			}
 
-			const stream = new Stream(value)
-			this.#runBidi(stream).catch((err) => stream.writer.reset(Closed.extract(err)))
+			const [msg, stream] = next
+			this.#runBidi(msg, stream).catch((err) => stream.writer.reset(Closed.extract(err)))
 		}
 	}
 
-	async #runBidi(stream: Stream) {
-		const typ = await stream.reader.u8()
+	async #runBidi(msg: Message.Bi, stream: Stream) {
+		if (msg instanceof Message.SessionClient) {
+			throw new Error("duplicate session stream")
+		} else if (msg instanceof Message.Announce) {
+			if (!this.#subscriber) {
+				throw new Error("not a subscriber")
+			}
 
-		switch (typ) {
-			case Message.StreamBi.Session:
-				throw new Error("duplicate session stream")
-			case Message.StreamBi.Announce:
-				if (!this.#subscriber) {
-					throw new Error("not a subscriber")
-				}
+			return await this.#subscriber.runAnnounce(msg, stream)
+		} else if (msg instanceof Message.Subscribe) {
+			if (!this.#publisher) {
+				throw new Error("not a publisher")
+			}
 
-				return await this.#subscriber.runAnnounce(stream)
-			case Message.StreamBi.Subscribe:
-				if (!this.#publisher) {
-					throw new Error("not a publisher")
-				}
+			return await this.#publisher.runSubscribe(msg, stream)
+		} else if (msg instanceof Message.Datagrams) {
+			if (!this.#publisher) {
+				throw new Error("not a publisher")
+			}
 
-				return await this.#publisher.runSubscribe(stream)
-			case Message.StreamBi.Datagrams:
-				if (!this.#publisher) {
-					throw new Error("not a publisher")
-				}
+			return await this.#publisher.runDatagrams(msg, stream)
+		} else if (msg instanceof Message.Fetch) {
+			if (!this.#publisher) {
+				throw new Error("not a publisher")
+			}
 
-				return await this.#publisher.runDatagrams(stream)
-			case Message.StreamBi.Fetch:
-				if (!this.#publisher) {
-					throw new Error("not a publisher")
-				}
+			return await this.#publisher.runFetch(msg, stream)
+		} else if (msg instanceof Message.InfoRequest) {
+			if (!this.#publisher) {
+				throw new Error("not a publisher")
+			}
 
-				return await this.#publisher.runFetch(stream)
-			case Message.StreamBi.Info:
-				if (!this.#publisher) {
-					throw new Error("not a publisher")
-				}
-
-				return await this.#publisher.runInfo(stream)
-			default:
-				throw new Error("unknown bi stream type: " + typ)
+			return await this.#publisher.runInfo(msg, stream)
+		} else {
+			const _: never = msg
 		}
 	}
 
 	async #runUnis() {
-		const streams = this.#quic.incomingUnidirectionalStreams.getReader()
-
 		for (;;) {
-			const { value, done } = await streams.read()
-			if (done) {
+			const next = await Reader.accept(this.#quic)
+			if (!next) {
 				break
 			}
 
-			const stream = new Reader(value)
-			this.#runUni(stream).catch((err) => stream.stop(Closed.extract(err)))
+			const [msg, stream] = next
+			this.#runUni(msg, stream).catch((err) => stream.stop(Closed.extract(err)))
 		}
 	}
 
-	async #runUni(stream: Reader) {
-		const typ = await stream.u8()
+	async #runUni(msg: Message.Uni, stream: Reader) {
+		if (msg instanceof Message.Group) {
+			if (!this.#subscriber) {
+				throw new Error("not a subscriber")
+			}
 
-		switch (typ) {
-			case Message.StreamUni.Group:
-				if (!this.#subscriber) {
-					throw new Error("not a subscriber")
-				}
-
-				return this.#subscriber.runGroup(stream)
-			default:
-				throw new Error("unknown uni stream type: " + typ)
+			return this.#subscriber.runGroup(msg, stream)
+		} else {
+			const _: never = msg
 		}
 	}
 

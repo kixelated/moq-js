@@ -34,14 +34,14 @@ export class Client {
 		const quic = new WebTransport(this.config.url, options)
 		await quic.ready
 
-		const stream = await quic.createBidirectionalStream()
-		const session = new Stream(stream)
-
 		const client = new Message.SessionClient([Message.Version.FORK_00], role)
-		await session.writer.u8(Message.StreamBi.Session)
-		await client.encode(session.writer)
+		console.log("sending client setup: ", client)
+		const stream = await Stream.open(quic, client)
 
-		const server = await Message.SessionServer.decode(session.reader)
+		console.log("waiting for server setup")
+
+		const server = await Message.SessionServer.decode(stream.reader)
+		console.log("received server setup: ", server)
 		if (server.version != Message.Version.FORK_00) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
@@ -52,7 +52,7 @@ export class Client {
 
 		// TODO use the returned server.role
 
-		return new Connection(quic, client.role, session)
+		return new Connection(quic, client.role, stream)
 	}
 
 	async #fetchFingerprint(url?: string): Promise<WebTransportHash | undefined> {

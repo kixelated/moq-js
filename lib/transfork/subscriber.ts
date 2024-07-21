@@ -23,9 +23,7 @@ export class Subscriber {
 		return this.#announced.next()
 	}
 
-	async runAnnounce(stream: Stream) {
-		const msg = await Message.Announce.decode(stream.reader)
-
+	async runAnnounce(msg: Message.Announce, stream: Stream) {
 		const announce = new Announced(msg)
 		await this.#announced.push(announce)
 
@@ -51,13 +49,9 @@ export class Subscriber {
 		this.#subscribe.set(subscribe.id, subscribe)
 
 		try {
-			const stream = new Stream(await this.#quic.createBidirectionalStream())
-
 			const track = subscribe.track
 			const msg = new Message.Subscribe(subscribe.id, track.broadcast, track.name, track.priority)
-
-			await stream.writer.u8(Message.StreamBi.Subscribe)
-			await msg.encode(stream.writer)
+			const stream = await Stream.open(this.#quic, msg)
 
 			await stream.reader.closed()
 			subscribe.close()
@@ -68,9 +62,7 @@ export class Subscriber {
 		}
 	}
 
-	async runGroup(stream: Reader) {
-		const msg = await Message.Group.decode(stream)
-
+	async runGroup(msg: Message.Group, stream: Reader) {
 		const subscribe = this.#subscribe.get(msg.subscribe)
 		if (!subscribe) return
 

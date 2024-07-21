@@ -33,11 +33,8 @@ export class Publisher {
 		this.#announce.set(announce.broadcast.name, announce)
 
 		try {
-			const stream = new Stream(await this.#quic.createBidirectionalStream())
-			await stream.writer.u8(Message.StreamBi.Announce)
-
 			const msg = new Message.Announce(announce.broadcast.name)
-			await msg.encode(stream.writer)
+			const stream = await Stream.open(this.#quic, msg)
 
 			await stream.reader.closed()
 		} finally {
@@ -49,9 +46,7 @@ export class Publisher {
 		return this.#announce.get(msg.broadcast)?.broadcast.get(msg.track)
 	}
 
-	async runSubscribe(stream: Stream) {
-		const msg = await Message.Subscribe.decode(stream.reader)
-
+	async runSubscribe(msg: Message.Subscribe, stream: Stream) {
 		if (this.#subscribe.has(msg.id)) {
 			throw new Error(`duplicate subscribe for id: ${msg.id}`)
 		}
@@ -88,20 +83,17 @@ export class Publisher {
 		}
 	}
 
-	async runDatagrams(stream: Stream) {
-		const datagrams = await Message.Subscribe.decode(stream.reader)
-
+	async runDatagrams(msg: Message.Datagrams, stream: Stream) {
+		await stream.writer.reset(501)
 		throw new Error("datagrams not implemented")
 	}
 
-	async runFetch(stream: Stream) {
-		const fetch = await Message.Fetch.decode(stream.reader)
-
+	async runFetch(msg: Message.Fetch, stream: Stream) {
+		await stream.writer.reset(501)
 		throw new Error("fetch not implemented")
 	}
 
-	async runInfo(stream: Stream) {
-		const msg = await Message.InfoRequest.decode(stream.reader)
+	async runInfo(msg: Message.InfoRequest, stream: Stream) {
 		const track = this.#get(msg)
 		if (!track) {
 			await stream.writer.reset(404)
@@ -172,11 +164,8 @@ class Subscribed {
 	}
 
 	async #runGroup(group: GroupReader) {
-		const stream = new Writer(await this.#quic.createUnidirectionalStream())
-
 		const msg = new Message.Group(this.#id, group.sequence)
-		await stream.u8(Message.StreamUni.Group)
-		await msg.encode(stream)
+		const stream = await Writer.open(this.#quic, msg)
 
 		for (;;) {
 			const frame = await group.read()

@@ -1,3 +1,5 @@
+import * as Message from "./message"
+
 const MAX_U6 = Math.pow(2, 6) - 1
 const MAX_U14 = Math.pow(2, 14) - 1
 const MAX_U30 = Math.pow(2, 30) - 1
@@ -12,6 +14,59 @@ export class Stream {
 	constructor(props: { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }) {
 		this.writer = new Writer(props.writable)
 		this.reader = new Reader(props.readable)
+	}
+
+	static async accept(quic: WebTransport): Promise<[Message.Bi, Stream] | undefined> {
+		const reader = quic.incomingBidirectionalStreams.getReader()
+		const next = await reader.read()
+		reader.releaseLock()
+
+		if (next.done) return
+		const stream = new Stream(next.value)
+		let msg: Message.Bi
+
+		const typ = await stream.reader.u8()
+		if (typ == Message.SessionClient.StreamID) {
+			msg = await Message.SessionClient.decode(stream.reader)
+		} else if (typ == Message.Announce.StreamID) {
+			msg = await Message.Announce.decode(stream.reader)
+		} else if (typ == Message.Subscribe.StreamID) {
+			msg = await Message.Subscribe.decode(stream.reader)
+		} else if (typ == Message.Datagrams.StreamID) {
+			msg = await Message.Datagrams.decode(stream.reader)
+		} else if (typ == Message.Fetch.StreamID) {
+			msg = await Message.Fetch.decode(stream.reader)
+		} else if (typ == Message.InfoRequest.StreamID) {
+			msg = await Message.InfoRequest.decode(stream.reader)
+		} else {
+			throw new Error("unknown stream type: " + typ)
+		}
+
+		return [msg, stream]
+	}
+
+	static async open(quic: WebTransport, msg: Message.Bi): Promise<Stream> {
+		const stream = new Stream(await quic.createBidirectionalStream())
+
+		if (msg instanceof Message.SessionClient) {
+			await stream.writer.u8(Message.SessionClient.StreamID)
+		} else if (msg instanceof Message.Announce) {
+			await stream.writer.u8(Message.Announce.StreamID)
+		} else if (msg instanceof Message.Subscribe) {
+			await stream.writer.u8(Message.Subscribe.StreamID)
+		} else if (msg instanceof Message.Datagrams) {
+			await stream.writer.u8(Message.Datagrams.StreamID)
+		} else if (msg instanceof Message.Fetch) {
+			await stream.writer.u8(Message.Fetch.StreamID)
+		} else if (msg instanceof Message.InfoRequest) {
+			await stream.writer.u8(Message.InfoRequest.StreamID)
+		} else {
+			// Make sure we're not missing any types.
+			const _: never = msg
+			throw new Error("invalid message type")
+		}
+
+		return stream
 	}
 }
 
@@ -153,6 +208,25 @@ export class Reader {
 		this.#reader.releaseLock()
 		return [this.#buffer, this.#stream]
 	}
+
+	static async accept(quic: WebTransport): Promise<[Message.Group, Reader] | undefined> {
+		const reader = quic.incomingUnidirectionalStreams.getReader()
+		const next = await reader.read()
+		reader.releaseLock()
+
+		if (next.done) return
+		const stream = new Reader(next.value)
+		let msg: Message.Uni
+
+		const typ = await stream.u8()
+		if (typ == Message.Group.StreamID) {
+			msg = await Message.Group.decode(stream)
+		} else {
+			throw new Error("unknown stream type: " + typ)
+		}
+
+		return [msg, stream]
+	}
 }
 
 // Writer wraps a stream and writes chunks of data
@@ -224,6 +298,20 @@ export class Writer {
 	release(): WritableStream<Uint8Array> {
 		this.#writer.releaseLock()
 		return this.#stream
+	}
+
+	static async open(quic: WebTransport, msg: Message.Uni): Promise<Writer> {
+		const stream = new Writer(await quic.createUnidirectionalStream())
+
+		if (msg instanceof Message.Group) {
+			await stream.u8(Message.Group.StreamID)
+		} else {
+			// Make sure we're not missing any types.
+			const _: never = msg
+			throw new Error("invalid message type")
+		}
+
+		return stream
 	}
 }
 
