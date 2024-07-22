@@ -7,7 +7,7 @@ export interface Range {
 }
 
 export class Timeline {
-	// Maintain audio and video seprarately
+	// Maintain audio and video separately
 	audio: Component
 	video: Component
 
