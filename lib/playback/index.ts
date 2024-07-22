@@ -28,7 +28,7 @@ export class Player {
 
 	#connection: Connection
 	#catalog: Catalog.Root
-	#namespace: String
+	#namespace: string
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
