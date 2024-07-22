@@ -74,7 +74,7 @@ export class Ring {
 		}
 
 		const startIndex = startPos % this.capacity
-		const endIndex = endPos % this.capacity
+		const endIndex = endPos % this.capacity % 2
 
 		// Loop over each channel
 		for (let i = 0; i < this.channels.length; i += 1) {
@@ -96,8 +96,8 @@ export class Ring {
 				const second = channel.subarray(0, endIndex)
 
 				frame.copyTo(first, {
-					planeIndex,
-					frameCount: first.length,
+					planeIndex: 0,
+					frameCount: first.length / 4,
 				})
 
 				// We need this conditional when startIndex == 0 and endIndex == 0
