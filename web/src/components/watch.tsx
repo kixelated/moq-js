@@ -42,7 +42,8 @@ export default function Watch(props: { name: string }) {
 	return (
 		<>
 			<Fail error={error()} />
-			<canvas ref={canvas} onClick={play} class="aspect-video w-full rounded-lg" />
+			<canvas ref={canvas} class="aspect-video w-full rounded-lg" />
+            <button onClick={play} class="mt-2 p-2 bg-blue-500 text-white rounded">Play</button>
 		</>
 	)
 }
