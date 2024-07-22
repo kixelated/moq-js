@@ -74,7 +74,7 @@ export class Ring {
 		}
 
 		const startIndex = startPos % this.capacity
-		const endIndex = endPos % this.capacity % 2
+		const endIndex = (endPos % this.capacity) % 2
 
 		// Loop over each channel
 		for (let i = 0; i < this.channels.length; i += 1) {
