@@ -51,7 +51,7 @@ export default class Backend {
 			msg.audio = {
 				channels: channels,
 				sampleRate: sampleRate,
-				ring: new RingShared(2, sampleRate / 20), // 50ms
+				ring: new RingShared(2, sampleRate / 10), // 100ms
 			}
 
 			this.#audio = new Audio(msg.audio)
