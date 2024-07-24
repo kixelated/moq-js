@@ -13,7 +13,7 @@ export interface Root {
 	streamingFormat: number
 	streamingFormatVersion: string
 	supportsDeltaUpdates: boolean
-	commonTrackFields?: CommonTrackFields
+	commonTrackFields: CommonTrackFields
 	tracks: Track[]
 }
 
@@ -23,13 +23,21 @@ export function encode(catalog: Root): Uint8Array {
 	return encoder.encode(str)
 }
 
-export function decode(raw: Uint8Array) {
+export function decode(raw: Uint8Array): Root {
 	const decoder = new TextDecoder()
 	const str = decoder.decode(raw)
 
 	const catalog = JSON.parse(str)
 	if (!isRoot(catalog)) {
 		throw new Error("invalid catalog")
+	}
+
+	// Merge common track fields into each track.
+	for (const track of catalog.tracks) {
+		track.altGroup ??= catalog.commonTrackFields.altGroup
+		track.namespace ??= catalog.commonTrackFields.namespace
+		track.packaging ??= catalog.commonTrackFields.packaging
+		track.renderGroup ??= catalog.commonTrackFields.renderGroup
 	}
 
 	return catalog
@@ -66,7 +74,7 @@ export function isRoot(catalog: any): catalog is Root {
 }
 
 export interface Track {
-	namespace: string
+	namespace?: string
 	name: string
 	depends?: any[]
 	packaging?: string
@@ -154,42 +162,38 @@ export function isAudioSelectionParams(params: any): params is AudioSelectionPar
 }
 
 function isCatalogFieldValid(catalog: any, field: string): boolean {
-        //packaging,namespace if common would be listed in commonTrackFields but if fields
-        //in commonTrackFields are mentiond in Tracks , the fields in Tracks precedes
+	//packaging,namespace if common would be listed in commonTrackFields but if fields
+	//in commonTrackFields are mentiond in Tracks , the fields in Tracks precedes
 
-        function isValidPackaging(packaging: any): boolean {
-                return packaging === "cmaf" || packaging === "loc"
-        }
+	function isValidPackaging(packaging: any): boolean {
+		return packaging === "cmaf" || packaging === "loc"
+	}
 
-        function isValidNamespace(namespace: any): boolean {
-                return typeof namespace === "string"
-        }
+	function isValidNamespace(namespace: any): boolean {
+		return typeof namespace === "string"
+	}
 
-        let isValidField: (value: any) => boolean
-                if (field === "packaging") {
-                        isValidField = isValidPackaging
-        } else if (field === "namespace") {
-                        isValidField = isValidNamespace
-        } else {
-                throw new Error(`Invalid field: ${field}`)
-        }
+	let isValidField: (value: any) => boolean
+	if (field === "packaging") {
+		isValidField = isValidPackaging
+	} else if (field === "namespace") {
+		isValidField = isValidNamespace
+	} else {
+		throw new Error(`Invalid field: ${field}`)
+	}
 
-        if (
-                catalog.commonTrackFields[field] !== undefined &&
-                !isValidField(catalog.commonTrackFields[field])
-        ) {
-                return false
-        }
+	if (catalog.commonTrackFields[field] !== undefined && !isValidField(catalog.commonTrackFields[field])) {
+		return false
+	}
 
-        for (const track of catalog.tracks) {
-                if (track[field] !== undefined && !isValidField(track[field])) {
-                        return false
-                }
-        }
+	for (const track of catalog.tracks) {
+		if (track[field] !== undefined && !isValidField(track[field])) {
+			return false
+		}
+	}
 
-        return true
+	return true
 }
-
 
 export function isMediaTrack(track: any): track is Track {
 	if (track.name.toLowerCase().includes("audio") || track.name.toLowerCase().includes("video")) {

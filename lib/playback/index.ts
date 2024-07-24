@@ -28,7 +28,6 @@ export class Player {
 
 	#connection: Connection
 	#catalog: Catalog.Root
-	#namespace: string
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -40,10 +39,6 @@ export class Player {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
-
-		if(this.#catalog.commonTrackFields.namespace !== undefined ){
-			this.#namespace = this.#catalog.commonTrackFields.namespace
-		}
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -71,10 +66,8 @@ export class Player {
 		const tracks = new Array<Catalog.Track>()
 
 		for (const track of this.#catalog.tracks) {
-			if(track.namespace !== undefined){
-				this.#namespace = track.namespace
-			}
-			if (track.initTrack) inits.add([this.#namespace, track.initTrack])
+			if (!track.namespace) throw new Error("track has no namespace")
+			if (track.initTrack) inits.add([track.namespace, track.initTrack])
 			tracks.push(track)
 		}
 
@@ -103,11 +96,8 @@ export class Player {
 	}
 
 	async #runTrack(track: Catalog.Track) {
-		if(track.namespace !== undefined){
-			this.#namespace = track.namespace
-		}
-
-		const sub = await this.#connection.subscribe(this.#namespace, track.initData)
+		if (!track.namespace) throw new Error("track has no namespace")
+		const sub = await this.#connection.subscribe(track.namespace, track.name)
 
 		try {
 			for (;;) {
