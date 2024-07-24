@@ -3,8 +3,8 @@ export { Reader, Writer }
 
 export enum StreamType {
 	Object = 0x0,
-	Group = 0x50,
-	Track = 0x51,
+	Track = 0x50,
+	Group = 0x51,
 }
 
 export interface TrackHeader {
