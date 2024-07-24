@@ -54,6 +54,7 @@ export class Player {
 		const connection = await client.connect()
 
 		const catalog = await Catalog.fetch(connection, config.namespace)
+		console.log("catalog", catalog)
 
 		const canvas = config.canvas.transferControlToOffscreen()
 		const backend = new Backend({ canvas, catalog })
