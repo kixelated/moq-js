@@ -64,6 +64,7 @@ export class Renderer {
 
 			// Write audio samples to the ring buffer, dropping when there's no space.
 			const written = this.#ring.write(frame)
+			console.log("written audio samples", written)
 
 			if (written < frame.numberOfFrames) {
 				console.warn(`droppped ${frame.numberOfFrames - written} audio samples`)

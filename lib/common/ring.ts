@@ -19,6 +19,8 @@ interface Frame {
 	copyTo(dst: Float32Array, options: FrameCopyToOptions): void
 }
 
+
+
 // No prototype to make this easier to send via postMessage
 export class RingShared {
 	state: SharedArrayBuffer
@@ -27,6 +29,7 @@ export class RingShared {
 	capacity: number
 
 	constructor(channels: number, capacity: number) {
+		this.capacity = capacity
 		// Store the current state in a separate ring buffer.
 		this.state = new SharedArrayBuffer(STATE.LENGTH * Int32Array.BYTES_PER_ELEMENT)
 
@@ -37,7 +40,7 @@ export class RingShared {
 			this.channels.push(buffer)
 		}
 
-		this.capacity = capacity
+		// this.capacity = capacity
 	}
 }
 
@@ -55,67 +58,76 @@ export class Ring {
 		}
 
 		this.capacity = shared.capacity
+		console.log("ring buffer capacity:", this.capacity)
 	}
 
-	// Write samples for single audio frame, returning the total number written.
 	write(frame: Frame): number {
-		const readPos = Atomics.load(this.state, STATE.READ_POS)
-		const writePos = Atomics.load(this.state, STATE.WRITE_POS)
+	    const readPos = Atomics.load(this.state, STATE.READ_POS);
+	    console.log("write to ring buffer readPos", readPos);
+	    const writePos = Atomics.load(this.state, STATE.WRITE_POS);
+	    console.log("write to ring buffer writePos", writePos);
 
-		const startPos = writePos
-		let endPos = writePos + frame.numberOfFrames
+	    const startPos = writePos;
+	    let endPos = writePos + frame.numberOfFrames;
 
-		if (endPos > readPos + this.capacity) {
-			endPos = readPos + this.capacity
-			if (endPos <= startPos) {
-				// No space to write
-				return 0
-			}
-		}
+	    if (endPos > readPos + this.capacity) {
+	        endPos = readPos + this.capacity;
+	        if (endPos <= startPos) {
+	            // No space to write
+	            return 0;
+	        }
+	    }
 
-		const startIndex = startPos % this.capacity
-		const endIndex = (endPos % this.capacity) % 2
+	    const startIndex = startPos % this.capacity;
+	    const endIndex = endPos % this.capacity
 
-		// Loop over each channel
-		for (let i = 0; i < this.channels.length; i += 1) {
-			const channel = this.channels[i]
+	    for (let i = 0; i < this.channels.length; i += 1) {
+	        const channel = this.channels[i];
+	        const planeIndex = Math.min(i, frame.numberOfChannels - 1);
 
-			// If the AudioData doesn't have enough channels, duplicate it.
-			const planeIndex = Math.min(i, frame.numberOfChannels - 1)
+	        if (startIndex < endIndex) {
+	            // One continuous range to copy.
+	            const full = channel.subarray(startIndex, endIndex);
+	            console.log("copying full channel range", full);
 
-			if (startIndex < endIndex) {
-				// One continuous range to copy.
-				const full = channel.subarray(startIndex, endIndex)
+	            try {
+	                frame.copyTo(full, {
+	                    planeIndex,
+	                    frameCount: endIndex - startIndex,
+	                });
+	            } catch (error) {
+	                console.error("Failed to copy audio data:", error);
+	                return 0; // Return 0 if copy fails
+	            }
+	        } else {
+	            // Two-part copying
+	            const first = channel.subarray(startIndex);
+	            const second = channel.subarray(0, endIndex);
 
-				frame.copyTo(full, {
-					planeIndex,
-					frameCount: endIndex - startIndex,
-				})
-			} else {
-				const first = channel.subarray(startIndex)
-				const second = channel.subarray(0, endIndex)
+	            try {
+	                frame.copyTo(first, {
+	                    planeIndex,
+	                    frameCount: first.length,
+	                });
 
-				frame.copyTo(first, {
-					planeIndex: 0,
-					frameCount: first.length / 4,
-				})
+	                if (second.length) {
+	                    frame.copyTo(second, {
+	                        planeIndex,
+	                        frameOffset: first.length,
+	                        frameCount: second.length,
+	                    });
+	                }
+	            } catch (error) {
+	                console.error("Failed to copy audio data:", error);
+	                return 0; // Return 0 if copy fails
+	            }
+	        }
+	    }
 
-				// We need this conditional when startIndex == 0 and endIndex == 0
-				// When capacity=4410 and frameCount=1024, this was happening 52s into the audio.
-				if (second.length) {
-					frame.copyTo(second, {
-						planeIndex,
-						frameOffset: first.length,
-						frameCount: second.length,
-					})
-				}
-			}
-		}
-
-		Atomics.store(this.state, STATE.WRITE_POS, endPos)
-
-		return endPos - startPos
+	    Atomics.store(this.state, STATE.WRITE_POS, endPos);
+	    return endPos - startPos;
 	}
+
 
 	read(dst: Float32Array[]): number {
 		const readPos = Atomics.load(this.state, STATE.READ_POS)
