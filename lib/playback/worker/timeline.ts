@@ -7,7 +7,7 @@ export interface Range {
 }
 
 export class Timeline {
-	// Maintain audio and video separately
+	// Maintain audio and video seprarately
 	audio: Component
 	video: Component
 
@@ -20,22 +20,16 @@ export class Timeline {
 
 interface Segment {
 	sequence: number
-	timestamp?: number
 	frames: ReadableStream<Frame>
 }
 
-const JITTER_BUFFER_SIZE = 200 // milliseconds
-
 export class Component {
 	#current?: Segment
-	#buffer: Segment[] = []
-	#jitterBufferSize: number
 
 	frames: ReadableStream<Frame>
 	#segments: TransformStream<Segment, Segment>
 
 	constructor() {
-		this.#jitterBufferSize = JITTER_BUFFER_SIZE
 		this.frames = new ReadableStream({
 			pull: this.#pull.bind(this),
 			cancel: this.#cancel.bind(this),
@@ -51,72 +45,53 @@ export class Component {
 
 	async #pull(controller: ReadableStreamDefaultController<Frame>) {
 		for (;;) {
-			// process buffered segments
-			await this.#processBuffer()
+			// Get the next segment to render.
+			const segments = this.#segments.readable.getReader()
 
-			if (!this.#current) {
-				const segments = this.#segments.readable.getReader()
-				const { value: segment, done } = await segments.read()
-				segments.releaseLock()
+			let res
+			if (this.#current) {
+				// Get the next frame to render.
+				const frames = this.#current.frames.getReader()
 
-				if (done) {
-					controller.close()
-					return
-				}
+				// Wait for either the frames or segments to be ready.
+				// NOTE: This assume that the first promise gets priority.
+				res = await Promise.race([frames.read(), segments.read()])
 
-				if (segment.timestamp === undefined) {
-					segment.timestamp = Date.now()
-				}
-
-				this.#buffer.push(segment)
-				this.#buffer.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0))
+				frames.releaseLock()
+			} else {
+				res = await segments.read()
 			}
 
-			// process frames from the current segment
-			if (this.#current) {
-				const frames = this.#current.frames.getReader()
-				const { value: frame, done } = await frames.read()
-				frames.releaseLock()
+			segments.releaseLock()
 
-				if (done) {
-					this.#current = undefined
-					continue
-				}
+			const { value, done } = res
 
-				controller.enqueue(frame)
+			if (done) {
+				// We assume the current segment has been closed
+				// TODO support the segments stream closing
+				this.#current = undefined
+				continue
+			}
+
+			if (!isSegment(value)) {
+				// Return so the reader can decide when to get the next frame.
+				controller.enqueue(value)
 				return
 			}
-		}
-	}
 
-	async #processBuffer() {
-		while (this.#buffer.length > 0) {
-			const now = Date.now()
-			const oldestSegment = this.#buffer[0]
-			// console.log("oldest segment", oldestSegment)
-			const timeDiff = now - (oldestSegment.timestamp ?? now)
-			// console.log("timeDiff", timeDiff)
-
-			if (timeDiff > this.#jitterBufferSize) {
-				// segment is old enough to process
-				const currentSegment = this.#buffer.shift()
-
-				if (!currentSegment) break
-
-				this.#current = currentSegment
-
-				const currentTimestamp = currentSegment.timestamp
-
-				// cancel any older segments still in the buffer
-				while (this.#buffer.length > 0 && (this.#buffer[0].timestamp ?? 0) < (currentTimestamp ?? 0)) {
-					const oldSegment = this.#buffer.shift()
-					await oldSegment?.frames.cancel("segment too old")
+			// We didn't get any frames, and instead got a new segment.
+			if (this.#current) {
+				if (value.sequence < this.#current.sequence) {
+					// Our segment is older than the current, abandon it.
+					await value.frames.cancel("skipping segment; too old")
+					continue
+				} else {
+					// Our segment is newer than the current, cancel the old one.
+					await this.#current.frames.cancel("skipping segment; too slow")
 				}
-				break
-			} else {
-				// The oldest segment is still too new, wait a bit
-				await new Promise((resolve) => setTimeout(resolve, 10))
 			}
+
+			this.#current = value
 		}
 	}
 

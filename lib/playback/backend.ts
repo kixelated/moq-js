@@ -48,11 +48,13 @@ export default class Backend {
 
 		// Only configure audio is we have an audio track
 		if (sampleRate && channels) {
+			const ring = new RingShared(1, sampleRate / 20) // 50ms
 			msg.audio = {
 				channels: channels,
 				sampleRate: sampleRate,
-				ring: new RingShared(2, sampleRate / 20), // 50ms
+				ring,
 			}
+			console.log("ring capacity", ring.capacity)
 
 			this.#audio = new Audio(msg.audio)
 		}

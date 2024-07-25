@@ -26,6 +26,19 @@ export class Renderer {
 	#start(controller: TransformStreamDefaultController) {
 		this.#decoder = new AudioDecoder({
 			output: (frame: AudioData) => {
+				console.log("Frame info:", {
+				 format: frame.format,
+         		 allocationSize: frame.allocationSize({
+						planeIndex: 0,
+						frameOffset: 0,
+						frameCount: frame.numberOfFrames
+					}),
+         		 numberOfChannels: frame.numberOfChannels,
+         		 numberOfFrames: frame.numberOfFrames,
+         		 sampleRate: frame.sampleRate,
+         		 duration: frame.duration,
+         		 timestamp: frame.timestamp
+				});
 				controller.enqueue(frame)
 			},
 			error: console.warn,
@@ -65,6 +78,7 @@ export class Renderer {
 			// Write audio samples to the ring buffer, dropping when there's no space.
 			const written = this.#ring.write(frame)
 			console.log("written audio samples", written)
+			console.log("numberOfFrames", frame.numberOfFrames)
 
 			if (written < frame.numberOfFrames) {
 				console.warn(`droppped ${frame.numberOfFrames - written} audio samples`)
