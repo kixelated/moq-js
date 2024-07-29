@@ -50,9 +50,8 @@ export class Broadcast {
 
 				const video: Catalog.VideoTrack = {
 					namespace: this.namespace,
-					name: track.name,
+					name: `${track.name}.m4s`,
 					initTrack: `${track.name}.mp4`,
-					initData: `${track.name}.m4s`,
 					selectionParams: {
 						mimeType: "video/mp4",
 						codec: config.video.codec,
@@ -71,9 +70,8 @@ export class Broadcast {
 
 				const audio: Catalog.AudioTrack = {
 					namespace: this.namespace,
-					name: track.name,
+					name: `${track.name}.m4s`,
 					initTrack: `${track.name}.mp4`,
-					initData: `${track.name}.m4s`,
 					selectionParams: {
 						mimeType: "audio/ogg",
 						codec: config.audio.codec,
