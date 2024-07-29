@@ -19,7 +19,6 @@ export class Track {
 	#notify = new Notify()
 
 	constructor(media: MediaStreamTrack, config: BroadcastConfig) {
-		// TODO allow multiple tracks of the same kind
 		this.name = media.kind
 
 		// We need to split based on type because Typescript is hard
