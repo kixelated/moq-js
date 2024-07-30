@@ -10,7 +10,7 @@ export enum Version {
 	FORK_00 = 0xff0bad00,
 }
 
-export class Params {
+export class Extensions {
 	entries: Map<bigint, Uint8Array>
 
 	constructor() {
@@ -40,9 +40,9 @@ export class Params {
 		}
 	}
 
-	static async decode(r: Reader): Promise<Params> {
+	static async decode(r: Reader): Promise<Extensions> {
 		const count = await r.u53()
-		const params = new Params()
+		const params = new Extensions()
 
 		for (let i = 0; i < count; i++) {
 			const id = await r.u62()
@@ -69,14 +69,14 @@ export enum Order {
 export class SessionClient {
 	versions: Version[]
 	role: Role
-	params: Params
+	extensions: Extensions
 
 	static StreamID = 0x0
 
-	constructor(versions: Version[], role: Role, params = new Params()) {
+	constructor(versions: Version[], role: Role, extensions = new Extensions()) {
 		this.versions = versions
 		this.role = role
-		this.params = params
+		this.extensions = extensions
 	}
 
 	async encode(w: Writer) {
@@ -86,9 +86,9 @@ export class SessionClient {
 		}
 
 		const role = new Uint8Array([this.role == "publisher" ? 1 : this.role == "subscriber" ? 2 : 3])
-		this.params.set(0n, role)
+		this.extensions.set(0n, role)
 
-		await this.params.encode(w)
+		await this.extensions.encode(w)
 	}
 
 	static async decode(r: Reader): Promise<SessionClient> {
@@ -98,39 +98,39 @@ export class SessionClient {
 			versions.push(await r.u53())
 		}
 
-		const params = await Params.decode(r)
-		const role = decodeRole(params.get(0n))
+		const extensions = await Extensions.decode(r)
+		const role = decodeRole(extensions.get(0n))
 
-		return new SessionClient(versions, role, params)
+		return new SessionClient(versions, role, extensions)
 	}
 }
 
 export class SessionServer {
 	version: Version
 	role: Role
-	params: Params
+	extensions: Extensions
 
-	constructor(version: Version, role: Role, params = new Params()) {
+	constructor(version: Version, role: Role, extensions = new Extensions()) {
 		this.version = version
 		this.role = role
-		this.params = params
+		this.extensions = extensions
 	}
 
 	async encode(w: Writer) {
 		await w.u53(this.version)
 
 		const role = new Uint8Array([this.role == "publisher" ? 1 : this.role == "subscriber" ? 2 : 3])
-		this.params.set(0n, role)
+		this.extensions.set(0n, role)
 
-		await this.params.encode(w)
+		await this.extensions.encode(w)
 	}
 
 	static async decode(r: Reader): Promise<SessionServer> {
 		const version = await r.u53()
-		const params = await Params.decode(r)
-		const role = decodeRole(params.get(0n))
+		const extensions = await Extensions.decode(r)
+		const role = decodeRole(extensions.get(0n))
 
-		return new SessionServer(version, role, params)
+		return new SessionServer(version, role, extensions)
 	}
 }
 

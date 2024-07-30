@@ -66,6 +66,8 @@ export class Stream {
 			throw new Error("invalid message type")
 		}
 
+		await msg.encode(stream.writer)
+
 		return stream
 	}
 }
