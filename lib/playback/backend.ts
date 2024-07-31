@@ -5,12 +5,12 @@ import { Audio } from "./audio"
 
 import MediaWorker from "./worker?worker"
 import { RingShared } from "../common/ring"
-import { Catalog, isAudioTrack } from "../media/catalog"
+import { Root, isAudioTrack } from "../media/catalog"
 import { GroupHeader } from "../transport/objects"
 
 export interface PlayerConfig {
 	canvas: OffscreenCanvas
-	catalog: Catalog
+	catalog: Root
 }
 
 // This is a non-standard way of importing worklet/workers.
@@ -35,12 +35,14 @@ export default class Backend {
 
 		for (const track of config.catalog.tracks) {
 			if (isAudioTrack(track)) {
-				if (sampleRate && track.sample_rate !== sampleRate) {
+				if (sampleRate && track.selectionParams.samplerate !== sampleRate) {
 					throw new Error(`TODO multiple audio tracks with different sample rates`)
 				}
 
-				sampleRate = track.sample_rate
-				channels = Math.max(track.channel_count, channels ?? 0)
+				sampleRate = track.selectionParams.samplerate
+
+				// TODO properly handle weird channel configs
+				channels = Math.max(+track.selectionParams.channelConfig, channels ?? 0)
 			}
 		}
 
@@ -48,11 +50,10 @@ export default class Backend {
 
 		// Only configure audio is we have an audio track
 		if (sampleRate && channels) {
-			const ring = new RingShared(1, sampleRate / 20) // 50ms
 			msg.audio = {
 				channels: channels,
 				sampleRate: sampleRate,
-				ring,
+				ring: new RingShared(1, sampleRate / 20), // 50ms
 			}
 
 			this.#audio = new Audio(msg.audio)

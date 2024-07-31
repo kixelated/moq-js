@@ -55,7 +55,6 @@ export class Ring {
 		}
 
 		this.capacity = shared.capacity
-		console.log("channels length", this.channels.length)
 	}
 
 	// Write samples for single audio frame, returning the total number written.

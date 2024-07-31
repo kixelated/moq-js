@@ -2,7 +2,7 @@ import { Connection, SubscribeRecv } from "../transport"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
-import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../media/catalog"
+import * as Catalog from "../media/catalog"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
@@ -24,15 +24,18 @@ export class Broadcast {
 	#tracks = new Map<string, Track>()
 
 	readonly config: BroadcastConfig
-	readonly catalog: Catalog
+	readonly catalog: Catalog.Root
 	readonly connection: Connection
+	readonly namespace: string
 
 	#running: Promise<void>
 
 	constructor(config: BroadcastConfig) {
 		this.connection = config.connection
 		this.config = config
-		this.catalog = new Catalog(config.namespace)
+		this.namespace = config.namespace
+
+		const tracks: Catalog.Track[] = []
 
 		for (const media of this.config.media.getTracks()) {
 			const track = new Track(media, config)
@@ -40,59 +43,68 @@ export class Broadcast {
 
 			const settings = media.getSettings()
 
-			let catalog: CatalogTrack
-
-			const mp4Catalog: Mp4Track = {
-				container: "mp4",
-				kind: media.kind,
-				init_track: `${track.name}.mp4`,
-				data_track: `${track.name}.m4s`,
-			}
-
 			if (isVideoTrackSettings(settings)) {
 				if (!config.video) {
 					throw new Error("no video configuration provided")
 				}
 
-				const videoCatalog: VideoTrack = {
-					...mp4Catalog,
-					kind: "video",
-					codec: config.video.codec,
-					width: settings.width,
-					height: settings.height,
-					frame_rate: settings.frameRate,
-					bit_rate: config.video.bitrate,
+				const video: Catalog.VideoTrack = {
+					namespace: this.namespace,
+					name: `${track.name}.m4s`,
+					initTrack: `${track.name}.mp4`,
+					selectionParams: {
+						mimeType: "video/mp4",
+						codec: config.video.codec,
+						width: settings.width,
+						height: settings.height,
+						framerate: settings.frameRate,
+						bitrate: config.video.bitrate,
+					},
 				}
 
-				catalog = videoCatalog
+				tracks.push(video)
 			} else if (isAudioTrackSettings(settings)) {
 				if (!config.audio) {
 					throw new Error("no audio configuration provided")
 				}
 
-				const audioCatalog: AudioTrack = {
-					...mp4Catalog,
-					kind: "audio",
-					codec: config.audio.codec,
-					sample_rate: settings.sampleRate,
-					sample_size: settings.sampleSize,
-					channel_count: settings.channelCount,
-					bit_rate: config.audio.bitrate,
+				const audio: Catalog.AudioTrack = {
+					namespace: this.namespace,
+					name: `${track.name}.m4s`,
+					initTrack: `${track.name}.mp4`,
+					selectionParams: {
+						mimeType: "audio/ogg",
+						codec: config.audio.codec,
+						samplerate: settings.sampleRate,
+						//sampleSize: settings.sampleSize,
+						channelConfig: `${settings.channelCount}`,
+						bitrate: config.audio.bitrate,
+					},
 				}
 
-				catalog = audioCatalog
+				tracks.push(audio)
 			} else {
 				throw new Error(`unknown track type: ${media.kind}`)
 			}
+		}
 
-			this.catalog.tracks.push(catalog)
+		this.catalog = {
+			version: 1,
+			streamingFormat: 1,
+			streamingFormatVersion: "0.2",
+			supportsDeltaUpdates: false,
+			commonTrackFields: {
+				packaging: "cmaf",
+				renderGroup: 1,
+			},
+			tracks,
 		}
 
 		this.#running = this.#run()
 	}
 
 	async #run() {
-		await this.connection.announce(this.catalog.namespace)
+		await this.connection.announce(this.namespace)
 
 		for (;;) {
 			const subscriber = await this.connection.subscribed()
@@ -131,7 +143,7 @@ export class Broadcast {
 		// We only support ".catalog"
 		if (name !== "") throw new Error(`unknown catalog: ${name}`)
 
-		const bytes = this.catalog.encode()
+		const bytes = Catalog.encode(this.catalog)
 
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()

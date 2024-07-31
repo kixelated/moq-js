@@ -1,122 +1,214 @@
 import { Connection } from "../../transport"
 import { asError } from "../../common/error"
 
-// JSON encoded catalog
-export class Catalog {
-	namespace: string
-	tracks = new Array<Track>()
+export interface CommonTrackFields {
+	namespace?: string
+	packaging?: string
+	renderGroup?: number
+	altGroup?: number
+}
 
-	constructor(namespace: string) {
-		this.namespace = namespace
+export interface Root {
+	version: number
+	streamingFormat: number
+	streamingFormatVersion: string
+	supportsDeltaUpdates: boolean
+	commonTrackFields: CommonTrackFields
+	tracks: Track[]
+}
+
+export function encode(catalog: Root): Uint8Array {
+	const encoder = new TextEncoder()
+	const str = JSON.stringify(catalog)
+	return encoder.encode(str)
+}
+
+export function decode(raw: Uint8Array): Root {
+	const decoder = new TextDecoder()
+	const str = decoder.decode(raw)
+
+	const catalog = JSON.parse(str)
+	if (!isRoot(catalog)) {
+		throw new Error("invalid catalog")
 	}
 
-	encode(): Uint8Array {
-		const encoder = new TextEncoder()
-		const str = JSON.stringify(this)
-		return encoder.encode(str)
+	// Merge common track fields into each track.
+	for (const track of catalog.tracks) {
+		track.altGroup ??= catalog.commonTrackFields.altGroup
+		track.namespace ??= catalog.commonTrackFields.namespace
+		track.packaging ??= catalog.commonTrackFields.packaging
+		track.renderGroup ??= catalog.commonTrackFields.renderGroup
 	}
 
-	decode(raw: Uint8Array) {
-		const decoder = new TextDecoder()
-		const str = decoder.decode(raw)
+	return catalog
+}
 
-		try {
-			this.tracks = JSON.parse(str).tracks
-			if (!isCatalog(this)) {
-				throw new Error("invalid catalog")
-			}
-		} catch (e) {
-			throw new Error("invalid catalog")
-		}
-	}
+export async function fetch(connection: Connection, namespace: string): Promise<Root> {
+	const subscribe = await connection.subscribe(namespace, ".catalog")
+	try {
+		const segment = await subscribe.data()
+		if (!segment) throw new Error("no catalog data")
 
-	async fetch(connection: Connection) {
-		const subscribe = await connection.subscribe(this.namespace, ".catalog")
-		try {
-			const segment = await subscribe.data()
-			if (!segment) throw new Error("no catalog data")
+		const chunk = await segment.read()
+		if (!chunk) throw new Error("no catalog chunk")
 
-			const chunk = await segment.read()
-			if (!chunk) throw new Error("no catalog chunk")
+		await segment.close()
+		await subscribe.close() // we done
 
-			await segment.close()
-			await subscribe.close() // we done
+		return decode(chunk.payload)
+	} catch (e) {
+		const err = asError(e)
 
-			this.decode(chunk.payload)
-		} catch (e) {
-			const err = asError(e)
+		// Close the subscription after we're done.
+		await subscribe.close(1n, err.message)
 
-			// Close the subscription after we're done.
-			await subscribe.close(1n, err.message)
-
-			throw err
-		}
+		throw err
 	}
 }
 
-export function isCatalog(catalog: any): catalog is Catalog {
+export function isRoot(catalog: any): catalog is Root {
+	if (!isCatalogFieldValid(catalog, "packaging")) return false
+	if (!isCatalogFieldValid(catalog, "namespace")) return false
 	if (!Array.isArray(catalog.tracks)) return false
 	return catalog.tracks.every((track: any) => isTrack(track))
 }
 
 export interface Track {
-	kind: string
-	container: string
+	namespace?: string
+	name: string
+	depends?: any[]
+	packaging?: string
+	renderGroup?: number
+	selectionParams: SelectionParams // technically optional but not really
+	altGroup?: number
+	initTrack?: string
+	initData?: string
 }
 
 export interface Mp4Track extends Track {
-	container: "mp4"
-	init_track: string
-	data_track: string
+	initTrack?: string
+	initData?: string
+	selectionParams: Mp4SelectionParams
+}
+
+export interface SelectionParams {
+	codec?: string
+	mimeType?: string
+	bitrate?: number
+	lang?: string
+}
+
+export interface Mp4SelectionParams extends SelectionParams {
+	mimeType: "video/mp4"
 }
 
 export interface AudioTrack extends Track {
-	kind: "audio"
-	codec: string
-	channel_count: number
-	sample_rate: number
-	sample_size: number
-	bit_rate?: number
+	name: string
+	selectionParams: AudioSelectionParams
+}
+
+export interface AudioSelectionParams extends SelectionParams {
+	samplerate: number
+	channelConfig: string
 }
 
 export interface VideoTrack extends Track {
-	kind: "video"
-	codec: string
+	name: string
+	selectionParams: VideoSelectionParams
+	temporalId?: number
+	spatialId?: number
+}
+
+export interface VideoSelectionParams extends SelectionParams {
 	width: number
 	height: number
-	frame_rate: number
-	bit_rate?: number
+	displayWidth?: number
+	displayHeight?: number
+	framerate?: number
 }
 
 export function isTrack(track: any): track is Track {
-	if (typeof track.kind !== "string") return false
-	if (typeof track.container !== "string") return false
+	if (typeof track.name !== "string") return false
 	return true
 }
 
 export function isMp4Track(track: any): track is Mp4Track {
-	if (track.container !== "mp4") return false
-	if (typeof track.init_track !== "string") return false
-	if (typeof track.data_track !== "string") return false
 	if (!isTrack(track)) return false
+	if (typeof track.initTrack !== "string" && typeof track.initData !== "string") return false
+	if (typeof track.selectionParams.mimeType !== "string") return false
 	return true
 }
 
 export function isVideoTrack(track: any): track is VideoTrack {
-	if (track.kind !== "video") return false
-	if (typeof track.codec !== "string") return false
-	if (typeof track.width !== "number") return false
-	if (typeof track.height !== "number") return false
 	if (!isTrack(track)) return false
+	return isVideoSelectionParams(track.selectionParams)
+}
+
+export function isVideoSelectionParams(params: any): params is VideoSelectionParams {
+	if (typeof params.width !== "number") return false
+	if (typeof params.height !== "number") return false
 	return true
 }
 
 export function isAudioTrack(track: any): track is AudioTrack {
-	if (track.kind !== "audio") return false
-	if (typeof track.codec !== "string") return false
-	if (typeof track.channel_count !== "number") return false
-	if (typeof track.sample_rate !== "number") return false
-	if (typeof track.sample_size !== "number") return false
 	if (!isTrack(track)) return false
+	return isAudioSelectionParams(track.selectionParams)
+}
+
+export function isAudioSelectionParams(params: any): params is AudioSelectionParams {
+	if (typeof params.channelConfig !== "string") return false
+	if (typeof params.samplerate !== "number") return false
 	return true
+}
+
+function isCatalogFieldValid(catalog: any, field: string): boolean {
+	//packaging,namespace if common would be listed in commonTrackFields but if fields
+	//in commonTrackFields are mentiond in Tracks , the fields in Tracks precedes
+
+	function isValidPackaging(packaging: any): boolean {
+		return packaging === "cmaf" || packaging === "loc"
+	}
+
+	function isValidNamespace(namespace: any): boolean {
+		return typeof namespace === "string"
+	}
+
+	let isValidField: (value: any) => boolean
+	if (field === "packaging") {
+		isValidField = isValidPackaging
+	} else if (field === "namespace") {
+		isValidField = isValidNamespace
+	} else {
+		throw new Error(`Invalid field: ${field}`)
+	}
+
+	if (catalog.commonTrackFields[field] !== undefined && !isValidField(catalog.commonTrackFields[field])) {
+		return false
+	}
+
+	for (const track of catalog.tracks) {
+		if (track[field] !== undefined && !isValidField(track[field])) {
+			return false
+		}
+	}
+
+	return true
+}
+
+export function isMediaTrack(track: any): track is Track {
+	if (track.name.toLowerCase().includes("audio") || track.name.toLowerCase().includes("video")) {
+		return true
+	}
+
+	if (track.selectionParams && track.selectionParams.codec) {
+		const codec = track.selectionParams.codec.toLowerCase()
+		const acceptedCodecs = ["mp4a", "avc1"]
+
+		for (const acceptedCodec of acceptedCodecs) {
+			if (codec.includes(acceptedCodec)) {
+				return true
+			}
+		}
+	}
+	return false
 }

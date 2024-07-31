@@ -1,7 +1,17 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
 import { Client, Connection } from "@kixelated/moq/transport"
-
-import { createSignal, createEffect, onCleanup, createMemo, Show, For, createSelector, Switch, Match } from "solid-js"
+import {
+	createSignal,
+	createEffect,
+	onCleanup,
+	createMemo,
+	Show,
+	For,
+	createSelector,
+	Switch,
+	Match,
+	onMount,
+} from "solid-js"
 
 import Fail from "./fail"
 
@@ -316,6 +326,35 @@ function Device(props: {
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
 	const [videoDeviceId, setVideoDeviceId] = createSignal<string>("")
 	const [audioDeviceId, setAudioDeviceId] = createSignal<string>("")
+	const [orientation, setOrientation] = createSignal({
+		landscape: true,
+		alpha: 0,
+		beta: 0,
+		gamma: 0,
+	})
+
+	const handleOrientation = (event: unknown) => {
+		const typedEvent = event as { alpha: number; beta: number; gamma: number }
+		let isLandscape = true
+		if (typedEvent.beta > 40 || typedEvent.beta < -45) {
+			isLandscape = false
+		}
+		const orient = {
+			landscape: isLandscape,
+			alpha: typedEvent.alpha,
+			beta: typedEvent.beta,
+			gamma: typedEvent.gamma,
+		}
+		setOrientation(orient)
+		//console.log(orient)
+	}
+
+	onMount(() => {
+		window.addEventListener("deviceorientation", handleOrientation)
+		onCleanup(() => {
+			window.removeEventListener("deviceorientation", handleOrientation)
+		})
+	})
 
 	let preview: HTMLVideoElement | undefined // undefined until mount
 
@@ -335,7 +374,14 @@ function Device(props: {
 		setMode("display")
 		setDevice(undefined)
 		props.setDeviceLoading(true)
-
+		const orient = orientation()
+		const videoTrackConstraints: MediaTrackConstraints = {
+			height: { ideal: DEFAULT_HEIGHT }, // max not supported
+			frameRate: { ideal: DEFAULT_FPS }, // max not supported
+		}
+		if (orient.landscape) {
+			videoTrackConstraints.aspectRatio = { ideal: 16 / 9 }
+		}
 		navigator.mediaDevices
 			.getDisplayMedia({
 				audio: {
@@ -345,11 +391,7 @@ function Device(props: {
 					},
 					sampleRate: { ideal: 48_000 },
 				},
-				video: {
-					aspectRatio: { ideal: 16 / 9 },
-					height: { ideal: DEFAULT_HEIGHT }, // max not supported
-					frameRate: { ideal: DEFAULT_FPS }, // max not supported
-				},
+				video: videoTrackConstraints,
 			})
 			.then(setDevice)
 			.catch(props.setError)
@@ -358,6 +400,15 @@ function Device(props: {
 	}
 
 	const mediaDevices = () => {
+		const orient = orientation()
+		const videoTrackConstraints: MediaTrackConstraints = {
+			height: { ideal: DEFAULT_HEIGHT, max: SUPPORTED_HEIGHT.at(-1) },
+			frameRate: { ideal: DEFAULT_FPS, max: SUPPORTED_FPS.at(-1) },
+			deviceId: videoDeviceId(),
+		}
+		if (orient.landscape) {
+			videoTrackConstraints.aspectRatio = { ideal: 16 / 9 }
+		}
 		return navigator.mediaDevices.getUserMedia({
 			audio:
 				audioDeviceId() === "disabled"
@@ -370,15 +421,7 @@ function Device(props: {
 							sampleRate: { ideal: 48_000 },
 							deviceId: audioDeviceId(),
 					  },
-			video:
-				videoDeviceId() === "disabled"
-					? false
-					: {
-							aspectRatio: { ideal: 16 / 9 },
-							height: { ideal: DEFAULT_HEIGHT, max: SUPPORTED_HEIGHT.at(-1) },
-							frameRate: { ideal: DEFAULT_FPS, max: SUPPORTED_FPS.at(-1) },
-							deviceId: videoDeviceId(),
-					  },
+			video: videoDeviceId() === "disabled" ? false : videoTrackConstraints,
 		})
 	}
 
