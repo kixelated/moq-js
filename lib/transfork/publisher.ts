@@ -2,7 +2,7 @@ import * as Message from "./message"
 import { Watch } from "../common/async"
 import { Stream, Writer } from "./stream"
 import { Closed } from "./error"
-import { Broadcast, BroadcastReader, GroupReader, TrackReader } from "./model"
+import { Broadcast, GroupReader, TrackReader } from "./model"
 
 export class Publisher {
 	#quic: WebTransport
@@ -18,32 +18,36 @@ export class Publisher {
 	}
 
 	// Announce a track broadcast.
-	announce(broadcast: Broadcast): Announce {
+	async announce(broadcast: Broadcast): Promise<Announce> {
 		if (this.#announce.has(broadcast.name)) {
 			throw new Error(`already announced: ${broadcast.name}`)
 		}
 
-		const announce = new Announce(broadcast.reader())
-		this.#runAnnounce(announce).catch((err) => console.warn("failed to announce: ", err))
+		const msg = new Message.Announce(broadcast.name)
+		const stream = await Stream.open(this.#quic, msg)
+
+		const announce = new Announce(stream, broadcast)
+		this.#announce.set(announce.broadcast.name, announce)
+
+		try {
+			const _ok = await Message.AnnounceOk.decode(stream.reader)
+		} catch (err) {
+			this.#announce.delete(announce.broadcast.name)
+			await announce.close(Closed.from(err))
+
+			throw err
+		}
+
+		announce
+			.run()
+			.catch((err) => console.warn("announce closed", err))
+			.finally(() => this.#announce.delete(announce.broadcast.name))
 
 		return announce
 	}
 
-	async #runAnnounce(announce: Announce) {
-		this.#announce.set(announce.broadcast.name, announce)
-
-		try {
-			const msg = new Message.Announce(announce.broadcast.name)
-			const stream = await Stream.open(this.#quic, msg)
-
-			await stream.reader.closed()
-		} finally {
-			this.#announce.delete(announce.broadcast.name)
-		}
-	}
-
 	#get(msg: { broadcast: string; track: string }): TrackReader | undefined {
-		return this.#announce.get(msg.broadcast)?.broadcast.get(msg.track)
+		return this.#announce.get(msg.broadcast)?.broadcast.reader().getTrack(msg.track)
 	}
 
 	async runSubscribe(msg: Message.Subscribe, stream: Stream) {
@@ -111,27 +115,30 @@ export class Publisher {
 }
 
 export class Announce {
-	readonly broadcast: BroadcastReader
+	readonly broadcast: Broadcast
+	readonly stream: Stream
 
-	#closed = new Watch<Closed | undefined>(undefined)
-
-	constructor(broadcast: BroadcastReader) {
+	constructor(stream: Stream, broadcast: Broadcast) {
 		this.broadcast = broadcast
+		this.stream = stream
 	}
 
-	close(err = new Closed()) {
-		this.#closed.update(err)
-		this.broadcast.close()
-	}
-
-	async closed(): Promise<Closed> {
-		let [closed, next] = this.#closed.value()
-
-		for (;;) {
-			if (closed !== undefined) return closed
-			if (!next) return new Closed()
-			;[closed, next] = await next
+	async run() {
+		try {
+			await this.closed()
+			await this.close()
+		} catch (err) {
+			await this.close(Closed.from(err))
 		}
+	}
+
+	async close(closed?: Closed) {
+		this.broadcast.close(closed)
+		await this.stream.close(closed?.code)
+	}
+
+	async closed() {
+		await this.stream.reader.closed()
 	}
 }
 
@@ -152,7 +159,7 @@ class Subscribed {
 		const closed = this.closed()
 
 		for (;;) {
-			const [group, done] = await Promise.all([this.#track.next(), closed])
+			const [group, done] = await Promise.all([this.#track.nextGroup(), closed])
 			if (done) return
 			if (!group) break
 
@@ -168,7 +175,7 @@ class Subscribed {
 		const stream = await Writer.open(this.#quic, msg)
 
 		for (;;) {
-			const frame = await group.read()
+			const frame = await group.readFrame()
 			if (!frame) break
 
 			await stream.u53(frame.byteLength)

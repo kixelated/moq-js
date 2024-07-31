@@ -13,7 +13,7 @@ import { GroupReader } from "../transfork/model"
 
 export interface PlayerConfig {
 	connection: Connection
-	catalog: Catalog.Broadcast
+	catalog: Catalog.Root
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	canvas: HTMLCanvasElement
 }
@@ -21,7 +21,7 @@ export interface PlayerConfig {
 // This class must be created on the main thread due to AudioContext.
 export class Player {
 	#connection: Connection
-	#catalog: Catalog.Broadcast
+	#catalog: Catalog.Root
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -52,12 +52,12 @@ export class Player {
 
 		for (const track of config.catalog.tracks) {
 			if (Catalog.isAudioTrack(track)) {
-				if (sampleRate && track.sample_rate !== sampleRate) {
+				if (sampleRate && track.selectionParams.samplerate !== sampleRate) {
 					throw new Error(`TODO multiple audio tracks with different sample rates`)
 				}
 
-				sampleRate = track.sample_rate
-				channels = Math.max(track.channel_count, channels ?? 0)
+				sampleRate = track.selectionParams.samplerate
+				channels = Math.max(+track.selectionParams.channelConfig, channels ?? 0)
 			}
 		}
 
@@ -89,9 +89,17 @@ export class Player {
 				throw new Error(`expected CMAF track`)
 			}
 
-			if (!this.#inits.has(track.init_track)) {
+			if (!track.initTrack) {
+				continue
+			}
+
+			if (!track.namespace) {
+				throw new Error(`missing track namespace`)
+			}
+
+			if (!this.#inits.has(track.initTrack)) {
 				// Load each unique init track
-				this.#inits.set(track.init_track, this.#runInit(track.init_track))
+				this.#inits.set(track.initTrack, this.#runInit(track.namespace, track.initTrack))
 			}
 
 			tracks.push(track)
@@ -101,33 +109,41 @@ export class Player {
 		await Promise.all(tracks.map((track) => this.#runTrack(track)))
 	}
 
-	async #runInit(name: string): Promise<Uint8Array> {
-		const track = this.#connection.subscribe(new Track(this.#catalog.broadcast, name, 0))
+	async #runInit(broadcast: string, name: string): Promise<Uint8Array> {
+		const sub = await this.#connection.subscribe(new Track(broadcast, name, 0))
 
 		try {
-			const init = await track.next()
+			const init = await sub.nextGroup()
 			if (!init) throw new Error("no init data")
 
 			// We don't care what type of reader we get, we just want the payload.
-			const chunk = await init.read()
+			const chunk = await init.readFrame()
 			if (!chunk) throw new Error("no init chunk")
 
 			return chunk
 		} finally {
-			track.close()
+			sub.close()
 		}
 	}
 
 	async #runTrack(track: Catalog.Mp4Track) {
-		if (track.kind !== "audio" && track.kind !== "video") {
-			throw new Error(`unknown track kind: ${track.kind}`)
+		if (!track.namespace) {
+			throw new Error(`missing track namespace`)
 		}
 
-		const subscribe = new Track(this.#catalog.broadcast, track.data_track, track.priority)
-		const reader = this.#connection.subscribe(subscribe)
+		let priority = 0
+		if (Catalog.isAudioTrack(track)) {
+			priority = 1
+		} else if (Catalog.isVideoTrack(track)) {
+			priority = 2
+		} else {
+			throw new Error(`unknown track type`)
+		}
+
+		const sub = await this.#connection.subscribe(new Track(track.namespace, track.name, priority))
 		try {
 			for (;;) {
-				const group = await Promise.race([reader.next(), this.#running])
+				const group = await Promise.race([sub.nextGroup(), this.#running])
 				if (!group) break
 
 				this.#runGroup(track, group)
@@ -135,18 +151,29 @@ export class Player {
 					.finally(() => group.close())
 			}
 		} finally {
-			reader.close()
+			sub.close()
 		}
 	}
 
 	async #runGroup(track: Catalog.Mp4Track, group: GroupReader) {
-		const init = await this.#inits.get(track.init_track)
-		if (!init) throw new Error(`missing init track: ${track.init_track}`) // impossible
+		if (!track.initTrack) {
+			throw new Error(`missing init track`)
+		}
+
+		const init = await this.#inits.get(track.initTrack)
+		if (!init) throw new Error(`missing init track: ${track.initTrack}`)
 
 		// Create a new stream that we will use to decode.
 		const container = new MP4.Parser(init)
 
-		const timeline = track.kind === "audio" ? this.#timeline.audio : this.#timeline.video
+		let timeline
+		if (Catalog.isAudioTrack(track)) {
+			timeline = this.#timeline.audio
+		} else if (Catalog.isVideoTrack(this.#timeline.video)) {
+			timeline = this.#timeline.video
+		} else {
+			throw new Error(`unknown track type`)
+		}
 
 		// Create a queue that will contain each MP4 frame.
 		const queue = new TransformStream<MP4.Frame>({})
@@ -162,7 +189,7 @@ export class Player {
 
 		// Read each chunk, decoding the MP4 frames and adding them to the queue.
 		for (;;) {
-			const chunk = await group.read()
+			const chunk = await group.readFrame()
 			if (!chunk) break
 
 			const frames = container.decode(chunk)

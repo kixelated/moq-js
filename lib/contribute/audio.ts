@@ -40,7 +40,7 @@ export class Packer {
 
 	#write(chunk: Chunk) {
 		if (chunk.type === "init") {
-			this.#init.append().writeAll(chunk.data)
+			this.#init.appendGroup().writeFrames(chunk.data)
 			return
 		}
 
@@ -51,10 +51,10 @@ export class Packer {
 				this.#current.close()
 			}
 
-			this.#current = this.#data.append()
+			this.#current = this.#data.appendGroup()
 		}
 
-		this.#current.write(chunk.data)
+		this.#current.writeFrame(chunk.data)
 	}
 
 	#close(err?: any) {

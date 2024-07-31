@@ -36,44 +36,44 @@ export class Subscriber {
 	}
 
 	// TODO: Deduplicate identical subscribes
-	subscribe(track: Track): TrackReader {
+	async subscribe(track: Track): Promise<TrackReader> {
 		const id = this.#subscribeNext++
+		const msg = new Message.Subscribe(id, track.broadcast, track.name, track.priority)
 
-		const subscribe = new Subscribe(id, track)
-		this.runSubscribe(subscribe).catch((err) => console.warn("failed to run subscribe", err))
+		const stream = await Stream.open(this.#quic, msg)
+		const subscribe = new Subscribe(id, stream, track)
 
-		return track.reader()
-	}
-
-	async runSubscribe(subscribe: Subscribe) {
 		this.#subscribe.set(subscribe.id, subscribe)
 
 		try {
-			const track = subscribe.track
-			const msg = new Message.Subscribe(subscribe.id, track.broadcast, track.name, track.priority)
-			const stream = await Stream.open(this.#quic, msg)
-
-			await stream.reader.closed()
-			subscribe.close()
+			const _ok = await Message.Info.decode(stream.reader)
 		} catch (err) {
-			subscribe.close(Closed.from(err))
-		} finally {
 			this.#subscribe.delete(subscribe.id)
+			await subscribe.close(Closed.from(err))
+			throw err
 		}
+
+		subscribe
+			.run()
+			.catch((err) => console.warn("subscribe closed", err))
+			.finally(() => this.#subscribe.delete(subscribe.id))
+
+		return track.reader()
 	}
 
 	async runGroup(msg: Message.Group, stream: Reader) {
 		const subscribe = this.#subscribe.get(msg.subscribe)
 		if (!subscribe) return
 
-		const group = subscribe.track.create(msg.sequence)
+		const group = subscribe.track.createGroup(msg.sequence)
 
 		const reader = new FrameReader(stream)
 		for (;;) {
 			const frame = await reader.read()
+			console.debug("received frame", frame)
 
 			if (!frame) break
-			group.write(frame)
+			group.writeFrame(frame)
 		}
 
 		group.close()
@@ -106,26 +106,32 @@ export class Announced {
 export class Subscribe {
 	readonly id: bigint
 	readonly track: Track
+	readonly stream: Stream
 
 	// A queue of received streams for this subscription.
 	#closed = new Watch<Closed | undefined>(undefined)
 
-	constructor(id: bigint, track: Track) {
+	constructor(id: bigint, stream: Stream, track: Track) {
 		this.id = id
 		this.track = track
+		this.stream = stream
 	}
 
-	close(err = new Closed()) {
-		this.#closed.update(err)
-		this.track.close(err)
-	}
-
-	async closed(): Promise<Closed> {
-		let [closed, next] = this.#closed.value()
-		for (;;) {
-			if (closed !== undefined) return closed
-			if (!next) return new Closed()
-			;[closed, next] = await next
+	async run() {
+		try {
+			await this.closed()
+			await this.close()
+		} catch (err) {
+			await this.close(Closed.from(err))
 		}
+	}
+
+	async close(closed?: Closed) {
+		this.track.close(closed)
+		await this.stream.close(closed?.code)
+	}
+
+	async closed() {
+		await this.stream.reader.closed()
 	}
 }

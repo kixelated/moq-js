@@ -70,6 +70,15 @@ export class Stream {
 
 		return stream
 	}
+
+	async close(code?: number) {
+		if (code === undefined) {
+			await this.writer.close()
+		} else {
+			await this.writer.reset(code)
+			await this.reader.stop(code)
+		}
+	}
 }
 
 // Reader wraps a stream and provides convience methods for reading pieces from a stream

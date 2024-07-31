@@ -4,6 +4,7 @@ import * as Audio from "./audio"
 import * as Video from "./video"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
+import { Closed } from "../transfork/error"
 
 export interface BroadcastConfig {
 	broadcast: string
@@ -21,35 +22,25 @@ export interface BroadcastConfigTrack {
 
 export class Broadcast {
 	#config: BroadcastConfig
-	#catalog: Catalog.Broadcast
-	#connection: Transfork.Connection
 	#broadcast: Transfork.Broadcast
 
-	constructor(config: BroadcastConfig) {
-		this.#connection = config.connection
+	private constructor(config: BroadcastConfig, broadcast: Transfork.Broadcast) {
 		this.#config = config
-		this.#catalog = new Catalog.Broadcast(config.broadcast)
-		this.#broadcast = new Transfork.Broadcast(config.broadcast)
+		this.#broadcast = broadcast
+	}
+
+	async create(config: BroadcastConfig): Promise<Broadcast> {
+		const tracks: Catalog.Track[] = []
 
 		for (const media of this.#config.media.getTracks()) {
 			const priority = media.kind === "video" ? 2 : 1
 
 			// TODO support multiple tracks of the same kind
 			const name = media.kind
-			const init = this.#broadcast.create(`${name}.mp4`, 0)
-			const data = this.#broadcast.create(`${name}.m4s`, priority)
+			const init = this.#broadcast.createTrack(`${name}.mp4`, 0)
+			const data = this.#broadcast.createTrack(`${name}.m4s`, priority)
 
 			const settings = media.getSettings()
-
-			let catalog: Catalog.Track
-
-			const mp4Catalog: Catalog.Mp4Track = {
-				container: "mp4",
-				kind: media.kind,
-				init_track: init.name,
-				data_track: data.name,
-				priority,
-			}
 
 			if (isVideoTrackSettings(settings)) {
 				if (!config.video) {
@@ -62,17 +53,21 @@ export class Broadcast {
 				// TODO handle error
 				packer.run().catch((err) => console.error("failed to run video packer: ", err))
 
-				const videoCatalog: Catalog.VideoTrack = {
-					...mp4Catalog,
-					kind: "video",
-					codec: config.video.codec,
-					width: settings.width,
-					height: settings.height,
-					frame_rate: settings.frameRate,
-					bit_rate: config.video.bitrate,
+				const video: Catalog.VideoTrack = {
+					namespace: config.broadcast,
+					name: `${name}.m4s`,
+					initTrack: `${name}.mp4`,
+					selectionParams: {
+						mimeType: "video/mp4",
+						codec: config.video.codec,
+						width: settings.width,
+						height: settings.height,
+						framerate: settings.frameRate,
+						bitrate: config.video.bitrate,
+					},
 				}
 
-				catalog = videoCatalog
+				tracks.push(video)
 			} else if (isAudioTrackSettings(settings)) {
 				if (!config.audio) {
 					throw new Error("no audio configuration provided")
@@ -82,41 +77,47 @@ export class Broadcast {
 				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, init, data)
 				packer.run().catch((err) => console.error("failed to run audio packer: ", err)) // TODO handle error
 
-				const audioCatalog: Catalog.AudioTrack = {
-					...mp4Catalog,
-					kind: "audio",
-					codec: config.audio.codec,
-					sample_rate: settings.sampleRate,
-					sample_size: settings.sampleSize,
-					channel_count: settings.channelCount,
-					bit_rate: config.audio.bitrate,
+				const audio: Catalog.AudioTrack = {
+					namespace: config.broadcast,
+					name: `${name}.m4s`,
+					initTrack: `${name}.mp4`,
+					selectionParams: {
+						mimeType: "audio/ogg",
+						codec: config.audio.codec,
+						samplerate: settings.sampleRate,
+						//sampleSize: settings.sampleSize,
+						channelConfig: `${settings.channelCount}`,
+						bitrate: config.audio.bitrate,
+					},
 				}
 
-				catalog = audioCatalog
+				tracks.push(audio)
 			} else {
 				throw new Error(`unknown track type: ${media.kind}`)
 			}
-
-			this.#catalog.tracks.push(catalog)
 		}
 
-		const catalog = this.#broadcast.create(".catalog", 0)
-		catalog.append().writeAll(this.#catalog.encode())
+		const catalog = {
+			version: 1,
+			streamingFormat: 1,
+			streamingFormatVersion: "0.2",
+			supportsDeltaUpdates: false,
+			commonTrackFields: {
+				packaging: "cmaf",
+				renderGroup: 1,
+			},
+			tracks,
+		}
 
-		this.#connection.announce(this.#broadcast)
+		const catalogTrack = this.#broadcast.createTrack(".catalog", 0)
+		catalogTrack.appendGroup().writeFrames(Catalog.encode(catalog))
+
+		await config.connection.announce(this.#broadcast)
+
+		return new Broadcast(config, this.#broadcast)
 	}
 
-	// Attach the captured video stream to the given video element.
-	attach(video: HTMLVideoElement) {
-		video.srcObject = this.#config.media
-	}
-
-	close() {
-		// TODO implement publish close
-	}
-
-	async closed() {
-		// TODO make this better
-		return this.#connection.closed()
+	close(closed?: Closed) {
+		this.#broadcast.close(closed)
 	}
 }

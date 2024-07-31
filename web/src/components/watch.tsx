@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
-import { Broadcast } from "@kixelated/moq/media/catalog"
+import * as Catalog from "@kixelated/moq/media/catalog"
 
 import Fail from "./fail"
 
@@ -17,7 +17,7 @@ export default function Watch(props: { name: string }) {
 
 	let canvas!: HTMLCanvasElement
 
-	const [useCatalog, setCatalog] = createSignal<Broadcast | undefined>()
+	const [useCatalog, setCatalog] = createSignal<Catalog.Root | undefined>()
 	const [useConnection, setConnection] = createSignal<Connection | undefined>()
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
@@ -39,9 +39,7 @@ export default function Watch(props: { name: string }) {
 		const connection = useConnection()
 		if (!connection) return
 
-		const catalog = new Broadcast(props.name)
-		catalog
-			.fetch(connection)
+		Catalog.fetch(connection, props.name)
 			.then(setCatalog)
 			.catch((err) => setError(new Error(`failed to fetch catalog: ${err}`)))
 	})

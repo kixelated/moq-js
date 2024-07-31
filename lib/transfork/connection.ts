@@ -50,12 +50,12 @@ export class Connection {
 		await Promise.all([session, bidis, unis])
 	}
 
-	announce(broadcast: Broadcast): Announce {
+	async announce(broadcast: Broadcast): Promise<Announce> {
 		if (!this.#publisher) {
 			throw new Error("not a publisher")
 		}
 
-		return this.#publisher.announce(broadcast)
+		return await this.#publisher.announce(broadcast)
 	}
 
 	async announced(): Promise<Announced | undefined> {
@@ -66,12 +66,12 @@ export class Connection {
 		return this.#subscriber.announced()
 	}
 
-	subscribe(track: Track): TrackReader {
+	async subscribe(track: Track): Promise<TrackReader> {
 		if (!this.#subscriber) {
 			throw new Error("not a subscriber")
 		}
 
-		return this.#subscriber.subscribe(track)
+		return await this.#subscriber.subscribe(track)
 	}
 
 	/* TODO support non-announced broadcasts
@@ -106,6 +106,8 @@ export class Connection {
 	}
 
 	async #runBidi(msg: Message.Bi, stream: Stream) {
+		console.debug("received bi stream: ", msg)
+
 		if (msg instanceof Message.SessionClient) {
 			throw new Error("duplicate session stream")
 		} else if (msg instanceof Message.Announce) {
@@ -156,6 +158,8 @@ export class Connection {
 	}
 
 	async #runUni(msg: Message.Uni, stream: Reader) {
+		console.debug("received uni stream: ", msg)
+
 		if (msg instanceof Message.Group) {
 			if (!this.#subscriber) {
 				throw new Error("not a subscriber")

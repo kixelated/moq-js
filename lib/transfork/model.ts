@@ -9,7 +9,7 @@ export class Broadcast {
 
 	constructor(public name: string) {}
 
-	create(name: string, priority: number): Track {
+	createTrack(name: string, priority: number): Track {
 		if (this.closed) throw this.closed
 		const track = new Track(this.name, name, priority)
 		track.readers += 1 // Avoid closing the track when all readers are closed
@@ -34,7 +34,7 @@ export class BroadcastReader {
 		this.#broadcast = broadcast
 	}
 
-	get(name: string): TrackReader | undefined {
+	getTrack(name: string): TrackReader | undefined {
 		const track = this.#broadcast.tracks.get(name)
 		if (track) {
 			return new TrackReader(track)
@@ -69,12 +69,12 @@ export class Track {
 		this.priority = priority
 	}
 
-	append(): Group {
+	appendGroup(): Group {
 		const next = this.latest.value()[0]?.sequence ?? 0
-		return this.create(next)
+		return this.createGroup(next)
 	}
 
-	create(sequence: number): Group {
+	createGroup(sequence: number): Group {
 		if (this.closed) throw this.closed
 
 		const group = new Group(sequence)
@@ -110,7 +110,7 @@ export class TrackReader {
 		this.#track = track
 	}
 
-	async next(): Promise<GroupReader | undefined> {
+	async nextGroup(): Promise<GroupReader | undefined> {
 		let [current, next] = this.#track.latest.value()
 
 		for (;;) {
@@ -155,12 +155,12 @@ export class Group {
 		this.sequence = sequence
 	}
 
-	write(frame: Uint8Array) {
+	writeFrame(frame: Uint8Array) {
 		if (this.closed) throw this.closed
 		this.chunks.update((chunks) => [...chunks, frame])
 	}
 
-	writeAll(...frames: Uint8Array[]) {
+	writeFrames(...frames: Uint8Array[]) {
 		if (this.closed) throw this.closed
 		this.chunks.update((chunks) => [...chunks, ...frames])
 		this.close()
@@ -186,7 +186,7 @@ export class GroupReader {
 		this.#group = group
 	}
 
-	async read(): Promise<Uint8Array | undefined> {
+	async readFrame(): Promise<Uint8Array | undefined> {
 		let [chunks, next] = this.#group.chunks.value()
 
 		for (;;) {
