@@ -54,7 +54,6 @@ export default class Backend {
 				sampleRate: sampleRate,
 				ring,
 			}
-			console.log("ring capacity", ring.capacity)
 
 			this.#audio = new Audio(msg.audio)
 		}

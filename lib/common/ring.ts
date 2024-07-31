@@ -63,7 +63,7 @@ export class Ring {
 		const readPos = Atomics.load(this.state, STATE.READ_POS)
 		const writePos = Atomics.load(this.state, STATE.WRITE_POS)
 
-		let samplesPerFrame = 1;
+		let samplesPerFrame = 1
 		samplesPerFrame = frame.numberOfChannels
 
 		 const numberOfSamples = frame.numberOfFrames * samplesPerFrame
@@ -82,13 +82,6 @@ export class Ring {
 
 		const startIndex = startPos % this.capacity
 		const endIndex = endPos % this.capacity
-
-		console.log("Write Frame info:", {
-			numberOfChannels: frame.numberOfChannels,
-			numberOfFrames: frame.numberOfFrames,
-			allocationSize: frame.numberOfChannels * frame.numberOfFrames * Float32Array.BYTES_PER_ELEMENT
-		});
-
 
 		// Loop over each channel
 		for (let i = 0; i < this.channels.length; i += 1) {
