@@ -3,7 +3,7 @@ import { Player } from "@kixelated/moq/playback"
 
 import Fail from "./fail"
 
-import { createEffect, createSignal, onCleanup } from "solid-js"
+import { createEffect, createSignal, onCleanup, Show } from "solid-js"
 
 export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
@@ -16,6 +16,7 @@ export default function Watch(props: { name: string }) {
 	let canvas!: HTMLCanvasElement
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
+	const [isAudioButtonVisible, setIsButtonVisible] = createSignal(true)
 	createEffect(() => {
 		const namespace = props.name
 		const url = `https://${server}`
@@ -35,7 +36,13 @@ export default function Watch(props: { name: string }) {
 		player.closed().then(setError).catch(setError)
 	})
 
-	const play = () => usePlayer()?.play()
+	const play = () => {
+		const player = usePlayer()
+		if (player) {
+			player.play()
+			setIsButtonVisible(false)
+		}
+	}
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
@@ -43,7 +50,11 @@ export default function Watch(props: { name: string }) {
 		<>
 			<Fail error={error()} />
 			<canvas ref={canvas} class="aspect-video w-full rounded-lg" />
-            <button onClick={play} class="mt-2 p-2 bg-blue-500 text-white rounded">Play Audio</button>
+			<Show when={isAudioButtonVisible()}>
+				<button onClick={play} class="mt-2 rounded bg-blue-500 p-2 text-white">
+					Play Audio
+				</button>
+			</Show>
 		</>
 	)
 }
