@@ -62,14 +62,8 @@ export class Ring {
 		const readPos = Atomics.load(this.state, STATE.READ_POS)
 		const writePos = Atomics.load(this.state, STATE.WRITE_POS)
 
-		let samplesPerFrame = 1
-		samplesPerFrame = frame.numberOfChannels
-
-		 const numberOfSamples = frame.numberOfFrames * samplesPerFrame
-		 let endPos = writePos + numberOfSamples
-
-
 		const startPos = writePos
+		let endPos = writePos + frame.numberOfFrames
 
 		if (endPos > readPos + this.capacity) {
 			endPos = readPos + this.capacity
@@ -86,30 +80,33 @@ export class Ring {
 		for (let i = 0; i < this.channels.length; i += 1) {
 			const channel = this.channels[i]
 
-			if (endIndex > startIndex) {
+			// If the AudioData doesn't have enough channels, duplicate it.
+			const planeIndex = Math.min(i, frame.numberOfChannels - 1)
+
+			if (startIndex < endIndex) {
 				// One continuous range to copy.
 				const full = channel.subarray(startIndex, endIndex)
 
 				frame.copyTo(full, {
-					planeIndex: 0,
-					frameCount: (endIndex - startIndex) / samplesPerFrame,
+					planeIndex,
+					frameCount: endIndex - startIndex,
 				})
 			} else {
 				const first = channel.subarray(startIndex)
 				const second = channel.subarray(0, endIndex)
 
 				frame.copyTo(first, {
-					planeIndex: 0,
-					frameCount: first.length / samplesPerFrame,
+					planeIndex,
+					frameCount: first.length,
 				})
 
 				// We need this conditional when startIndex == 0 and endIndex == 0
 				// When capacity=4410 and frameCount=1024, this was happening 52s into the audio.
 				if (second.length) {
 					frame.copyTo(second, {
-						planeIndex: 0,
-						frameOffset: first.length / samplesPerFrame,
-						frameCount: second.length / samplesPerFrame,
+						planeIndex,
+						frameOffset: first.length,
+						frameCount: second.length,
 					})
 				}
 			}
