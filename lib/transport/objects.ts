@@ -17,6 +17,7 @@ export interface TrackHeader {
 export interface TrackChunk {
 	group: number // The group sequence, as a number because 2^53 is enough.
 	object: number
+	status: number
 	payload: Uint8Array
 }
 
@@ -30,6 +31,7 @@ export interface GroupHeader {
 
 export interface GroupChunk {
 	object: number
+	status: number
 	payload: Uint8Array
 }
 
@@ -40,6 +42,7 @@ export interface ObjectHeader {
 	group: number
 	object: number
 	priority: number
+	status: number
 }
 
 export interface ObjectChunk {
@@ -75,6 +78,7 @@ export class Objects {
 			await w.u53(h.group)
 			await w.u53(h.object)
 			await w.u53(h.priority)
+			await w.u53(h.status)
 
 			res = new ObjectWriter(h, w) as WriterType<T>
 		} else if (h.type === StreamType.Group) {
@@ -89,8 +93,6 @@ export class Objects {
 		} else {
 			throw new Error("unknown header type")
 		}
-
-		// console.trace("send object", res.header)
 
 		return res
 	}
@@ -132,6 +134,7 @@ export class Objects {
 				track: await r.u62(),
 				group: await r.u53(),
 				object: await r.u53(),
+				status: await r.u53(),
 				priority: await r.u53(),
 			}
 
@@ -139,8 +142,6 @@ export class Objects {
 		} else {
 			throw new Error("unknown stream type")
 		}
-
-		// console.trace("receive object", res.header)
 
 		return res
 	}
@@ -156,6 +157,11 @@ export class TrackWriter {
 		await this.stream.u53(c.group)
 		await this.stream.u53(c.object)
 		await this.stream.u53(c.payload.byteLength)
+
+		// Only write the status if the payload is empty
+		if (c.payload.byteLength == 0) {
+			await this.stream.u53(c.status)
+		}
 		await this.stream.write(c.payload)
 	}
 
@@ -173,6 +179,10 @@ export class GroupWriter {
 	async write(c: GroupChunk) {
 		await this.stream.u53(c.object)
 		await this.stream.u53(c.payload.byteLength)
+		// Write object status if payload empty
+		if (c.payload.byteLength == 0) {
+			await this.stream.u53(c.status)
+		}
 		await this.stream.write(c.payload)
 	}
 
@@ -210,11 +220,21 @@ export class TrackReader {
 		const group = await this.stream.u53()
 		const object = await this.stream.u53()
 		const size = await this.stream.u53()
+
+		// Only read the status if the payload is empty
+		let status
+		if (size == 0) {
+			status = await this.stream.u53()
+		} else {
+			status = 0
+		}
+
 		const payload = await this.stream.read(size)
 
 		return {
 			group,
 			object,
+			status,
 			payload,
 		}
 	}
@@ -237,10 +257,20 @@ export class GroupReader {
 
 		const object = await this.stream.u53()
 		const size = await this.stream.u53()
+
+		// Only read the status if the payload is empty
+		let status
+		if (size == 0) {
+			status = await this.stream.u53()
+		} else {
+			status = 0
+		}
+
 		const payload = await this.stream.read(size)
 
 		return {
 			object,
+			status,
 			payload,
 		}
 	}

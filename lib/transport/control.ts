@@ -76,11 +76,6 @@ export interface Subscribe {
 	params?: Parameters
 }
 
-// export interface Location {
-// 	mode: "none" | "absolute" | "latest" | "future"
-// 	value?: number // ignored for type=none, otherwise defaults to 0
-// }
-
 export interface FilterType {
 	// TODO: discuss un-nesting start/end values
 	// and the pros/cons of allowing undefined values
