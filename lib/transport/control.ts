@@ -66,17 +66,30 @@ export interface Subscribe {
 	namespace: string
 	name: string
 
-	start_group: Location
-	start_object: Location
-	end_group: Location
-	end_object: Location
+	filter_type: FilterType
+
+	// start_group?: Location
+	// start_object?: Location
+	// end_group?: Location
+	// end_object?: Location
 
 	params?: Parameters
 }
 
-export interface Location {
-	mode: "none" | "absolute" | "latest" | "future"
-	value?: number // ignored for type=none, otherwise defaults to 0
+// export interface Location {
+// 	mode: "none" | "absolute" | "latest" | "future"
+// 	value?: number // ignored for type=none, otherwise defaults to 0
+// }
+
+export interface FilterType {
+	// TODO: discuss un-nesting start/end values
+	// and the pros/cons of allowing undefined values
+
+	mode: "LatestGroup" | "LatestObject" | "AbsoluteStart" | "AbsoluteRange"
+	start_group: number // ignored except for AbsoluteStart, AbsoluteRange
+	start_object: number // ignored except for AbsoluteStart, AbsoluteRange
+	end_group: number // ignored except for AbsoluteRange
+	end_object: number // ignored except for AbsoluteRange
 }
 
 export type Parameters = Map<bigint, Uint8Array>
@@ -245,26 +258,47 @@ export class Decoder {
 			trackId: await this.r.u62(),
 			namespace: await this.r.string(),
 			name: await this.r.string(),
-			start_group: await this.location(),
-			start_object: await this.location(),
-			end_group: await this.location(),
-			end_object: await this.location(),
+			filter_type: await this.filter_type(),
 			params: await this.parameters(),
 		}
 	}
 
-	private async location(): Promise<Location> {
+	private async filter_type(): Promise<FilterType> {
 		const mode = await this.r.u62()
-		if (mode == 0n) {
-			return { mode: "none", value: 0 }
-		} else if (mode == 1n) {
-			return { mode: "absolute", value: await this.r.u53() }
+		if (mode == 1n) {
+			return {
+				mode: "LatestGroup",
+				start_group: 0,
+				start_object: 0,
+				end_group: 0,
+				end_object: 0,
+			}
 		} else if (mode == 2n) {
-			return { mode: "latest", value: await this.r.u53() }
+			return {
+				mode: "LatestObject",
+				start_group: 0,
+				start_object: 0,
+				end_group: 0,
+				end_object: 0,
+			}
 		} else if (mode == 3n) {
-			return { mode: "future", value: await this.r.u53() }
+			return {
+				mode: "AbsoluteStart",
+				start_group: await this.r.u53(),
+				start_object: await this.r.u53(),
+				end_group: 0,
+				end_object: 0,
+			}
+		} else if (mode == 4n) {
+			return {
+				mode: "AbsoluteRange",
+				start_group: await this.r.u53(),
+				start_object: await this.r.u53(),
+				end_group: await this.r.u53(),
+				end_object: await this.r.u53(),
+			}
 		} else {
-			throw new Error(`invalid location mode: ${mode}`)
+			throw new Error(`invalid filter type: ${mode}`)
 		}
 	}
 
@@ -419,25 +453,29 @@ export class Encoder {
 		await this.w.u62(s.trackId)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
-		await this.location(s.start_group)
-		await this.location(s.start_object)
-		await this.location(s.end_group)
-		await this.location(s.end_object)
+		await this.filter_type(s.filter_type)
 		await this.parameters(s.params)
 	}
 
-	private async location(l: Location) {
-		if (l.mode == "none") {
-			await this.w.u8(0)
-		} else if (l.mode == "absolute") {
-			await this.w.u8(1)
-			await this.w.u53(l.value ?? 0)
-		} else if (l.mode == "latest") {
-			await this.w.u8(2)
-			await this.w.u53(l.value ?? 0)
-		} else if (l.mode == "future") {
-			await this.w.u8(3)
-			await this.w.u53(l.value ?? 0)
+	private async filter_type(f: FilterType) {
+		switch (f.mode) {
+			case "LatestGroup":
+				await this.w.u62(1n)
+				break
+			case "LatestObject":
+				await this.w.u62(2n)
+				break
+			case "AbsoluteStart":
+				await this.w.u62(3n)
+				await this.w.u53(f.start_group)
+				await this.w.u53(f.start_object)
+				break
+			case "AbsoluteRange":
+				await this.w.u62(3n)
+				await this.w.u53(f.start_group)
+				await this.w.u53(f.start_object)
+				await this.w.u53(f.end_group)
+				await this.w.u53(f.end_object)
 		}
 	}
 
