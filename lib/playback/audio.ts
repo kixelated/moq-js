@@ -4,7 +4,7 @@ import * as Message from "./worker/message"
 
 // This is a non-standard way of importing worklet/workers.
 // Unfortunately, it's the only option because of a Vite bug: https://github.com/vitejs/vite/issues/11823
-import workletURL from "./worklet?url"
+import workletURL from "./worklet/index.ts?worker&url"
 
 // NOTE: This must be on the main thread
 export class Audio {
