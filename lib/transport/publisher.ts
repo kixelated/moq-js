@@ -224,6 +224,7 @@ export class SubscribeRecv {
 			group: props.group,
 			object: props.object,
 			priority: props.priority ?? 0,
+			status: 0,
 		})
 	}
 }
