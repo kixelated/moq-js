@@ -139,27 +139,26 @@ export class Player {
 	}
 
 	displayCatalog() {
-	    const catalogJson = JSON.stringify(this.#catalog, null, 2);
+	    const catalogJson = JSON.stringify(this.#catalog, null, 2)
 		if (this.#catalogContainer) {
-			this.#catalogContainer.textContent = catalogJson;
-			this.#catalogContainer.style.fontSize = '0.85rem';
-			
-			const catalogBox = this.#catalogContainer.parentElement;
-			const downloadButton = catalogBox?.querySelector("#downloadButton") as HTMLButtonElement;
+			this.#catalogContainer.textContent = catalogJson
+			this.#catalogContainer.style.fontSize = "0.85rem"
+			const catalogBox = this.#catalogContainer.parentElement
+			const downloadButton = catalogBox?.querySelector("#downloadButton") as HTMLButtonElement
 			if (downloadButton) {
 				downloadButton.onclick = () => {
-					const blob = new Blob([catalogJson], { type: "application/json" });
-					const catalogTempDownloadURL = URL.createObjectURL(blob);
-					const catalogTempDownloadLink = document.createElement("a");
-					catalogTempDownloadLink.href = catalogTempDownloadURL;
-					catalogTempDownloadLink.download = "catalog.json";
-					catalogTempDownloadLink.click();
-					URL.revokeObjectURL(catalogTempDownloadURL);
-				};
+					const blob = new Blob([catalogJson], { type: "application/json" })
+					const catalogTempDownloadURL = URL.createObjectURL(blob)
+					const catalogTempDownloadLink = document.createElement("a")
+					catalogTempDownloadLink.href = catalogTempDownloadURL
+					catalogTempDownloadLink.download = "catalog.json"
+					catalogTempDownloadLink.click()
+					URL.revokeObjectURL(catalogTempDownloadURL)
+				}
 			}
-	    } else {
-			console.error("catalogContainer is not defined");
-	    }
+		} else {
+			console.error("catalogContainer is not defined")
+		}
 	}
 
 	#onMessage(msg: Message.FromWorker) {
