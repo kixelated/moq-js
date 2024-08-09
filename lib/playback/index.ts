@@ -139,7 +139,7 @@ export class Player {
 	}
 
 	displayCatalog() {
-	    const catalogJson = JSON.stringify(this.#catalog, null, 2)
+		const catalogJson = JSON.stringify(this.#catalog, null, 2)
 		if (this.#catalogContainer) {
 			this.#catalogContainer.textContent = catalogJson
 			this.#catalogContainer.style.fontSize = "0.85rem"
