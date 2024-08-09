@@ -94,6 +94,8 @@ export class Objects {
 			throw new Error("unknown header type")
 		}
 
+		// console.trace("send object", res.header)
+
 		return res
 	}
 
@@ -142,6 +144,8 @@ export class Objects {
 		} else {
 			throw new Error("unknown stream type")
 		}
+
+		// console.trace("receive object", res.header)
 
 		return res
 	}
