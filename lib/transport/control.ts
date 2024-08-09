@@ -66,20 +66,12 @@ export interface Subscribe {
 	namespace: string
 	name: string
 
-	filter_type: FilterType
-
-	// start_group?: Location
-	// start_object?: Location
-	// end_group?: Location
-	// end_object?: Location
+	location: Location
 
 	params?: Parameters
 }
 
-export interface FilterType {
-	// TODO: discuss un-nesting start/end values
-	// and the pros/cons of allowing undefined values
-
+export interface Location {
 	mode: "LatestGroup" | "LatestObject" | "AbsoluteStart" | "AbsoluteRange"
 	start_group: number // ignored except for AbsoluteStart, AbsoluteRange
 	start_object: number // ignored except for AbsoluteStart, AbsoluteRange
@@ -253,12 +245,12 @@ export class Decoder {
 			trackId: await this.r.u62(),
 			namespace: await this.r.string(),
 			name: await this.r.string(),
-			filter_type: await this.filter_type(),
+			location: await this.location(),
 			params: await this.parameters(),
 		}
 	}
 
-	private async filter_type(): Promise<FilterType> {
+	private async location(): Promise<Location> {
 		const mode = await this.r.u62()
 		if (mode == 1n) {
 			return {
@@ -448,11 +440,11 @@ export class Encoder {
 		await this.w.u62(s.trackId)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
-		await this.filter_type(s.filter_type)
+		await this.location(s.location)
 		await this.parameters(s.params)
 	}
 
-	private async filter_type(f: FilterType) {
+	private async location(f: Location) {
 		switch (f.mode) {
 			case "LatestGroup":
 				await this.w.u62(1n)

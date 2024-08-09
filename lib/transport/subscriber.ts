@@ -72,7 +72,7 @@ export class Subscriber {
 			trackId: id,
 			namespace,
 			name: track,
-			filter_type: {
+			location: {
 				mode: "LatestGroup",
 				start_group: 0,
 				start_object: 0,
