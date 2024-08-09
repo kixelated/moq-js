@@ -17,6 +17,7 @@ export interface PlayerConfig {
 	namespace: string
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	canvas: HTMLCanvasElement
+	catalogContainer: HTMLDivElement
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -28,6 +29,7 @@ export class Player {
 
 	#connection: Connection
 	#catalog: Catalog.Root
+	#catalogContainer: HTMLDivElement
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -35,10 +37,11 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog.Root, backend: Backend) {
+	private constructor(connection: Connection, catalog: Catalog.Root, backend: Backend, catalogContainer: HTMLDivElement) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
+		this.#catalogContainer = catalogContainer
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -59,7 +62,7 @@ export class Player {
 		const canvas = config.canvas.transferControlToOffscreen()
 		const backend = new Backend({ canvas, catalog })
 
-		return new Player(connection, catalog, backend)
+		return new Player(connection, catalog, backend, config.catalogContainer)
 	}
 
 	async #run() {
@@ -133,6 +136,30 @@ export class Player {
 		} finally {
 			await sub.close()
 		}
+	}
+
+	displayCatalog() {
+	    const catalogJson = JSON.stringify(this.#catalog, null, 2);
+		if (this.#catalogContainer) {
+			this.#catalogContainer.textContent = catalogJson;
+			this.#catalogContainer.style.fontSize = '0.85rem';
+			
+			const catalogBox = this.#catalogContainer.parentElement;
+			const downloadButton = catalogBox?.querySelector("#downloadButton") as HTMLButtonElement;
+			if (downloadButton) {
+				downloadButton.onclick = () => {
+					const blob = new Blob([catalogJson], { type: "application/json" });
+					const catalogTempDownloadURL = URL.createObjectURL(blob);
+					const catalogTempDownloadLink = document.createElement("a");
+					catalogTempDownloadLink.href = catalogTempDownloadURL;
+					catalogTempDownloadLink.download = "catalog.json";
+					catalogTempDownloadLink.click();
+					URL.revokeObjectURL(catalogTempDownloadURL);
+				};
+			}
+	    } else {
+			console.error("catalogContainer is not defined");
+	    }
 	}
 
 	#onMessage(msg: Message.FromWorker) {
