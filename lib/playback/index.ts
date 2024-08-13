@@ -89,6 +89,7 @@ export class Player {
 			// We don't care what type of reader we get, we just want the payload.
 			const chunk = await init.read()
 			if (!chunk) throw new Error("no init chunk")
+			if (!(chunk.payload instanceof Uint8Array)) throw new Error("invalid init chunk")
 
 			this.#backend.init({ data: chunk.payload, name })
 		} finally {

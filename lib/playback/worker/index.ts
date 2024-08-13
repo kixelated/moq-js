@@ -87,6 +87,10 @@ class Worker {
 				break
 			}
 
+			if (!(chunk.payload instanceof Uint8Array)) {
+				throw new Error(`invalid payload: ${chunk.payload}`)
+			}
+
 			const frames = container.decode(chunk.payload)
 			for (const frame of frames) {
 				await segment.write(frame)
