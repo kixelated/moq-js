@@ -71,12 +71,28 @@ export interface Subscribe {
 	params?: Parameters
 }
 
-export interface Location {
-	mode: "LatestGroup" | "LatestObject" | "AbsoluteStart" | "AbsoluteRange"
-	start_group: number // ignored except for AbsoluteStart, AbsoluteRange
-	start_object: number // ignored except for AbsoluteStart, AbsoluteRange
-	end_group: number // ignored except for AbsoluteRange
-	end_object: number // ignored except for AbsoluteRange
+export type Location = LatestGroup | LatestObject | AbsoluteStart | AbsoluteRange
+
+export interface LatestGroup {
+	mode: "latest_group"
+}
+
+export interface LatestObject {
+	mode: "latest_object"
+}
+
+export interface AbsoluteStart {
+	mode: "absolute_start"
+	start_group: number
+	start_object: number
+}
+
+export interface AbsoluteRange {
+	mode: "absolute_range"
+	start_group: number
+	start_object: number
+	end_group: number
+	end_object: number
 }
 
 export type Parameters = Map<bigint, Uint8Array>
@@ -254,31 +270,21 @@ export class Decoder {
 		const mode = await this.r.u62()
 		if (mode == 1n) {
 			return {
-				mode: "LatestGroup",
-				start_group: 0,
-				start_object: 0,
-				end_group: 0,
-				end_object: 0,
+				mode: "latest_group",
 			}
 		} else if (mode == 2n) {
 			return {
-				mode: "LatestObject",
-				start_group: 0,
-				start_object: 0,
-				end_group: 0,
-				end_object: 0,
+				mode: "latest_object",
 			}
 		} else if (mode == 3n) {
 			return {
-				mode: "AbsoluteStart",
+				mode: "absolute_start",
 				start_group: await this.r.u53(),
 				start_object: await this.r.u53(),
-				end_group: 0,
-				end_object: 0,
 			}
 		} else if (mode == 4n) {
 			return {
-				mode: "AbsoluteRange",
+				mode: "absolute_range",
 				start_group: await this.r.u53(),
 				start_object: await this.r.u53(),
 				end_group: await this.r.u53(),
@@ -444,25 +450,25 @@ export class Encoder {
 		await this.parameters(s.params)
 	}
 
-	private async location(f: Location) {
-		switch (f.mode) {
-			case "LatestGroup":
+	private async location(l: Location) {
+		switch (l.mode) {
+			case "latest_group":
 				await this.w.u62(1n)
 				break
-			case "LatestObject":
+			case "latest_object":
 				await this.w.u62(2n)
 				break
-			case "AbsoluteStart":
+			case "absolute_start":
 				await this.w.u62(3n)
-				await this.w.u53(f.start_group)
-				await this.w.u53(f.start_object)
+				await this.w.u53(l.start_group)
+				await this.w.u53(l.start_object)
 				break
-			case "AbsoluteRange":
+			case "absolute_range":
 				await this.w.u62(3n)
-				await this.w.u53(f.start_group)
-				await this.w.u53(f.start_object)
-				await this.w.u53(f.end_group)
-				await this.w.u53(f.end_object)
+				await this.w.u53(l.start_group)
+				await this.w.u53(l.start_object)
+				await this.w.u53(l.end_group)
+				await this.w.u53(l.end_object)
 		}
 	}
 
