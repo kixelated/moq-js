@@ -1,0 +1,61 @@
+/* watch.css */
+
+.showcatalog-button {
+	font-size: 0.75rem;
+	background-color: #4b5563;
+	padding: 0.25rem 0.5rem;
+	transition: background-color 0.3s ease;
+}
+
+.showcatalog-button:hover {
+	background-color: #6b7280;
+}
+
+.catalog-box {
+	position: relative;
+	max-height: 18.75rem;
+	max-width: 100%;
+}
+
+.download-button {
+	position: absolute;
+	top: 0.5rem;
+	right: 1.25rem;
+	z-index: 1;
+	font-size: 0.65rem;
+	padding: 0.25rem 0.5rem;
+	background-color: #2563eb;
+	color: #fff;
+	border: none;
+	border-radius: 0.25rem;
+	cursor: pointer;
+	transition: background-color 0.3s ease;
+}
+
+.download-button:hover {
+	background-color: #60a5fa;
+}
+
+.catalog-container{
+	position: relative;
+	font-size: 0.85rem;
+	overflow-y: auto;
+	max-height: 15.625rem;
+	scrollbar-width: thin;
+	scrollbar-color: #888 transparent; 
+}
+
+
+.catalog-container::-webkit-scrollbar {
+	width: 0.75rem;
+}
+
+.catalog-container::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.catalog-container::-webkit-scrollbar-thumb {
+	background: #888; 
+	border-radius: 1.25rem;
+}
+
