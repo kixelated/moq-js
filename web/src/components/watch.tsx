@@ -2,9 +2,8 @@
 import { Player } from "@kixelated/moq/playback"
 
 import Fail from "./fail"
-import "./watch.css";
 
-import { createEffect, createSignal, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js"
 
 export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
@@ -15,11 +14,10 @@ export default function Watch(props: { name: string }) {
 	const [error, setError] = createSignal<Error | undefined>()
 
 	let canvas!: HTMLCanvasElement
-	let catalogContainer!: HTMLDivElement
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
-	const [showCatalog, setShowCatalog] = createSignal(false);
-	
+	const [showCatalog, setShowCatalog] = createSignal(false)
+
 	createEffect(() => {
 		const namespace = props.name
 		const url = `https://${server}`
@@ -39,31 +37,18 @@ export default function Watch(props: { name: string }) {
 		player.closed().then(setError).catch(setError)
 	})
 
-	const play = () => usePlayer()?.play()
-
-	const toggleCatalog = () => {
-		setShowCatalog(prev => !prev)
+	const play = () => {
+		usePlayer()?.play().catch(setError)
 	}
 
-	createEffect(() => {
-		if (showCatalog() && usePlayer()) {
-			const catalogJson = JSON.stringify(usePlayer()?.getCatalog(), null, 2);
-			if (catalogContainer) {
-				catalogContainer.textContent = catalogJson;
-			}
-		}
-	});
+	// The JSON catalog for debugging.
+	const catalog = createMemo(() => {
+		const player = usePlayer()
+		if (!player) return
 
-	const downloadCatalog = () => {
-		const catalogJson = JSON.stringify(usePlayer()?.getCatalog(), null, 2);
-		const blob = new Blob([catalogJson], { type: "application/json" });
-		const catalogTempDownloadURL = URL.createObjectURL(blob);
-		const catalogTempDownloadLink = document.createElement("a");
-		catalogTempDownloadLink.href = catalogTempDownloadURL;
-		catalogTempDownloadLink.download = "catalog.json";
-		catalogTempDownloadLink.click();
-		URL.revokeObjectURL(catalogTempDownloadURL);
-	};
+		const catalog = player.getCatalog()
+		return JSON.stringify(catalog, null, 2)
+	})
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
@@ -71,18 +56,17 @@ export default function Watch(props: { name: string }) {
 		<>
 			<Fail error={error()} />
 			<canvas ref={canvas} onClick={play} class="aspect-video w-full rounded-lg" />
-			<div class="flex mt-2">
-					<button class="showcatalog-button" onClick={toggleCatalog}>
-						{showCatalog() ? 'Hide Catalog' : 'Show Catalog'}
+
+			<h3>Debug</h3>
+			<Show when={catalog()}>
+				<div class="mt-2 flex">
+					<button onClick={() => setShowCatalog((prev) => !prev)}>
+						{showCatalog() ? "Hide Catalog" : "Show Catalog"}
 					</button>
-			</div>
-			<Show when={showCatalog()}>
-				<div id="catalogBox" class="catalog-box">
-					<button id="downloadButton" class="download-button" onClick={downloadCatalog}>
-						Download Catalog
-					</button>
-					<pre ref={el => catalogContainer = el!} id="catalogContainer" class="catalog-container"></pre>
 				</div>
+				<Show when={showCatalog()}>
+					<pre>{catalog()}</pre>
+				</Show>
 			</Show>
 		</>
 	)
