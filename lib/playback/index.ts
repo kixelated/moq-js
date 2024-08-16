@@ -135,6 +135,10 @@ export class Player {
 		}
 	}
 
+	getCatalog() {
+		return this.#catalog
+	}
+
 	#onMessage(msg: Message.FromWorker) {
 		if (msg.timeline) {
 			//this.#timeline.update(msg.timeline)
