@@ -28,9 +28,7 @@ export default function Watch(props: { name: string }) {
 		// TODO remove this when WebTransport correctly supports self-signed certificates
 		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
-		Player.create({ url, fingerprint, canvas, namespace }).then(player => {
-			setPlayer(player)
-		}).catch(setError)
+		Player.create({ url, fingerprint, canvas, namespace }).then(setPlayer).catch(setError)
 	})
 
 	createEffect(() => {
