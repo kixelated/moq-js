@@ -72,10 +72,9 @@ export class Subscriber {
 			trackId: id,
 			namespace,
 			name: track,
-			start_group: { mode: "latest", value: 0 },
-			start_object: { mode: "absolute", value: 0 },
-			end_group: { mode: "none" },
-			end_object: { mode: "none" },
+			location: {
+				mode: "latest_group",
+			},
 		})
 
 		return subscribe

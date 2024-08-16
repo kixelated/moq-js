@@ -7,6 +7,13 @@ export enum StreamType {
 	Group = 0x51,
 }
 
+export enum Status {
+	OBJECT_NULL = 1,
+	GROUP_NULL = 2,
+	GROUP_END = 3,
+	TRACK_END = 4,
+}
+
 export interface TrackHeader {
 	type: StreamType.Track
 	sub: bigint
@@ -17,7 +24,7 @@ export interface TrackHeader {
 export interface TrackChunk {
 	group: number // The group sequence, as a number because 2^53 is enough.
 	object: number
-	payload: Uint8Array
+	payload: Uint8Array | Status
 }
 
 export interface GroupHeader {
@@ -30,7 +37,7 @@ export interface GroupHeader {
 
 export interface GroupChunk {
 	object: number
-	payload: Uint8Array
+	payload: Uint8Array | Status
 }
 
 export interface ObjectHeader {
@@ -40,6 +47,7 @@ export interface ObjectHeader {
 	group: number
 	object: number
 	priority: number
+	status: number
 }
 
 export interface ObjectChunk {
@@ -75,6 +83,7 @@ export class Objects {
 			await w.u53(h.group)
 			await w.u53(h.object)
 			await w.u53(h.priority)
+			await w.u53(h.status)
 
 			res = new ObjectWriter(h, w) as WriterType<T>
 		} else if (h.type === StreamType.Group) {
@@ -132,6 +141,7 @@ export class Objects {
 				track: await r.u62(),
 				group: await r.u53(),
 				object: await r.u53(),
+				status: await r.u53(),
 				priority: await r.u53(),
 			}
 
@@ -155,8 +165,15 @@ export class TrackWriter {
 	async write(c: TrackChunk) {
 		await this.stream.u53(c.group)
 		await this.stream.u53(c.object)
-		await this.stream.u53(c.payload.byteLength)
-		await this.stream.write(c.payload)
+
+		if (c.payload instanceof Uint8Array) {
+			await this.stream.u53(c.payload.byteLength)
+			await this.stream.write(c.payload)
+		} else {
+			// empty payload with status
+			await this.stream.u53(0)
+			await this.stream.u53(c.payload as number)
+		}
 	}
 
 	async close() {
@@ -172,8 +189,13 @@ export class GroupWriter {
 
 	async write(c: GroupChunk) {
 		await this.stream.u53(c.object)
-		await this.stream.u53(c.payload.byteLength)
-		await this.stream.write(c.payload)
+		if (c.payload instanceof Uint8Array) {
+			await this.stream.u53(c.payload.byteLength)
+			await this.stream.write(c.payload)
+		} else {
+			await this.stream.u53(0)
+			await this.stream.u53(c.payload as number)
+		}
 	}
 
 	async close() {
@@ -210,7 +232,13 @@ export class TrackReader {
 		const group = await this.stream.u53()
 		const object = await this.stream.u53()
 		const size = await this.stream.u53()
-		const payload = await this.stream.read(size)
+
+		let payload
+		if (size == 0) {
+			payload = (await this.stream.u53()) as Status
+		} else {
+			payload = await this.stream.read(size)
+		}
 
 		return {
 			group,
@@ -237,7 +265,13 @@ export class GroupReader {
 
 		const object = await this.stream.u53()
 		const size = await this.stream.u53()
-		const payload = await this.stream.read(size)
+
+		let payload
+		if (size == 0) {
+			payload = (await this.stream.u53()) as Status
+		} else {
+			payload = await this.stream.read(size)
+		}
 
 		return {
 			object,

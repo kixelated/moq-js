@@ -66,17 +66,33 @@ export interface Subscribe {
 	namespace: string
 	name: string
 
-	start_group: Location
-	start_object: Location
-	end_group: Location
-	end_object: Location
+	location: Location
 
 	params?: Parameters
 }
 
-export interface Location {
-	mode: "none" | "absolute" | "latest" | "future"
-	value?: number // ignored for type=none, otherwise defaults to 0
+export type Location = LatestGroup | LatestObject | AbsoluteStart | AbsoluteRange
+
+export interface LatestGroup {
+	mode: "latest_group"
+}
+
+export interface LatestObject {
+	mode: "latest_object"
+}
+
+export interface AbsoluteStart {
+	mode: "absolute_start"
+	start_group: number
+	start_object: number
+}
+
+export interface AbsoluteRange {
+	mode: "absolute_range"
+	start_group: number
+	start_object: number
+	end_group: number
+	end_object: number
 }
 
 export type Parameters = Map<bigint, Uint8Array>
@@ -245,26 +261,37 @@ export class Decoder {
 			trackId: await this.r.u62(),
 			namespace: await this.r.string(),
 			name: await this.r.string(),
-			start_group: await this.location(),
-			start_object: await this.location(),
-			end_group: await this.location(),
-			end_object: await this.location(),
+			location: await this.location(),
 			params: await this.parameters(),
 		}
 	}
 
 	private async location(): Promise<Location> {
 		const mode = await this.r.u62()
-		if (mode == 0n) {
-			return { mode: "none", value: 0 }
-		} else if (mode == 1n) {
-			return { mode: "absolute", value: await this.r.u53() }
+		if (mode == 1n) {
+			return {
+				mode: "latest_group",
+			}
 		} else if (mode == 2n) {
-			return { mode: "latest", value: await this.r.u53() }
+			return {
+				mode: "latest_object",
+			}
 		} else if (mode == 3n) {
-			return { mode: "future", value: await this.r.u53() }
+			return {
+				mode: "absolute_start",
+				start_group: await this.r.u53(),
+				start_object: await this.r.u53(),
+			}
+		} else if (mode == 4n) {
+			return {
+				mode: "absolute_range",
+				start_group: await this.r.u53(),
+				start_object: await this.r.u53(),
+				end_group: await this.r.u53(),
+				end_object: await this.r.u53(),
+			}
 		} else {
-			throw new Error(`invalid location mode: ${mode}`)
+			throw new Error(`invalid filter type: ${mode}`)
 		}
 	}
 
@@ -419,25 +446,29 @@ export class Encoder {
 		await this.w.u62(s.trackId)
 		await this.w.string(s.namespace)
 		await this.w.string(s.name)
-		await this.location(s.start_group)
-		await this.location(s.start_object)
-		await this.location(s.end_group)
-		await this.location(s.end_object)
+		await this.location(s.location)
 		await this.parameters(s.params)
 	}
 
 	private async location(l: Location) {
-		if (l.mode == "none") {
-			await this.w.u8(0)
-		} else if (l.mode == "absolute") {
-			await this.w.u8(1)
-			await this.w.u53(l.value ?? 0)
-		} else if (l.mode == "latest") {
-			await this.w.u8(2)
-			await this.w.u53(l.value ?? 0)
-		} else if (l.mode == "future") {
-			await this.w.u8(3)
-			await this.w.u53(l.value ?? 0)
+		switch (l.mode) {
+			case "latest_group":
+				await this.w.u62(1n)
+				break
+			case "latest_object":
+				await this.w.u62(2n)
+				break
+			case "absolute_start":
+				await this.w.u62(3n)
+				await this.w.u53(l.start_group)
+				await this.w.u53(l.start_object)
+				break
+			case "absolute_range":
+				await this.w.u62(3n)
+				await this.w.u53(l.start_group)
+				await this.w.u53(l.start_object)
+				await this.w.u53(l.end_group)
+				await this.w.u53(l.end_object)
 		}
 	}
 

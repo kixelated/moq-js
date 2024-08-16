@@ -55,7 +55,11 @@ export async function fetch(connection: Connection, namespace: string): Promise<
 		await segment.close()
 		await subscribe.close() // we done
 
-		return decode(chunk.payload)
+		if (chunk.payload instanceof Uint8Array) {
+			return decode(chunk.payload)
+		} else {
+			throw new Error("invalid catalog chunk")
+		}
 	} catch (e) {
 		const err = asError(e)
 
