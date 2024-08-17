@@ -52,4 +52,4 @@ jobs:
       - uses: google-github-actions/deploy-cloudrun@v1
         with:
           service: ${{env.SERVICE}}
-          image: ${{env.REGISTRY}}/${{env.IMAGE}}:${{steps.depot.outputs.imageid}}
+          image: ${{env.REGISTRY}}/${{env.IMAGE}}@${{steps.depot.outputs.imageid}}
