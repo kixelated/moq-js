@@ -36,6 +36,7 @@ jobs:
 
       # Build and push Docker image with Depot
       - uses: depot/build-push-action@v1
+        id: depot
         with:
           project: hppp3x0qjc
           context: .
@@ -51,4 +52,4 @@ jobs:
       - uses: google-github-actions/deploy-cloudrun@v1
         with:
           service: ${{env.SERVICE}}
-          image: ${{env.REGISTRY}}/${{env.IMAGE}}
+          image: ${{env.REGISTRY}}/${{env.IMAGE}}:${{steps.depot.outputs.imageid}}
