@@ -10,6 +10,7 @@ export default function Watch(props: { name: string }) {
 	const urlSearchParams = new URLSearchParams(window.location.search)
 	const params = Object.fromEntries(urlSearchParams.entries())
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
+	let tracknum: number = params.track ?? 0
 
 	const [error, setError] = createSignal<Error | undefined>()
 
@@ -17,6 +18,9 @@ export default function Watch(props: { name: string }) {
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
 	const [showCatalog, setShowCatalog] = createSignal(false)
+
+	const [options, setOptions] = createSignal([])
+	const [selectedOption, setSelectedOption] = createSignal<string | undefined>()
 
 	createEffect(() => {
 		const namespace = props.name
@@ -26,7 +30,7 @@ export default function Watch(props: { name: string }) {
 		// TODO remove this when WebTransport correctly supports self-signed certificates
 		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
-		Player.create({ url, fingerprint, canvas, namespace }).then(setPlayer).catch(setError)
+		Player.create({ url, fingerprint, canvas, namespace }, tracknum).then(setPlayer).catch(setError)
 	})
 
 	createEffect(() => {
@@ -50,13 +54,62 @@ export default function Watch(props: { name: string }) {
 		return JSON.stringify(catalog, null, 2)
 	})
 
+	function updateURLWithTracknumber(trackIndex) {
+		const url = new URL(window.location.href)
+		url.searchParams.set('track', trackIndex.toString())
+		window.history.replaceState({}, '', decodeURIComponent(url.toString()))
+	}
+
+	createEffect(async () => {
+		const player = usePlayer()
+		if (!player) return
+
+		const videotracks = await player.getVideoTracks()
+		setOptions(videotracks)
+
+		if (tracknum >= 0 && tracknum < videotracks.length) {
+			const selectedTrack = videotracks[tracknum]
+			setSelectedOption(selectedTrack)
+			updateURLWithTracknumber(tracknum)
+		}
+
+	})
+
+	const handleOptionSelectChange = (event) => {
+		const selectedTrack = event.target.value
+		setSelectedOption(selectedTrack)
+		usePlayer()?.switchTrack(selectedTrack)
+
+		const videotracks = options()
+		const trackIndex = videotracks.indexOf(selectedTrack)
+		tracknum = trackIndex
+
+		if (trackIndex !== -1) {
+			updateURLWithTracknumber(trackIndex)
+		}
+
+	}
+
+
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
 			<Fail error={error()} />
 			<canvas ref={canvas} onClick={play} class="aspect-video w-full rounded-lg" />
-
+			<div class="mt-2 flex">
+				<select value={selectedOption() ?? ''} onChange={handleOptionSelectChange}>
+					{options()?.length ? (
+						options().map((option, index) => (
+							<option key={index} value={option}>
+								{option}
+							</option>
+						))
+					) : (
+						<option disabled>No options available</option>
+					)}
+				</select>
+			</div>
 			<h3>Debug</h3>
 			<Show when={catalog()}>
 				<div class="mt-2 flex">

@@ -18,6 +18,8 @@ export class Subscriber {
 	#subscribe = new Map<bigint, SubscribeSend>()
 	#subscribeNext = 0n
 
+	#trackToIDMap = new Map<string, bigint>()
+
 	constructor(control: Control.Stream, objects: Objects) {
 		this.#control = control
 		this.#objects = objects
@@ -66,6 +68,8 @@ export class Subscriber {
 		const subscribe = new SubscribeSend(this.#control, id, namespace, track)
 		this.#subscribe.set(id, subscribe)
 
+		this.#trackToIDMap.set(track, id)
+
 		await this.#control.send({
 			kind: Control.Msg.Subscribe,
 			id,
@@ -78,6 +82,24 @@ export class Subscriber {
 		})
 
 		return subscribe
+	}
+
+	async unsubscribe(track: string) {
+		if (this.#trackToIDMap.has(track)) {
+			const trackID = this.#trackToIDMap.get(track)
+			if (trackID === undefined) {
+				console.warn(`Exception track ${track} not found in trackToIDMap.`)
+				return
+			}
+			try {
+				await this.#control.send({ kind: Control.Msg.Unsubscribe, id: trackID })
+				this.#trackToIDMap.delete(track)
+			} catch (error) {
+				console.error(`Failed to unsubscribe from track ${track}:`, error)
+			}
+		} else {
+			console.warn(`During unsubscribe request initiation attempt track ${track} not found in trackToIDMap.`)
+		}
 	}
 
 	recvSubscribeOk(msg: Control.SubscribeOk) {

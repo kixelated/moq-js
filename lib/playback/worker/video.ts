@@ -2,12 +2,31 @@ import { Frame, Component } from "./timeline"
 import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 
+interface DecoderConfig {
+	codec: string
+	description?: ArrayBuffer | Uint8Array | DataView
+	codedWidth?: number
+	codedHeight?: number
+	displayAspectWidth?: number
+	displayAspectHeight?: number
+	colorSpace?: {
+		primaries?: "bt709" | "bt470bg" | "smpte170m"
+		transfer?: "bt709" | "smpte170m" | "iec61966-2-1"
+		matrix?: "rgb" | "bt709" | "bt470bg" | "smpte170m"
+	}
+	hardwareAcceleration?: "no-preference" | "prefer-hardware" | "prefer-software"
+	optimizeForLatency?: boolean
+}
+
 export class Renderer {
 	#canvas: OffscreenCanvas
 	#timeline: Component
 
 	#decoder!: VideoDecoder
 	#queue: TransformStream<Frame, VideoFrame>
+
+	#decoderConfig?: DecoderConfig
+	#waitingForKeyframe: boolean = true
 
 	constructor(config: Message.ConfigVideo, timeline: Component) {
 		this.#canvas = config.canvas
@@ -50,10 +69,30 @@ export class Renderer {
 	}
 
 	#transform(frame: Frame) {
+		if (this.#decoder.state === "closed") {
+			console.warn("Decoder is closed. Skipping frame.")
+			return
+		}
+
+		const { sample, track } = frame
+
+		// Reset the decoder on video track change
+		if (this.#decoderConfig && this.#decoder.state == "configured") {
+			if (MP4.isVideoTrack(track)) {
+				const configMismatch =
+					this.#decoderConfig.codec !== track.codec ||
+					this.#decoderConfig.codedWidth !== track.video.width ||
+					this.#decoderConfig.codedHeight !== track.video.height
+
+				if (configMismatch) {
+					this.#decoder.reset()
+					this.#decoderConfig = undefined
+				}
+			}
+		}
+
 		// Configure the decoder with the first frame
 		if (this.#decoder.state !== "configured") {
-			const { sample, track } = frame
-
 			const desc = sample.description
 			const box = desc.avcC ?? desc.hvcC ?? desc.vpcC ?? desc.av1C
 			if (!box) throw new Error(`unsupported codec: ${track.codec}`)
@@ -64,21 +103,41 @@ export class Renderer {
 
 			if (!MP4.isVideoTrack(track)) throw new Error("expected video track")
 
-			this.#decoder.configure({
+			this.#decoderConfig = {
 				codec: track.codec,
 				codedHeight: track.video.height,
 				codedWidth: track.video.width,
 				description,
 				// optimizeForLatency: true
-			})
+			}
+
+			this.#decoder.configure(this.#decoderConfig)
+			if (!frame.sample.is_sync) {
+				this.#waitingForKeyframe = true
+			} else {
+				this.#waitingForKeyframe = false
+			}
 		}
 
-		const chunk = new EncodedVideoChunk({
-			type: frame.sample.is_sync ? "key" : "delta",
-			data: frame.sample.data,
-			timestamp: frame.sample.dts / frame.track.timescale,
-		})
+		//At the start of decode , VideoDecoder seems to expect a key frame after configure() or flush()
+		if (this.#decoder.state == "configured") {
+			if (this.#waitingForKeyframe && !frame.sample.is_sync) {
+				console.warn("Skipping non-keyframe until a keyframe is found.")
+				return
+			}
 
-		this.#decoder.decode(chunk)
+			// On arrival of a keyframe, allow decoding and stop waiting for a keyframe.
+			if (frame.sample.is_sync) {
+				this.#waitingForKeyframe = false
+			}
+
+			const chunk = new EncodedVideoChunk({
+				type: frame.sample.is_sync ? "key" : "delta",
+				data: frame.sample.data,
+				timestamp: frame.sample.dts / frame.track.timescale,
+			})
+
+			this.#decoder.decode(chunk)
+		}
 	}
 }

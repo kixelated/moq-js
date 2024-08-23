@@ -28,6 +28,7 @@ export class Player {
 
 	#connection: Connection
 	#catalog: Catalog.Root
+	#tracknum: number
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -35,10 +36,11 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog.Root, backend: Backend) {
+	private constructor(connection: Connection, catalog: Catalog.Root, backend: Backend, tracknum: number) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
+		this.#tracknum = tracknum
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -49,7 +51,7 @@ export class Player {
 		this.#running = Promise.race([this.#run(), abort]).catch(this.#close)
 	}
 
-	static async create(config: PlayerConfig): Promise<Player> {
+	static async create(config: PlayerConfig, tracknum: number): Promise<Player> {
 		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
 		const connection = await client.connect()
 
@@ -59,18 +61,20 @@ export class Player {
 		const canvas = config.canvas.transferControlToOffscreen()
 		const backend = new Backend({ canvas, catalog })
 
-		return new Player(connection, catalog, backend)
+		return new Player(connection, catalog, backend, tracknum)
 	}
 
 	async #run() {
 		const inits = new Set<[string, string]>()
 		const tracks = new Array<Catalog.Track>()
 
-		for (const track of this.#catalog.tracks) {
-			if (!track.namespace) throw new Error("track has no namespace")
-			if (track.initTrack) inits.add([track.namespace, track.initTrack])
-			tracks.push(track)
-		}
+		this.#catalog.tracks.forEach((track, index) => {
+			if (index == this.#tracknum || Catalog.isAudioTrack(track)) {
+				if (!track.namespace) throw new Error("track has no namespace")
+				if (track.initTrack) inits.add([track.namespace, track.initTrack])
+				tracks.push(track)
+			}
+		})
 
 		// Call #runInit on each unique init track
 		// TODO do this in parallel with #runTrack to remove a round trip
@@ -138,6 +142,36 @@ export class Player {
 
 	getCatalog() {
 		return this.#catalog
+	}
+
+	getCurrentTrack() {
+		if (this.#tracknum >= 0 && this.#tracknum < this.#catalog.tracks.length) {
+			return this.#catalog.tracks[this.#tracknum]
+		} else {
+			console.warn("Invalid track number:", this.#tracknum)
+			return null
+		}
+	}
+
+	getVideoTracks() {
+		return this.#catalog.tracks.filter(Catalog.isVideoTrack).map((track) => track.name)
+	}
+
+	async switchTrack(trackname: string) {
+		const currentTrack = this.getCurrentTrack()
+		if (currentTrack) {
+			console.log(`Unsubscribing from track: ${currentTrack.name} and Subscribing to track: ${trackname}`)
+			await this.unsubscribeFromTrack(currentTrack.name)
+		} else {
+			console.log(`Subscribing to track: ${trackname}`)
+		}
+		this.#tracknum = this.#catalog.tracks.findIndex((track) => track.name === trackname)
+		const tracksToStream = this.#catalog.tracks.filter((track) => track.name === trackname)
+		await Promise.all(tracksToStream.map((track) => this.#runTrack(track)))
+	}
+
+	async unsubscribeFromTrack(trackname: string) {
+		await this.#connection.unsubscribe(trackname)
 	}
 
 	#onMessage(msg: Message.FromWorker) {
