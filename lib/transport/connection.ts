@@ -55,6 +55,10 @@ export class Connection {
 		return this.#subscriber.subscribe(namespace, track)
 	}
 
+	unsubscribe(track: string) {
+		return this.#subscriber.unsubscribe(track)
+	}
+
 	subscribed() {
 		return this.#publisher.subscribed()
 	}
