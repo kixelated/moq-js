@@ -69,7 +69,7 @@ export class Renderer {
 				codedHeight: track.video.height,
 				codedWidth: track.video.width,
 				description,
-				// optimizeForLatency: true
+				optimizeForLatency: true,
 			})
 		}
 

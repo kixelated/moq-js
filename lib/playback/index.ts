@@ -50,12 +50,14 @@ export class Player {
 	}
 
 	static async create(config: PlayerConfig): Promise<Player> {
-		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
+		const { url, fingerprint, namespace } = config
+		const client = new Client({
+			url,
+			fingerprint,
+			role: "subscriber",
+		})
 		const connection = await client.connect()
-
-		const catalog = await Catalog.fetch(connection, config.namespace)
-		console.log("catalog", catalog)
-
+		const catalog = await Catalog.fetch(connection, namespace)
 		const canvas = config.canvas.transferControlToOffscreen()
 		const backend = new Backend({ canvas, catalog })
 

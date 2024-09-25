@@ -26,7 +26,7 @@ class Worker {
 		if (msg.config) {
 			this.#onConfig(msg.config)
 		} else if (msg.init) {
-			// TODO buffer the init segmnet so we don't hold the stream open.
+			// TODO buffer the init segment so we don't hold the stream open.
 			this.#onInit(msg.init)
 		} else if (msg.segment) {
 			this.#onSegment(msg.segment).catch(console.warn)

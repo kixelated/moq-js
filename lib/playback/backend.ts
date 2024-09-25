@@ -1,20 +1,15 @@
 /// <reference types="vite/client" />
 
 import * as Message from "./worker/message"
-import { Audio } from "./audio"
-
-import MediaWorker from "./worker?worker"
-import { RingShared } from "../common/ring"
 import { Root, isAudioTrack } from "../media/catalog"
 import { GroupHeader } from "../transport/objects"
+import { RingShared } from "../common/ring"
+import type { Audio } from "./audio"
 
 export interface PlayerConfig {
 	canvas: OffscreenCanvas
 	catalog: Root
 }
-
-// This is a non-standard way of importing worklet/workers.
-// Unfortunately, it's the only option because of a Vite bug: https://github.com/vitejs/vite/issues/11823
 
 // Responsible for sending messages to the worker and worklet.
 export default class Backend {
@@ -26,9 +21,10 @@ export default class Backend {
 
 	constructor(config: PlayerConfig) {
 		// TODO does this block the main thread? If so, make this async
-		// @ts-expect-error: The Vite typing is wrong https://github.com/vitejs/vite/blob/22bd67d70a1390daae19ca33d7de162140d533d6/packages/vite/client.d.ts#L182
-		this.#worker = new MediaWorker({ format: "es" })
-		this.#worker.addEventListener("message", this.on.bind(this))
+		this.#worker = new Worker(new URL("worker/index.ts", import.meta.url), {
+			type: "module",
+			name: "media",
+		})
 
 		let sampleRate: number | undefined
 		let channels: number | undefined
@@ -38,9 +34,7 @@ export default class Backend {
 				if (sampleRate && track.selectionParams.samplerate !== sampleRate) {
 					throw new Error(`TODO multiple audio tracks with different sample rates`)
 				}
-
 				sampleRate = track.selectionParams.samplerate
-
 				// TODO properly handle weird channel configs
 				channels = Math.max(+track.selectionParams.channelConfig, channels ?? 0)
 			}
@@ -55,8 +49,7 @@ export default class Backend {
 				sampleRate: sampleRate,
 				ring: new RingShared(2, sampleRate / 10), // 100ms
 			}
-
-			this.#audio = new Audio(msg.audio)
+			this.loadAudio().then((module) => (this.#audio = new module.Audio(msg.audio as Message.ConfigAudio)))
 		}
 
 		// TODO only send the canvas if we have a video track
@@ -67,6 +60,10 @@ export default class Backend {
 		this.send({ config: msg }, msg.video.canvas)
 	}
 
+	async loadAudio(): Promise<typeof import("./audio")> {
+		return await import("./audio")
+	}
+
 	async play() {
 		await this.#audio?.context.resume()
 	}
@@ -75,7 +72,7 @@ export default class Backend {
 		this.send({ init })
 	}
 
-	segment(segment: Segment) {
+	segment(segment: Message.Segment) {
 		this.send({ segment }, segment.stream)
 	}
 
@@ -86,29 +83,11 @@ export default class Backend {
 
 	// Enforce we're sending valid types to the worker
 	private send(msg: Message.ToWorker, ...transfer: Transferable[]) {
-		//console.log("sent message from main to worker", msg)
 		this.#worker.postMessage(msg, transfer)
-	}
-
-	private on(e: MessageEvent) {
-		const msg = e.data as Message.FromWorker
-
-		// Don't print the verbose timeline message.
-		if (!msg.timeline) {
-			//console.log("received message from worker to main", msg)
-		}
 	}
 }
 
 export interface Init {
 	name: string // name of the init track
 	data: Uint8Array
-}
-
-export interface Segment {
-	init: string // name of the init track
-	kind: "audio" | "video"
-	header: GroupHeader
-	buffer: Uint8Array
-	stream: ReadableStream<Uint8Array>
 }

@@ -16,17 +16,19 @@ export interface ClientConfig {
 }
 
 export class Client {
-	#fingerprint: Promise<WebTransportHash | undefined>
+	#fingerprint: Promise<WebTransportHash | undefined> | null = null
 
 	readonly config: ClientConfig
 
 	constructor(config: ClientConfig) {
 		this.config = config
 
-		this.#fingerprint = this.#fetchFingerprint(config.fingerprint).catch((e) => {
-			console.warn("failed to fetch fingerprint: ", e)
-			return undefined
-		})
+		if (config.fingerprint) {
+			this.#fingerprint = this.#fetchFingerprint(config.fingerprint).catch((e) => {
+				console.warn("failed to fetch fingerprint: ", e)
+				return undefined
+			})
+		}
 	}
 
 	async connect(): Promise<Connection> {
@@ -43,11 +45,13 @@ export class Client {
 
 		const writer = new Stream.Writer(stream.writable)
 		const reader = new Stream.Reader(new Uint8Array(), stream.readable)
-
 		const setup = new Setup.Stream(reader, writer)
 
 		// Send the setup message.
-		await setup.send.client({ versions: [Setup.Version.DRAFT_04], role: this.config.role })
+		await setup.send.client({
+			versions: [Setup.Version.DRAFT_04],
+			role: this.config.role,
+		})
 
 		// Receive the setup message.
 		// TODO verify the SETUP response.
@@ -59,6 +63,14 @@ export class Client {
 
 		const control = new Control.Stream(reader, writer)
 		const objects = new Objects(quic)
+
+		quic.closed
+			.then(() => {
+				console.log("WebTransport connection closed normally")
+			})
+			.catch((error) => {
+				console.error("WebTransport connection closed abruptly:", error)
+			})
 
 		return new Connection(quic, control, objects)
 	}
