@@ -1,5 +1,8 @@
-import type { Frame } from "../media/mp4"
-export type { Frame }
+export interface Frame {
+	type: "key" | "delta"
+	timestamp: number
+	data: Uint8Array
+}
 
 export interface Range {
 	start: number

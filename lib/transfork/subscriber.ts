@@ -46,37 +46,42 @@ export class Subscriber {
 		this.#subscribe.set(subscribe.id, subscribe)
 
 		try {
-			const _ok = await Message.Info.decode(stream.reader)
+			const ok = await Message.Info.decode(stream.reader)
+			console.log("subscribed", track, ok)
+
+			/*
+			for (;;) {
+				const dropped = await Message.GroupDrop.decode(stream.reader)
+				console.debug("dropped", dropped)
+			}
+				*/
+
+			return subscribe.track.reader()
 		} catch (err) {
+			console.error(err)
 			this.#subscribe.delete(subscribe.id)
 			await subscribe.close(Closed.from(err))
 			throw err
 		}
-
-		subscribe
-			.run()
-			.catch((err) => console.warn("subscribe closed", err))
-			.finally(() => this.#subscribe.delete(subscribe.id))
-
-		return track.reader()
 	}
 
-	async runGroup(msg: Message.Group, stream: Reader) {
-		const subscribe = this.#subscribe.get(msg.subscribe)
+	async runGroup(group: Message.Group, stream: Reader) {
+		const subscribe = this.#subscribe.get(group.subscribe)
 		if (!subscribe) return
 
-		const group = subscribe.track.createGroup(msg.sequence)
+		const writer = subscribe.track.createGroup(group.sequence)
 
 		const reader = new FrameReader(stream)
 		for (;;) {
 			const frame = await reader.read()
-			console.debug("received frame", frame)
-
 			if (!frame) break
-			group.writeFrame(frame)
+
+			console.debug("received frame", group, frame)
+			writer.writeFrame(frame)
 		}
 
-		group.close()
+		console.debug("end of group", group)
+		writer.close()
 	}
 }
 

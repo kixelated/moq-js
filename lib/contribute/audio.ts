@@ -1,7 +1,7 @@
+import { Deferred } from "../common/async"
 import { Group, Track } from "../transfork"
 import { Closed } from "../transfork/error"
 import { Chunk } from "./chunk"
-import { Container } from "./container"
 
 const SUPPORTED = [
 	// TODO support AAC
@@ -12,16 +12,13 @@ const SUPPORTED = [
 export class Packer {
 	#source: MediaStreamTrackProcessor<AudioData>
 	#encoder: Encoder
-	#container = new Container()
-	#init: Track
 
 	#data: Track
 	#current?: Group
 
-	constructor(track: MediaStreamAudioTrack, encoder: Encoder, init: Track, data: Track) {
+	constructor(track: MediaStreamAudioTrack, encoder: Encoder, data: Track) {
 		this.#source = new MediaStreamTrackProcessor({ track })
 		this.#encoder = encoder
-		this.#init = init
 		this.#data = data
 	}
 
@@ -32,18 +29,10 @@ export class Packer {
 			abort: (e) => this.#close(e),
 		})
 
-		return this.#source.readable
-			.pipeThrough(this.#encoder.frames)
-			.pipeThrough(this.#container.encode)
-			.pipeTo(output)
+		return this.#source.readable.pipeThrough(this.#encoder.frames).pipeTo(output)
 	}
 
 	#write(chunk: Chunk) {
-		if (chunk.type === "init") {
-			this.#init.appendGroup().writeFrames(chunk.data)
-			return
-		}
-
 		// TODO use a fixed interval instead of keyframes (audio)
 		// TODO actually just align with video
 		if (!this.#current || chunk.type === "key") {
@@ -63,7 +52,6 @@ export class Packer {
 			this.#current.close(closed)
 		}
 
-		this.#init.close(closed)
 		this.#data.close(closed)
 	}
 }
@@ -71,9 +59,9 @@ export class Packer {
 export class Encoder {
 	#encoder!: AudioEncoder
 	#encoderConfig: AudioEncoderConfig
-	#decoderConfig?: AudioDecoderConfig
+	#decoderConfig = new Deferred<AudioDecoderConfig>()
 
-	frames: TransformStream<AudioData, AudioDecoderConfig | EncodedAudioChunk>
+	frames: TransformStream<AudioData, EncodedAudioChunk>
 
 	constructor(config: AudioEncoderConfig) {
 		this.#encoderConfig = config
@@ -85,7 +73,7 @@ export class Encoder {
 		})
 	}
 
-	#start(controller: TransformStreamDefaultController<AudioDecoderConfig | EncodedAudioChunk>) {
+	#start(controller: TransformStreamDefaultController<EncodedAudioChunk>) {
 		this.#encoder = new AudioEncoder({
 			output: (frame, metadata) => {
 				this.#enqueue(controller, frame, metadata)
@@ -104,17 +92,16 @@ export class Encoder {
 	}
 
 	#enqueue(
-		controller: TransformStreamDefaultController<AudioDecoderConfig | EncodedAudioChunk>,
+		controller: TransformStreamDefaultController<EncodedAudioChunk>,
 		frame: EncodedAudioChunk,
 		metadata?: EncodedAudioChunkMetadata,
 	) {
 		const config = metadata?.decoderConfig
-		if (config && !this.#decoderConfig) {
+		if (config && !this.#decoderConfig.pending) {
 			const config = metadata.decoderConfig
 			if (!config) throw new Error("missing decoder config")
 
-			controller.enqueue(config)
-			this.#decoderConfig = config
+			this.#decoderConfig.resolve(config)
 		}
 
 		controller.enqueue(frame)
@@ -135,5 +122,9 @@ export class Encoder {
 
 	get config() {
 		return this.#encoderConfig
+	}
+
+	async decoderConfig(): Promise<AudioDecoderConfig> {
+		return await this.#decoderConfig.promise
 	}
 }

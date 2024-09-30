@@ -30,17 +30,19 @@ export class Broadcast {
 	}
 
 	async create(config: BroadcastConfig): Promise<Broadcast> {
-		const tracks: Catalog.Track[] = []
+		const broadcast: Catalog.Broadcast = { name: config.broadcast, audio: [], video: [] }
 
 		for (const media of this.#config.media.getTracks()) {
-			const priority = media.kind === "video" ? 2 : 1
-
-			// TODO support multiple tracks of the same kind
-			const name = media.kind
-			const init = this.#broadcast.createTrack(`${name}.mp4`, 0)
-			const data = this.#broadcast.createTrack(`${name}.m4s`, priority)
-
 			const settings = media.getSettings()
+
+			const track: Catalog.Track = {
+				name: media.id, // TODO way too verbose
+				priority: media.kind == "video" ? 1 : 2,
+				group_order: "desc",
+				group_expires: 0,
+			}
+
+			const data = this.#broadcast.createTrack(track.name, track.priority)
 
 			if (isVideoTrackSettings(settings)) {
 				if (!config.video) {
@@ -48,76 +50,55 @@ export class Broadcast {
 				}
 
 				const encoder = new Video.Encoder(config.video)
-				const packer = new Video.Packer(media as MediaStreamVideoTrack, encoder, init, data)
+				const packer = new Video.Packer(media as MediaStreamVideoTrack, encoder, data)
 
 				// TODO handle error
 				packer.run().catch((err) => console.error("failed to run video packer: ", err))
 
-				const video: Catalog.VideoTrack = {
-					namespace: config.broadcast,
-					name: `${name}.m4s`,
-					initTrack: `${name}.mp4`,
-					selectionParams: {
-						mimeType: "video/mp4",
-						codec: config.video.codec,
-						width: settings.width,
-						height: settings.height,
-						framerate: settings.frameRate,
-						bitrate: config.video.bitrate,
-					},
+				const decoder = await encoder.decoderConfig()
+
+				const video: Catalog.Video = {
+					track: track,
+					codec: decoder.codec,
+					//description: decoder.description ? new Uint8Array(decoder.description) : undefined,
+					dimensions: { width: settings.width, height: settings.height },
+					frame_rate: settings.frameRate,
+					timescale: 1000,
+					bitrate: config.video.bitrate,
 				}
 
-				tracks.push(video)
+				broadcast.video.push(video)
 			} else if (isAudioTrackSettings(settings)) {
 				if (!config.audio) {
 					throw new Error("no audio configuration provided")
 				}
 
 				const encoder = new Audio.Encoder(config.audio)
-				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, init, data)
+				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, data)
 				packer.run().catch((err) => console.error("failed to run audio packer: ", err)) // TODO handle error
 
-				const audio: Catalog.AudioTrack = {
-					namespace: config.broadcast,
-					name: `${name}.m4s`,
-					initTrack: `${name}.mp4`,
-					selectionParams: {
-						mimeType: "audio/ogg",
-						codec: config.audio.codec,
-						samplerate: settings.sampleRate,
-						//sampleSize: settings.sampleSize,
-						channelConfig: `${settings.channelCount}`,
-						bitrate: config.audio.bitrate,
-					},
+				const audio: Catalog.Audio = {
+					track: track,
+					codec: config.audio.codec,
+					sample_rate: settings.sampleRate,
+					channel_count: settings.channelCount,
+					bitrate: config.audio.bitrate,
+					timescale: 1000,
 				}
 
-				tracks.push(audio)
+				broadcast.audio.push(audio)
 			} else {
 				throw new Error(`unknown track type: ${media.kind}`)
 			}
 		}
 
-		const catalog = {
-			version: 1,
-			streamingFormat: 1,
-			streamingFormatVersion: "0.2",
-			supportsDeltaUpdates: false,
-			commonTrackFields: {
-				packaging: "cmaf",
-				renderGroup: 1,
-			},
-			tracks,
-		}
-
-		const catalogTrack = this.#broadcast.createTrack(".catalog", 0)
-		catalogTrack.appendGroup().writeFrames(Catalog.encode(catalog))
+		const catalogTrack = this.#broadcast.createTrack("catalog.json", 0)
+		catalogTrack.appendGroup().writeFrames(Catalog.encode(broadcast))
 
 		await config.connection.announce(this.#broadcast)
 
 		return new Broadcast(config, this.#broadcast)
 	}
 
-	close(closed?: Closed) {
-		this.#broadcast.close(closed)
-	}
+	close(closed?: Closed) {}
 }

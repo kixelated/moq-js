@@ -2,19 +2,11 @@
 
 import { Ring, RingShared } from "../common/ring"
 import { Component, Frame } from "./timeline"
-import * as MP4 from "../media/mp4"
+import * as Catalog from "../media/catalog"
 
 // This is a non-standard way of importing worklet/workers.
 // Unfortunately, it's the only option because of a Vite bug: https://github.com/vitejs/vite/issues/11823
 import workletURL from "./worklet?url"
-
-export interface Config {
-	channels: number
-	sampleRate: number
-
-	ring: RingShared
-	timeline: Component
-}
 
 export class Renderer {
 	#context: AudioContext
@@ -22,20 +14,23 @@ export class Renderer {
 
 	#ring: Ring
 	#timeline: Component
+	#track: Catalog.Audio
 
 	#decoder!: AudioDecoder
 	#stream: TransformStream<Frame, AudioData>
 
-	constructor(config: Config) {
+	constructor(track: Catalog.Audio, timeline: Component) {
+		this.#track = track
 		this.#context = new AudioContext({
 			latencyHint: "interactive",
-			sampleRate: config.sampleRate,
+			sampleRate: track.sample_rate,
 		})
 
-		this.#worklet = this.load(config)
+		this.#worklet = this.load(track)
 
-		this.#timeline = config.timeline
-		this.#ring = new Ring(config.ring)
+		this.#timeline = timeline
+		const ring = new RingShared(2, track.sample_rate / 20) // 50ms
+		this.#ring = new Ring(ring)
 
 		this.#stream = new TransformStream({
 			start: this.#start.bind(this),
@@ -45,7 +40,7 @@ export class Renderer {
 		this.#run().catch((err) => console.error("failed to run audio renderer: ", err))
 	}
 
-	private async load(config: Config): Promise<AudioWorkletNode> {
+	private async load(config: Catalog.Audio): Promise<AudioWorkletNode> {
 		// Load the worklet source code.
 		await this.#context.audioWorklet.addModule(workletURL)
 
@@ -88,26 +83,20 @@ export class Renderer {
 			},
 			error: console.warn,
 		})
+
+		// We only support OPUS right now which doesn't need a description.
+		this.#decoder.configure({
+			codec: this.#track.codec,
+			sampleRate: this.#track.sample_rate,
+			numberOfChannels: this.#track.channel_count,
+		})
 	}
 
 	#transform(frame: Frame) {
-		if (this.#decoder.state !== "configured") {
-			const track = frame.track
-			if (!MP4.isAudioTrack(track)) throw new Error("expected audio track")
-
-			// We only support OPUS right now which doesn't need a description.
-			this.#decoder.configure({
-				codec: track.codec,
-				sampleRate: track.audio.sample_rate,
-				numberOfChannels: track.audio.channel_count,
-			})
-		}
-
 		const chunk = new EncodedAudioChunk({
-			type: frame.sample.is_sync ? "key" : "delta",
-			timestamp: frame.sample.dts / frame.track.timescale,
-			duration: frame.sample.duration,
-			data: frame.sample.data,
+			type: frame.type,
+			timestamp: frame.timestamp,
+			data: frame.data,
 		})
 
 		this.#decoder.decode(chunk)

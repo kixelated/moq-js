@@ -1,6 +1,7 @@
 import { Stream } from "./stream"
 import * as Message from "./message"
 import { Connection } from "./connection"
+import * as Hex from "../common/hex"
 
 export interface ClientConfig {
 	url: string
@@ -60,16 +61,11 @@ export class Client {
 
 		// TODO remove this fingerprint when Chrome WebTransport accepts the system CA
 		const response = await fetch(url)
-		const hexString = await response.text()
-
-		const hexBytes = new Uint8Array(hexString.length / 2)
-		for (let i = 0; i < hexBytes.length; i += 1) {
-			hexBytes[i] = parseInt(hexString.slice(2 * i, 2 * i + 2), 16)
-		}
+		const bytes = Hex.decode(await response.text())
 
 		return {
 			algorithm: "sha-256",
-			value: hexBytes,
+			value: bytes,
 		}
 	}
 }

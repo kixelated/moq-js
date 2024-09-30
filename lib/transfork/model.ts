@@ -113,6 +113,8 @@ export class TrackReader {
 	async nextGroup(): Promise<GroupReader | undefined> {
 		let [current, next] = this.#track.latest.value()
 
+		console.log("waiting for next group")
+
 		for (;;) {
 			if (current && this.latest != current.sequence) {
 				this.latest = current.sequence
@@ -122,6 +124,7 @@ export class TrackReader {
 			if (this.#track.closed) throw this.#track.closed
 
 			if (!next) return
+			console.log("waiting again")
 			;[current, next] = await next
 		}
 	}

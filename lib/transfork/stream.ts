@@ -42,6 +42,8 @@ export class Stream {
 			throw new Error("unknown stream type: " + typ)
 		}
 
+		console.debug("accepted stream", msg)
+
 		return [msg, stream]
 	}
 
@@ -67,6 +69,8 @@ export class Stream {
 		}
 
 		await msg.encode(stream.writer)
+
+		console.debug("opened stream", msg)
 
 		return stream
 	}
