@@ -28,8 +28,8 @@ export class Stream {
 		const typ = await stream.reader.u8()
 		if (typ == Message.SessionClient.StreamID) {
 			msg = await Message.SessionClient.decode(stream.reader)
-		} else if (typ == Message.Announce.StreamID) {
-			msg = await Message.Announce.decode(stream.reader)
+		} else if (typ == Message.AnnounceInterest.StreamID) {
+			msg = await Message.AnnounceInterest.decode(stream.reader)
 		} else if (typ == Message.Subscribe.StreamID) {
 			msg = await Message.Subscribe.decode(stream.reader)
 		} else if (typ == Message.Datagrams.StreamID) {
@@ -52,8 +52,8 @@ export class Stream {
 
 		if (msg instanceof Message.SessionClient) {
 			await stream.writer.u8(Message.SessionClient.StreamID)
-		} else if (msg instanceof Message.Announce) {
-			await stream.writer.u8(Message.Announce.StreamID)
+		} else if (msg instanceof Message.AnnounceInterest) {
+			await stream.writer.u8(Message.AnnounceInterest.StreamID)
 		} else if (msg instanceof Message.Subscribe) {
 			await stream.writer.u8(Message.Subscribe.StreamID)
 		} else if (msg instanceof Message.Datagrams) {
@@ -330,33 +330,33 @@ export class Writer {
 	}
 }
 
-function setUint8(dst: Uint8Array, v: number): Uint8Array {
+export function setUint8(dst: Uint8Array, v: number): Uint8Array {
 	dst[0] = v
 	return dst.slice(0, 1)
 }
 
-function setUint16(dst: Uint8Array, v: number): Uint8Array {
+export function setUint16(dst: Uint8Array, v: number): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 2)
 	view.setUint16(0, v)
 
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-function setInt32(dst: Uint8Array, v: number): Uint8Array {
+export function setInt32(dst: Uint8Array, v: number): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 4)
 	view.setInt32(0, v)
 
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-function setUint32(dst: Uint8Array, v: number): Uint8Array {
+export function setUint32(dst: Uint8Array, v: number): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 4)
 	view.setUint32(0, v)
 
 	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
 }
 
-function setVint53(dst: Uint8Array, v: number): Uint8Array {
+export function setVint53(dst: Uint8Array, v: number): Uint8Array {
 	if (v <= MAX_U6) {
 		return setUint8(dst, v)
 	} else if (v <= MAX_U14) {
@@ -370,7 +370,7 @@ function setVint53(dst: Uint8Array, v: number): Uint8Array {
 	}
 }
 
-function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
+export function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
 	if (v < MAX_U6) {
 		return setUint8(dst, Number(v))
 	} else if (v < MAX_U14) {
@@ -384,7 +384,7 @@ function setVint62(dst: Uint8Array, v: bigint): Uint8Array {
 	}
 }
 
-function setUint64(dst: Uint8Array, v: bigint): Uint8Array {
+export function setUint64(dst: Uint8Array, v: bigint): Uint8Array {
 	const view = new DataView(dst.buffer, dst.byteOffset, 8)
 	view.setBigUint64(0, v)
 

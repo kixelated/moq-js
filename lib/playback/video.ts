@@ -1,5 +1,6 @@
-import { Frame, Component } from "./timeline"
+import { Component } from "./timeline"
 import * as Catalog from "../media/catalog"
+import { Frame } from "../media/frame"
 
 export class Renderer {
 	#track: Catalog.Video
@@ -55,18 +56,22 @@ export class Renderer {
 
 		this.#decoder.configure({
 			codec: this.#track.codec,
-			codedHeight: this.#track.dimensions.height,
-			codedWidth: this.#track.dimensions.width,
+			codedHeight: this.#track.resolution.height,
+			codedWidth: this.#track.resolution.width,
 			description: this.#track.description,
 			optimizeForLatency: true,
 		})
 	}
 
 	#transform(frame: Frame) {
+		// TODO figure out if this is the proper way to downgrade a bigint.
+		// I'm on the plane and can't search the internet
+		const timestamp = new Number(frame.timestamp).valueOf()
+
 		const chunk = new EncodedVideoChunk({
 			type: frame.type,
 			data: frame.data,
-			timestamp: frame.timestamp,
+			timestamp: timestamp,
 		})
 
 		this.#decoder.decode(chunk)

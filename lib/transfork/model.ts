@@ -70,7 +70,7 @@ export class Track {
 	}
 
 	appendGroup(): Group {
-		const next = this.latest.value()[0]?.sequence ?? 0
+		const next = this.latest.value()[0]?.id ?? 0
 		return this.createGroup(next)
 	}
 
@@ -81,7 +81,7 @@ export class Track {
 		const [current, _] = this.latest.value()
 
 		// TODO use an array
-		if (!current || current.sequence < sequence) {
+		if (!current || current.id < sequence) {
 			const reader = new GroupReader(group)
 			this.latest.update(reader)
 		}
@@ -113,18 +113,15 @@ export class TrackReader {
 	async nextGroup(): Promise<GroupReader | undefined> {
 		let [current, next] = this.#track.latest.value()
 
-		console.log("waiting for next group")
-
 		for (;;) {
-			if (current && this.latest != current.sequence) {
-				this.latest = current.sequence
+			if (current && this.latest != current.id) {
+				this.latest = current.id
 				return current
 			}
 
 			if (this.#track.closed) throw this.#track.closed
 
 			if (!next) return
-			console.log("waiting again")
 			;[current, next] = await next
 		}
 	}
@@ -148,14 +145,14 @@ export class TrackReader {
 }
 
 export class Group {
-	readonly sequence: number
+	readonly id: number
 
 	chunks = new Watch<Uint8Array[]>([])
 	readers = 0
 	closed?: Closed
 
-	constructor(sequence: number) {
-		this.sequence = sequence
+	constructor(id: number) {
+		this.id = id
 	}
 
 	writeFrame(frame: Uint8Array) {
@@ -172,6 +169,10 @@ export class Group {
 	reader(): GroupReader {
 		this.readers += 1
 		return new GroupReader(this)
+	}
+
+	get length(): number {
+		return this.chunks.value()[0].length
 	}
 
 	close(closed = new Closed()) {
@@ -205,8 +206,12 @@ export class GroupReader {
 		}
 	}
 
-	get sequence(): number {
-		return this.#group.sequence
+	get index(): number {
+		return this.#index
+	}
+
+	get id(): number {
+		return this.#group.id
 	}
 
 	close() {

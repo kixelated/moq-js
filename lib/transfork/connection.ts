@@ -2,10 +2,11 @@ import * as Message from "./message"
 import { asError } from "../common/error"
 import { Stream, Reader } from "./stream"
 
-import { Announce, Publisher } from "./publisher"
+import { Publisher } from "./publisher"
 import { Announced, Subscriber } from "./subscriber"
 import { Broadcast, Track, TrackReader } from "./model"
 import { Closed } from "./error"
+import { Queue } from "../common/async"
 
 export class Connection {
 	// The established WebTransport session.
@@ -15,25 +16,20 @@ export class Connection {
 	#session: Stream
 
 	// Module for contributing tracks.
-	#publisher?: Publisher
+	#publisher: Publisher
 
 	// Module for distributing tracks.
-	#subscriber?: Subscriber
+	#subscriber: Subscriber
 
 	// Async work running in the background
 	#running: Promise<void>
 
-	constructor(quic: WebTransport, role: Message.Role, session: Stream) {
+	constructor(quic: WebTransport, session: Stream) {
 		this.#quic = quic
 		this.#session = session
 
-		if (role == "publisher" || role == "both") {
-			this.#publisher = new Publisher(this.#quic)
-		}
-
-		if (role == "subscriber" || role == "both") {
-			this.#subscriber = new Subscriber(this.#quic)
-		}
+		this.#publisher = new Publisher(this.#quic)
+		this.#subscriber = new Subscriber(this.#quic)
 
 		this.#running = this.#run()
 	}
@@ -50,39 +46,17 @@ export class Connection {
 		await Promise.all([session, bidis, unis])
 	}
 
-	async announce(broadcast: Broadcast): Promise<Announce> {
-		if (!this.#publisher) {
-			throw new Error("not a publisher")
-		}
-
-		return await this.#publisher.announce(broadcast)
+	publish(broadcast: Broadcast) {
+		this.#publisher.announce(broadcast)
 	}
 
-	async announced(): Promise<Announced | undefined> {
-		if (!this.#subscriber) {
-			throw new Error("not a subscriber")
-		}
-
-		return this.#subscriber.announced()
+	async announced(prefix = ""): Promise<Queue<Announced>> {
+		return this.#subscriber.announced(prefix)
 	}
 
 	async subscribe(track: Track): Promise<TrackReader> {
-		if (!this.#subscriber) {
-			throw new Error("not a subscriber")
-		}
-
 		return await this.#subscriber.subscribe(track)
 	}
-
-	/* TODO support non-announced broadcasts
-	async subscribed(): Promise<Subscribed | undefined> {
-		if (!this.#publisher) {
-			throw new Error("not a publisher")
-		}
-
-		return this.#publisher.subscribed()
-	}
-	*/
 
 	async #runSession() {
 		// Receive messages until the connection is closed.
@@ -110,12 +84,12 @@ export class Connection {
 
 		if (msg instanceof Message.SessionClient) {
 			throw new Error("duplicate session stream")
-		} else if (msg instanceof Message.Announce) {
+		} else if (msg instanceof Message.AnnounceInterest) {
 			if (!this.#subscriber) {
 				throw new Error("not a subscriber")
 			}
 
-			return await this.#subscriber.runAnnounce(msg, stream)
+			return await this.#publisher.runAnnounce(msg, stream)
 		} else if (msg instanceof Message.Subscribe) {
 			if (!this.#publisher) {
 				throw new Error("not a publisher")

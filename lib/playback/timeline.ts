@@ -1,8 +1,4 @@
-export interface Frame {
-	type: "key" | "delta"
-	timestamp: number
-	data: Uint8Array
-}
+import { Frame } from "../media/frame"
 
 export interface Range {
 	start: number

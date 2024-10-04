@@ -61,7 +61,7 @@ export class Broadcast {
 					track: track,
 					codec: decoder.codec,
 					//description: decoder.description ? new Uint8Array(decoder.description) : undefined,
-					dimensions: { width: settings.width, height: settings.height },
+					resolution: { width: settings.width, height: settings.height },
 					frame_rate: settings.frameRate,
 					timescale: 1000,
 					bitrate: config.video.bitrate,
@@ -95,7 +95,7 @@ export class Broadcast {
 		const catalogTrack = this.#broadcast.createTrack("catalog.json", 0)
 		catalogTrack.appendGroup().writeFrames(Catalog.encode(broadcast))
 
-		await config.connection.announce(this.#broadcast)
+		await config.connection.publish(this.#broadcast)
 
 		return new Broadcast(config, this.#broadcast)
 	}

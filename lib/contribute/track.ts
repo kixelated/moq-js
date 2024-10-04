@@ -1,7 +1,6 @@
 import { Segment } from "./segment"
 import { Notify } from "../common/async"
 import { Chunk } from "./chunk"
-import { Container } from "./container"
 import { BroadcastConfig } from "./broadcast"
 
 import * as Audio from "./audio"
@@ -36,7 +35,6 @@ export class Track {
 	async #runAudio(track: MediaStreamAudioTrack, config: AudioEncoderConfig) {
 		const source = new MediaStreamTrackProcessor({ track })
 		const encoder = new Audio.Encoder(config)
-		const container = new Container()
 
 		// Split the container at keyframe boundaries
 		const segments = new WritableStream({
@@ -51,7 +49,6 @@ export class Track {
 	async #runVideo(track: MediaStreamVideoTrack, config: VideoEncoderConfig) {
 		const source = new MediaStreamTrackProcessor({ track })
 		const encoder = new Video.Encoder(config)
-		const container = new Container()
 
 		// Split the container at keyframe boundaries
 		const segments = new WritableStream({
@@ -64,12 +61,6 @@ export class Track {
 	}
 
 	async #write(chunk: Chunk) {
-		if (chunk.type === "init") {
-			this.#init = chunk.data
-			this.#notify.wake()
-			return
-		}
-
 		let current = this.#segments.at(-1)
 		if (!current || chunk.type === "key") {
 			if (current) {

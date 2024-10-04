@@ -25,7 +25,7 @@ export class Client {
 		})
 	}
 
-	async connect(role: Message.Role = "both"): Promise<Connection> {
+	async connect(): Promise<Connection> {
 		// Helper function to make creating a promise easier
 		const options: WebTransportOptions = {}
 
@@ -35,7 +35,7 @@ export class Client {
 		const quic = new WebTransport(this.config.url, options)
 		await quic.ready
 
-		const client = new Message.SessionClient([Message.Version.FORK_00], role)
+		const client = new Message.SessionClient([Message.Version.FORK_02])
 		console.log("sending client setup: ", client)
 		const stream = await Stream.open(quic, client)
 
@@ -43,17 +43,13 @@ export class Client {
 
 		const server = await Message.SessionServer.decode(stream.reader)
 		console.log("received server setup: ", server)
-		if (server.version != Message.Version.FORK_00) {
+		if (server.version != Message.Version.FORK_02) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
 
-		console.log(
-			`established connection: version=${server.version} client_role=${client.role} server_role=${server.role}`,
-		)
+		console.log(`established connection: version=${server.version}`)
 
-		// TODO use the returned server.role
-
-		return new Connection(quic, client.role, stream)
+		return new Connection(quic, stream)
 	}
 
 	async #fetchFingerprint(url?: string): Promise<WebTransportHash | undefined> {

@@ -8,7 +8,7 @@ export class Publisher {
 	#quic: WebTransport
 
 	// Our announced broadcasts.
-	#announce = new Map<string, Announce>()
+	#announce = new Map<string, Broadcast>()
 
 	// Their subscribed tracks.
 	#subscribe = new Map<bigint, Subscribed>()
@@ -18,36 +18,29 @@ export class Publisher {
 	}
 
 	// Announce a track broadcast.
-	async announce(broadcast: Broadcast): Promise<Announce> {
+	announce(broadcast: Broadcast) {
 		if (this.#announce.has(broadcast.name)) {
 			throw new Error(`already announced: ${broadcast.name}`)
 		}
 
-		const msg = new Message.Announce(broadcast.name)
-		const stream = await Stream.open(this.#quic, msg)
-
-		const announce = new Announce(stream, broadcast)
-		this.#announce.set(announce.broadcast.name, announce)
-
-		try {
-			const _ok = await Message.AnnounceOk.decode(stream.reader)
-		} catch (err) {
-			this.#announce.delete(announce.broadcast.name)
-			await announce.close(Closed.from(err))
-
-			throw err
-		}
-
-		announce
-			.run()
-			.catch((err) => console.warn("announce closed", err))
-			.finally(() => this.#announce.delete(announce.broadcast.name))
-
-		return announce
+		this.#announce.set(broadcast.name, broadcast)
 	}
 
 	#get(msg: { broadcast: string; track: string }): TrackReader | undefined {
-		return this.#announce.get(msg.broadcast)?.broadcast.reader().getTrack(msg.track)
+		return this.#announce.get(msg.broadcast)?.reader().getTrack(msg.track)
+	}
+
+	async runAnnounce(msg: Message.AnnounceInterest, stream: Stream) {
+		for (const announce of this.#announce.values()) {
+			if (announce.name.startsWith(msg.prefix)) {
+				const msg = new Message.Announce(announce.name)
+				await msg.encode(stream.writer)
+			}
+		}
+
+		// TODO support updates.
+		// Until then, just keep the stream open.
+		await stream.reader.closed()
 	}
 
 	async runSubscribe(msg: Message.Subscribe, stream: Stream) {
@@ -171,7 +164,7 @@ class Subscribed {
 	}
 
 	async #runGroup(group: GroupReader) {
-		const msg = new Message.Group(this.#id, group.sequence)
+		const msg = new Message.Group(this.#id, group.id)
 		const stream = await Writer.open(this.#quic, msg)
 
 		for (;;) {

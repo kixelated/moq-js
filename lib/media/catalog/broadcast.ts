@@ -19,9 +19,7 @@ export function decode(broadcast: string, raw: Uint8Array): Broadcast {
 	const decoder = new TextDecoder()
 	const str = decoder.decode(raw)
 
-	console.debug("raw catalog", str)
 	const catalog = JSON.parse(str)
-	console.debug("decoded catalog", catalog)
 	if (!decodeBroadcast(catalog)) {
 		throw new Error("invalid catalog")
 	}

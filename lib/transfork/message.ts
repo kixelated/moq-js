@@ -1,13 +1,13 @@
 import { Reader, Writer } from "./stream"
 
-export type Role = "publisher" | "subscriber" | "both"
-
 export enum Version {
 	DRAFT_00 = 0xff000000,
 	DRAFT_01 = 0xff000001,
 	DRAFT_02 = 0xff000002,
 	DRAFT_03 = 0xff000003,
 	FORK_00 = 0xff0bad00,
+	FORK_01 = 0xff0bad01,
+	FORK_02 = 0xff0bad02,
 }
 
 export class Extensions {
@@ -68,14 +68,12 @@ export enum Order {
 
 export class SessionClient {
 	versions: Version[]
-	role: Role
 	extensions: Extensions
 
 	static StreamID = 0x0
 
-	constructor(versions: Version[], role: Role, extensions = new Extensions()) {
+	constructor(versions: Version[], extensions = new Extensions()) {
 		this.versions = versions
-		this.role = role
 		this.extensions = extensions
 	}
 
@@ -84,9 +82,6 @@ export class SessionClient {
 		for (const v of this.versions) {
 			await w.u53(v)
 		}
-
-		const role = new Uint8Array([this.role == "publisher" ? 1 : this.role == "subscriber" ? 2 : 3])
-		this.extensions.set(0n, role)
 
 		await this.extensions.encode(w)
 	}
@@ -99,38 +94,28 @@ export class SessionClient {
 		}
 
 		const extensions = await Extensions.decode(r)
-		const role = decodeRole(extensions.get(0n))
-
-		return new SessionClient(versions, role, extensions)
+		return new SessionClient(versions, extensions)
 	}
 }
 
 export class SessionServer {
 	version: Version
-	role: Role
 	extensions: Extensions
 
-	constructor(version: Version, role: Role, extensions = new Extensions()) {
+	constructor(version: Version, extensions = new Extensions()) {
 		this.version = version
-		this.role = role
 		this.extensions = extensions
 	}
 
 	async encode(w: Writer) {
 		await w.u53(this.version)
-
-		const role = new Uint8Array([this.role == "publisher" ? 1 : this.role == "subscriber" ? 2 : 3])
-		this.extensions.set(0n, role)
-
 		await this.extensions.encode(w)
 	}
 
 	static async decode(r: Reader): Promise<SessionServer> {
 		const version = await r.u53()
 		const extensions = await Extensions.decode(r)
-		const role = decodeRole(extensions.get(0n))
-
-		return new SessionServer(version, role, extensions)
+		return new SessionServer(version, extensions)
 	}
 }
 
@@ -159,8 +144,6 @@ export class SessionInfo {
 export class Announce {
 	broadcast: string
 
-	static StreamID = 0x1
-
 	constructor(broadcast: string) {
 		this.broadcast = broadcast
 	}
@@ -172,21 +155,24 @@ export class Announce {
 	static async decode(r: Reader): Promise<Announce> {
 		return new Announce(await r.string())
 	}
+
+	static async decode_maybe(r: Reader): Promise<Announce | undefined> {
+		if (await r.done()) return
+		return await Announce.decode(r)
+	}
 }
 
-export class AnnounceOk {
-	cool = true
+export class AnnounceInterest {
+	static StreamID = 0x1
 
-	static async encode(w: Writer) {
-		await w.u53(1)
+	constructor(public prefix: string) {}
+
+	async encode(w: Writer) {
+		await w.string(this.prefix)
 	}
 
-	static async decode(r: Reader): Promise<AnnounceOk> {
-		if ((await r.u53()) != 1) {
-			throw new Error("invalid cool")
-		}
-
-		return new AnnounceOk()
+	static async decode(r: Reader): Promise<AnnounceInterest> {
+		return new AnnounceInterest(await r.string())
 	}
 }
 
@@ -440,21 +426,5 @@ export class Frame {
 	}
 }
 
-function decodeRole(raw: Uint8Array | undefined): Role {
-	if (!raw) throw new Error("missing role parameter")
-	if (raw.length != 1) throw new Error("multi-byte varint not supported")
-
-	switch (raw[0]) {
-		case 1:
-			return "publisher"
-		case 2:
-			return "subscriber"
-		case 3:
-			return "both"
-		default:
-			throw new Error(`invalid role: ${raw[0]}`)
-	}
-}
-
-export type Bi = SessionClient | Announce | Subscribe | Datagrams | Fetch | InfoRequest
+export type Bi = SessionClient | AnnounceInterest | Subscribe | Datagrams | Fetch | InfoRequest
 export type Uni = Group

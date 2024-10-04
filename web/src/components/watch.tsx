@@ -17,7 +17,7 @@ export default function Watch(props: { name: string }) {
 
 	let canvas!: HTMLCanvasElement
 
-	const [useCatalog, setCatalog] = createSignal<Catalog.Root | undefined>()
+	const [useCatalog, setCatalog] = createSignal<Catalog.Broadcast | undefined>()
 	const [useConnection, setConnection] = createSignal<Connection | undefined>()
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
@@ -30,7 +30,7 @@ export default function Watch(props: { name: string }) {
 
 		const client = new Client({ url, fingerprint })
 		client
-			.connect("subscriber")
+			.connect()
 			.then(setConnection)
 			.catch((err) => setError(new Error(`failed to connect to server: ${err}`)))
 	})

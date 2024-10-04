@@ -5,12 +5,13 @@ import { Track } from "../transfork"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
-import { Frame, Timeline } from "./timeline"
+import { Timeline } from "./timeline"
 import { GroupReader } from "../transfork/model"
+import { Frame } from "../media/frame"
 
 export interface PlayerConfig {
 	connection: Connection
-	broadcast: Catalog.Broadcast
+	catalog: Catalog.Broadcast
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	canvas: HTMLCanvasElement
 }
@@ -34,7 +35,7 @@ export class Player {
 
 	constructor(config: PlayerConfig) {
 		this.#connection = config.connection
-		this.#broadcast = config.broadcast
+		this.#broadcast = config.catalog
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -44,13 +45,13 @@ export class Player {
 		const running = []
 
 		// Only configure audio is we have an audio track
-		const audio = (config.broadcast.audio || []).at(0)
+		const audio = (config.catalog.audio || []).at(0)
 		if (audio) {
 			this.#audio = new Audio.Renderer(audio, this.#timeline.audio)
 			running.push(this.#runAudio(audio))
 		}
 
-		const video = (config.broadcast.video || []).at(0)
+		const video = (config.catalog.video || []).at(0)
 		if (video) {
 			this.#video = new Video.Renderer(video, config.canvas, this.#timeline.video)
 			running.push(this.#runVideo(video))
@@ -106,21 +107,15 @@ export class Player {
 		// Add the segment to the timeline
 		const segments = timeline.segments.getWriter()
 		await segments.write({
-			sequence: group.sequence,
+			sequence: group.id,
 			frames: queue.readable,
 		})
 		segments.releaseLock()
 
 		// Read each chunk, decoding the MP4 frames and adding them to the queue.
-		for (let i = 0; ; i += 1) {
-			const chunk = await group.readFrame()
-			if (!chunk) break
-
-			const frame: Frame = {
-				type: i == 0 ? "key" : "delta",
-				timestamp: 0, // TODO
-				data: chunk,
-			}
+		for (;;) {
+			const frame = await Frame.read(group)
+			if (!frame) break
 
 			await segment.write(frame)
 		}
@@ -133,20 +128,21 @@ export class Player {
 		const timeline = this.#timeline.video
 
 		// Create a queue that will contain each MP4 frame.
-		const queue = new TransformStream<Uint8Array>({})
+		const queue = new TransformStream<Frame>({})
 		const segment = queue.writable.getWriter()
 
 		// Add the segment to the timeline
 		const segments = timeline.segments.getWriter()
 		await segments.write({
-			sequence: group.sequence,
+			sequence: group.id,
 			frames: queue.readable,
 		})
 		segments.releaseLock()
 
 		for (;;) {
-			const frame = await group.readFrame()
+			const frame = await Frame.read(group)
 			if (!frame) break
+			console.log("frame", frame)
 
 			await segment.write(frame)
 		}

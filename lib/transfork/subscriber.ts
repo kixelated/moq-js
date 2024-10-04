@@ -8,9 +8,6 @@ import { Track, TrackReader } from "./model"
 export class Subscriber {
 	#quic: WebTransport
 
-	// Announced broadcasts.
-	#announced = new Queue<Announced>()
-
 	// Our subscribed tracks.
 	#subscribe = new Map<bigint, Subscribe>()
 	#subscribeNext = 0n
@@ -19,19 +16,37 @@ export class Subscriber {
 		this.#quic = quic
 	}
 
-	async announced(): Promise<Announced | undefined> {
-		return this.#announced.next()
+	async announced(prefix: string): Promise<Queue<Announced>> {
+		const announced = new Queue<Announced>()
+
+		const msg = new Message.AnnounceInterest(prefix)
+		const stream = await Stream.open(this.#quic, msg)
+
+		this.runAnnounced(stream, announced)
+			.then(() => announced.close())
+			.catch((err) => announced.abort(err))
+
+		return announced
 	}
 
-	async runAnnounce(msg: Message.Announce, stream: Stream) {
-		const announce = new Announced(msg)
-		await this.#announced.push(announce)
+	async runAnnounced(stream: Stream, announced: Queue<Announced>) {
+		const toggle: Map<string, Announced> = new Map()
 
-		try {
-			await Promise.any([stream.reader.closed(), announce.closed()])
-			announce.close()
-		} catch (err) {
-			announce.close(Closed.from(err))
+		for (;;) {
+			const announce = await Message.Announce.decode_maybe(stream.reader)
+			if (!announce) {
+				break
+			}
+
+			const existing = toggle.get(announce.broadcast)
+			if (existing) {
+				existing.close()
+				toggle.delete(announce.broadcast)
+			} else {
+				const item = new Announced(announce)
+				await announced.push(item)
+				toggle.set(announce.broadcast, item)
+			}
 		}
 	}
 
@@ -76,11 +91,10 @@ export class Subscriber {
 			const frame = await reader.read()
 			if (!frame) break
 
-			console.debug("received frame", group, frame)
 			writer.writeFrame(frame)
 		}
 
-		console.debug("end of group", group)
+		console.trace("end of group", group)
 		writer.close()
 	}
 }

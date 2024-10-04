@@ -125,7 +125,7 @@ export default function Publish() {
 			fingerprint,
 		})
 
-		client.connect("publisher").then(setConnection).catch(setError)
+		client.connect().then(setConnection).catch(setError)
 	})
 
 	const createBroadcast = function () {

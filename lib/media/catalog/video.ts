@@ -8,8 +8,7 @@ export interface Video {
 	timescale: number
 	bitrate?: number
 	frame_rate?: number
-	dimensions: Dimensions
-	display?: Dimensions
+	resolution: Dimensions
 }
 
 export interface Dimensions {
