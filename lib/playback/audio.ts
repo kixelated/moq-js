@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 
 import { Ring, RingShared } from "../common/ring"
-import { Component, Frame } from "./timeline"
+import { Component } from "./timeline"
 import * as Catalog from "../media/catalog"
+import { Frame } from "../media/frame"
 
 // This is a non-standard way of importing worklet/workers.
 // Unfortunately, it's the only option because of a Vite bug: https://github.com/vitejs/vite/issues/11823

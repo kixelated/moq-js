@@ -114,7 +114,7 @@ export class Player {
 
 		// Read each chunk, decoding the MP4 frames and adding them to the queue.
 		for (;;) {
-			const frame = await Frame.read(group)
+			const frame = await Frame.decode(group)
 			if (!frame) break
 
 			await segment.write(frame)
@@ -140,7 +140,7 @@ export class Player {
 		segments.releaseLock()
 
 		for (;;) {
-			const frame = await Frame.read(group)
+			const frame = await Frame.decode(group)
 			if (!frame) break
 			console.log("frame", frame)
 

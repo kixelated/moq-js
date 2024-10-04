@@ -64,14 +64,10 @@ export class Renderer {
 	}
 
 	#transform(frame: Frame) {
-		// TODO figure out if this is the proper way to downgrade a bigint.
-		// I'm on the plane and can't search the internet
-		const timestamp = new Number(frame.timestamp).valueOf()
-
 		const chunk = new EncodedVideoChunk({
 			type: frame.type,
 			data: frame.data,
-			timestamp: timestamp,
+			timestamp: frame.timestamp,
 		})
 
 		this.#decoder.decode(chunk)

@@ -1,7 +1,7 @@
 import { Deferred } from "../common/async"
+import { Frame } from "../media/frame"
 import { Group, Track } from "../transfork"
 import { Closed } from "../transfork/error"
-import { Chunk } from "./chunk"
 
 const SUPPORTED = [
 	"avc1", // H.264
@@ -36,8 +36,8 @@ export class Packer {
 		return this.#source.readable.pipeThrough(this.#encoder.frames).pipeTo(output)
 	}
 
-	#write(chunk: Chunk) {
-		if (!this.#current || chunk.type === "key") {
+	#write(frame: Frame) {
+		if (!this.#current || frame.type === "key") {
 			if (this.#current) {
 				this.#current.close()
 			}
@@ -45,7 +45,7 @@ export class Packer {
 			this.#current = this.#data.appendGroup()
 		}
 
-		this.#current.writeFrame(chunk.data)
+		frame.encode(this.#current)
 	}
 
 	#close(err?: any) {

@@ -1,7 +1,7 @@
 import { Deferred } from "../common/async"
+import { Frame } from "../media/frame"
 import { Group, Track } from "../transfork"
 import { Closed } from "../transfork/error"
-import { Chunk } from "./chunk"
 
 const SUPPORTED = [
 	// TODO support AAC
@@ -32,10 +32,10 @@ export class Packer {
 		return this.#source.readable.pipeThrough(this.#encoder.frames).pipeTo(output)
 	}
 
-	#write(chunk: Chunk) {
+	#write(frame: Frame) {
 		// TODO use a fixed interval instead of keyframes (audio)
 		// TODO actually just align with video
-		if (!this.#current || chunk.type === "key") {
+		if (!this.#current || frame.type === "key") {
 			if (this.#current) {
 				this.#current.close()
 			}
@@ -43,7 +43,7 @@ export class Packer {
 			this.#current = this.#data.appendGroup()
 		}
 
-		this.#current.writeFrame(chunk.data)
+		this.#current.writeFrame(frame.data)
 	}
 
 	#close(err?: any) {
