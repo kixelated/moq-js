@@ -1,0 +1,100 @@
+---
+layout: "@/layouts/global.astro"
+title: Fork
+author: kixelated
+description: Time to take another stab at it.
+cover: "/blog/transfork/fork.png"
+date: 2024-10-08
+---
+
+# Fork
+
+The IETF process is a long burn.
+I've flown out to 8 in-person meetings, attended at least 20 remote meetings, left hundreds of comments on issues/PRs, and even authored the original transport draft.
+I have spent so much of my limited time on this planet working on this endeavor.
+
+Unfortunately, this is the end of my involvement.
+I don't think the [MoQ working group](https://datatracker.ietf.org/group/moq/about/) will produce anything useful.
+
+## Why
+
+The core MoQ group consists of 5 people from Cisco and ~5 people from CDN companies.
+The focus has unsurprisingly been on layer that Cisco will use and CDNs will sell to them: [MoqTransport](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/).
+
+The unfortunate side effect of this dynamic is that the media layer (the M in MoQ) is an after-thought.
+There's interest in standardizing _something_ but nobody intends to implement it as far as I can tell.
+So instead the transport is molded around Cisco's proprietary media stack and their bizarre requirements.
+And they have some bizarre requirements.
+
+A concrete example: **sequential IDs**.
+Every sane internet transport over lossy networks use sequential IDs: TCP, RTP, QUIC, etc.
+The idea is that receiver can detect gaps caused by loss, and vice-versa knows when it has all of the data without blocking or querying the source.
+But no, the Cisco folks insist that we MUST support both explicit and implicit gaps without specifying a reason.
+It's the transport equivalent of arguing for both `null` and `undefined` in Javascript.
+
+This may seem like a trivial transport detail, but it's one of many infuriating debates that have lasted years and will never be resolved while the current WG dynamics exist.
+They don't need to compromise or back down on any position.
+
+The result thus far can only be described as _obtuse_.
+When a user joins the Discord server and asks how to use MoQ, I don't have a good answer.
+"it depends" or "you have to do it yourself" or "we were thinking something like".
+I can point to the [latest draft](https://www.ietf.org/archive/id/draft-ietf-moq-transport-06.html) but it raises more questions than it answers.
+The protocol has become so abstracted, vague, and yet offers few concrete properties or functionality.
+
+And to be clear, this isn't entirely Cisco's fault.
+These individuals have the right intentions and of them are brilliant (shoutout to Cullen, Mo, Christian).
+However, the power dynamics in the MoQ working group are broken until there are other stakeholders who actually care about media.
+
+## What Now
+
+I still love the idea of using QUIC to deliver media.
+Suddenly WebRTC is no longer a requirement when WebCodecs and WebTransport are combined..
+And I also love the concept behind MoqTransport:
+A generic transport for media-like applications, fixing many of the scaling issues with WebRTC.
+
+To this end, I've created:
+
+-   🍴[MoqTransfork](https://datatracker.ietf.org/doc/draft-lcurley-moq-transfork/): A simple way to transport media-like content without a specific encoding.
+-   🎏 **Karp**: A thin layer on top of MoqTransfork with functionality similar to HLS/DASH/WebRTC.
+
+Why two protocols?
+So relays/CDNs can implement MoqTransfork while media applications (ex. VLC/OBS) also implement Karp.
+
+I swear there used to be [fork emoji](https://www.reddit.com/r/MandelaEffect/comments/16eq2nx/fork_emoji/).
+
+## New Release
+
+I've been working on this hard fork for a while in my limited free time.
+It's become a grab-bag of new features all getting merged at the same time.
+
+-   [Experimental WASM player](https://github.com/kixelated/moq-wasm)
+-   New clustering protocol (using MoqTransfork!)
+-   CMAF -> Karp transmuxing
+-   Broadcast discovery
+-   Simpler (but more powerful) API
+
+And let's not forget the existing features that have been migrated over:
+
+-   [Rust library](https://github.com/kixelated/moq-rs)
+-   [Typescript library](https://github.com/kixelated/moq-js) (web)
+-   [Gstreamer plugin](https://github.com/kixelated/moq-gst)
+-   [ffmpeg integration](https://github.com/kixelated/moq-rs/tree/main/moq-pub)
+-   [Relay server](https://github.com/kixelated/moq-rs/tree/main/moq-relay)
+-   [GCP infrastructure](https://github.com/kixelated/quic.video/tree/main/infra)
+
+And yes, this is a hard fork.
+If you want to stick with the IETF standard, that's fine but you gotta hit the fork button too.
+
+## What's Next
+
+I'm going to continue investing all of my free time (and hopefully some of my professional time) into MoQ.
+But the time that would have been spent arguing to be better spent actually implementing cool shit.
+
+I would highly encourage that anyone else do the same.
+If you're an individual, startup, or a massive company alike, I would recommend that you make your own Media over QUIC implementation.
+The "standard" will take 3-5 years at best even if you ignore these red flags, so just use the available tech today instead.
+
+You can always hit [me](https://github.com/kixelated) up on [Discord](https://discord.gg/FCYF3p99mr) if you want to use MoQ and more advice.
+I can't promise that it will be good advice though.
+
+<img src="/blog/kixelCat.png" class="inline w-16" />
