@@ -4,7 +4,7 @@ import { BroadcastConfig } from "./broadcast"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
-import { Frame } from "../media/frame"
+import { Frame } from "../karp/frame"
 
 export class Track {
 	name: string

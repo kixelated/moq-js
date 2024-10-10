@@ -1,6 +1,6 @@
 import { Component } from "./timeline"
-import * as Catalog from "../media/catalog"
-import { Frame } from "../media/frame"
+import * as Catalog from "../karp/catalog"
+import { Frame } from "../karp/frame"
 
 export class Renderer {
 	#track: Catalog.Video

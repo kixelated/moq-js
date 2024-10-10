@@ -1,5 +1,5 @@
 import { Deferred } from "../common/async"
-import { Frame } from "../media/frame"
+import { Frame } from "../karp/frame"
 import { Group, Track } from "../transfork"
 import { Closed } from "../transfork/error"
 

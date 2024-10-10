@@ -1,4 +1,4 @@
-import { Frame } from "../media/frame"
+import { Frame } from "../karp/frame"
 
 export interface Range {
 	start: number

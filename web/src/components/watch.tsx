@@ -1,10 +1,10 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
-import * as Catalog from "@kixelated/moq/media/catalog"
+import * as Catalog from "@kixelated/moq/karp/catalog"
 
 import Fail from "./fail"
 
-import { createEffect, createSignal, onCleanup, onMount } from "solid-js"
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { Client, Connection } from "@kixelated/moq/transfork"
 
 export default function Watch(props: { name: string }) {
@@ -21,7 +21,8 @@ export default function Watch(props: { name: string }) {
 	const [useConnection, setConnection] = createSignal<Connection | undefined>()
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
-	onMount(() => {
+
+	createEffect(() => {
 		const url = `https://${server}`
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
@@ -60,7 +61,9 @@ export default function Watch(props: { name: string }) {
 		player.closed().catch((err) => setError(new Error(`player closed: ${err}`)))
 	})
 
-	const play = () => usePlayer()?.play()
+	const play = () => {
+		usePlayer()?.play().catch(setError)
+	}
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
