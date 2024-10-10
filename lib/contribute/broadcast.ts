@@ -4,7 +4,6 @@ import * as Audio from "./audio"
 import * as Video from "./video"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
-import { Closed } from "../transfork/error"
 
 export interface BroadcastConfig {
 	name: string
@@ -97,8 +96,8 @@ export class Broadcast {
 		const catalogTrack = this.#broadcast.createTrack("catalog.json", 0)
 		catalogTrack.appendGroup().writeFrames(Catalog.encode(broadcast))
 
-		await connection.publish(this.#broadcast)
+		connection.publish(this.#broadcast)
 	}
 
-	close(closed?: Closed) {}
+	close() {}
 }

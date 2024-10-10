@@ -6,6 +6,6 @@ export function decode(str: string): Uint8Array {
 	return bytes
 }
 
-export function encode(bytes: Uint8Array): string {
+export function encode(_bytes: Uint8Array): string {
 	throw "todo"
 }
