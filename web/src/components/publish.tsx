@@ -1,5 +1,5 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
-import { Client, Connection } from "@kixelated/moq/transport"
+import { Client, Connection } from "@kixelated/moq/transfork"
 import {
 	createSignal,
 	createEffect,
@@ -123,7 +123,6 @@ export default function Publish() {
 		const client = new Client({
 			url,
 			fingerprint,
-			role: "publisher",
 		})
 
 		client.connect().then(setConnection).catch(setError)
@@ -133,11 +132,6 @@ export default function Publish() {
 		const d = device()
 		if (!d) {
 			throw new Error("no input selected")
-		}
-
-		const c = connection()
-		if (!c) {
-			throw new Error("no connection to server")
 		}
 
 		const a = audio()
@@ -151,11 +145,10 @@ export default function Publish() {
 		}
 
 		return new Broadcast({
-			connection: c,
+			name: name,
 			media: d,
 			audio: a,
 			video: v,
-			namespace: name,
 		})
 	}
 
@@ -170,6 +163,16 @@ export default function Publish() {
 		}
 	})
 
+	createEffect(() => {
+		const conn = connection()
+		if (!conn) return
+
+		const b = broadcast()
+		if (!b) return
+
+		b.publish(conn).catch(setError)
+	})
+
 	// Close the connection on unload
 	createEffect(() => {
 		const conn = connection()
@@ -177,26 +180,6 @@ export default function Publish() {
 
 		onCleanup(() => conn.close())
 		conn.closed().then(setError, setError)
-	})
-
-	// Close the broadcast on unload or error
-	createEffect(() => {
-		const b = broadcast()
-		if (!b) return
-
-		// Clear any error on start
-		setError(undefined)
-
-		// Close the broadcast on teardown
-		onCleanup(() => b.close())
-
-		// Wait until the broadcast is closed.
-		b.closed()
-			.then(setError, setError)
-			.finally(() => {
-				setBroadcast(undefined)
-				setActive(false)
-			})
 	})
 
 	// The text for the submit button
@@ -229,7 +212,7 @@ export default function Publish() {
 		navigator.clipboard
 			.writeText(absolute)
 			.then(() => setCopied(true))
-			.catch((err) => console.error("Failed to copy link:", err))
+			.catch((err) => console.error("failed to copy link:", err))
 	}
 
 	// Hide the copied message after a few seconds

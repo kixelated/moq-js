@@ -1,9 +1,11 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
+import * as Catalog from "@kixelated/moq/karp/catalog"
 
 import Fail from "./fail"
 
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js"
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js"
+import { Client, Connection } from "@kixelated/moq/transfork"
 
 export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
@@ -15,18 +17,40 @@ export default function Watch(props: { name: string }) {
 
 	let canvas!: HTMLCanvasElement
 
+	const [useCatalog, setCatalog] = createSignal<Catalog.Broadcast | undefined>()
+	const [useConnection, setConnection] = createSignal<Connection | undefined>()
+
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
-	const [showCatalog, setShowCatalog] = createSignal(false)
 
 	createEffect(() => {
-		const namespace = props.name
 		const url = `https://${server}`
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
 		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
-		Player.create({ url, fingerprint, canvas, namespace }).then(setPlayer).catch(setError)
+		const client = new Client({ url, fingerprint })
+		client
+			.connect()
+			.then(setConnection)
+			.catch((err) => setError(new Error(`failed to connect to server: ${err}`)))
+	})
+
+	createEffect(() => {
+		const connection = useConnection()
+		if (!connection) return
+
+		Catalog.fetch(connection, props.name)
+			.then(setCatalog)
+			.catch((err) => setError(new Error(`failed to fetch catalog: ${err}`)))
+	})
+
+	createEffect(() => {
+		const connection = useConnection()
+		const catalog = useCatalog()
+		if (!connection || !catalog) return setPlayer(undefined)
+
+		setPlayer(new Player({ connection, catalog, canvas }))
 	})
 
 	createEffect(() => {
@@ -34,21 +58,12 @@ export default function Watch(props: { name: string }) {
 		if (!player) return
 
 		onCleanup(() => player.close())
-		player.closed().then(setError).catch(setError)
+		player.closed().catch((err) => setError(new Error(`player closed: ${err}`)))
 	})
 
 	const play = () => {
 		usePlayer()?.play().catch(setError)
 	}
-
-	// The JSON catalog for debugging.
-	const catalog = createMemo(() => {
-		const player = usePlayer()
-		if (!player) return
-
-		const catalog = player.getCatalog()
-		return JSON.stringify(catalog, null, 2)
-	})
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
@@ -56,18 +71,6 @@ export default function Watch(props: { name: string }) {
 		<>
 			<Fail error={error()} />
 			<canvas ref={canvas} onClick={play} class="aspect-video w-full rounded-lg" />
-
-			<h3>Debug</h3>
-			<Show when={catalog()}>
-				<div class="mt-2 flex">
-					<button onClick={() => setShowCatalog((prev) => !prev)}>
-						{showCatalog() ? "Hide Catalog" : "Show Catalog"}
-					</button>
-				</div>
-				<Show when={showCatalog()}>
-					<pre>{catalog()}</pre>
-				</Show>
-			</Show>
 		</>
 	)
 }

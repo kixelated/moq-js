@@ -1,6 +1,12 @@
-import { Show } from "solid-js"
+import { createEffect, Show } from "solid-js"
 
 export default function Fail(props: { error?: Error }) {
+	createEffect(() => {
+		if (props.error) {
+			console.error(props.error)
+		}
+	})
+
 	return (
 		<Show when={props.error}>
 			{(error) => (
