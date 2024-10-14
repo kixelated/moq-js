@@ -14,8 +14,8 @@ I've flown out to 8 in-person meetings, attended at least 30 remote meetings, le
 I have spent so much of my limited time on this planet working on this endeavor.
 
 Unfortunately, this is the end of my involvement.
-I think the [MoQ working group](https://datatracker.ietf.org/group/moq/about/) will produce _something_ in 3-5 years, but it's not something that I plan to use.
-I'm going to focus on implementing cool shit instead.
+I think the [MoQ working group](https://datatracker.ietf.org/group/moq/about/) will produce _something_ in 3-5 years, but it's not something that I plan to use with the current direction.
+I'm going to focus on implementing cool shit now, instead of "standard" stuff later.
 
 ## What Happened?
 
@@ -24,7 +24,7 @@ This dynamic has meant that 99% of the focus has been on layer that Cisco could 
 
 Unfortunately, the media layer (the M in MoQ) has become an after-thought.
 There's interest in standardizing _something_ but nobody intends to implement it.
-So instead, the transport has become overly generic... and molded around Cisco's proprietary stack.
+So instead, the transport has become overly generic and worse: molded around Cisco's proprietary stack.
 And they have some bizarre requirements.
 
 A concrete example: **sequential IDs**.
@@ -34,7 +34,7 @@ In my case, I want the player and CDN to know that there's no gap between frame 
 But no, the Cisco folks insist that we MUST support both explicit and implicit gaps and have yet to elaborate why.
 
 This may seem like a trivial transport detail, but it's one of many infuriating debates that have lasted years and will never be resolved while the current WG dynamics exist.
-The best compromise is one that nobody is happy with, but there's no need to compromise when you stack the working group.
+There's no need to compromise when the working group is stacked.
 
 The result so far can only be described as _obtuse_.
 When a user asks how to use MoQ, I don't have an answer except for: "_it depends_".
@@ -55,7 +55,7 @@ A generic transport for media-like applications, fixing many of the scaling issu
 To this end, I've created:
 
 -   🍴[MoqTransfork](https://datatracker.ietf.org/doc/draft-lcurley-moq-transfork/): A simple way to transport media-like content without a specific encoding. It should be implemented by generic servers, such as a CDN
--   🎏 **Karp**: A thin layer on top of 🍴**MoqTransfork** capable of mutliple quality/latency targets. It should be implemented by generic media clients, such as VLC and OBS.
+-   🎏 **Karp**: A thin layer on top of 🍴**MoqTransfork** capable of mutliple quality/latency targets. It should be implemented by generic media clients, such as VLC and OBS. Final name TBD.
 
 I swear there used to be [fork emoji](https://www.reddit.com/r/MandelaEffect/comments/16eq2nx/fork_emoji/).
 
@@ -96,7 +96,7 @@ The next step is a conferencing demo.
 
 I would highly encourage that anyone else do the same.
 If you're an individual, startup, or a massive company alike, I would recommend that you don't block on the IETF.
-Use the tech that is available today (ex. WebTransport + WebCodecs) instead of a promised "standard".
+Use the tech that is available today (ex. WebTransport + WebCodecs) instead of a promised standard.
 
 You can always hit [me](https://github.com/kixelated) up on [Discord](https://discord.gg/FCYF3p99mr) if you want to use MoQ and crave more advice.
 I can't promise that it will be good advice though.
