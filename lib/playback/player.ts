@@ -142,7 +142,6 @@ export class Player {
 		for (;;) {
 			const frame = await Frame.decode(group)
 			if (!frame) break
-			console.log("frame", frame)
 
 			await segment.write(frame)
 		}
