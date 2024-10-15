@@ -29,14 +29,19 @@ And they have some bizarre requirements.
 
 A concrete example: **sequential IDs**.
 Every sane internet transport over lossy networks use sequential IDs: TCP, RTP, QUIC, etc.
-The idea is that receiver can detect gaps caused by loss.
-In my case, I want the player and CDN to know that there's no gap between frame 5 and frame 6, avoiding the need ask upstream (ex. "does frame 5.5 exist?").
-But no, the Cisco folks insist that we MUST support both explicit and implicit gaps and have yet to elaborate why.
+The idea is that receiver can detect gaps caused by loss by inspecting sequence numbers. 
+For example, after receiving packets `7 8 10`, a receiver knows that packet `9` is still in flight, eventually giving up if it takes too long.
+
+However, the Cisco folks insist that sequence numbers are arbitrary application data that can have both implicit AND explicit gaps.
+To borrow Javascript terminology: packet 9 could be marked as `null` (exists but empty), `undefined` (never existed), or `pending` (still in flight).
+This is a problem because a player and CDN can't tell the difference between `undefined` and `pending`.
+In the previous example, if the application just decided to skip `9` for the luls (`undefined`), now every downstream (CDN and player) has to explicitly query "is there a hole in my buffer?" even when there is zero packet loss. 
 
 This may seem like a trivial transport detail, but it's one of many infuriating debates that have lasted years and will never be resolved while the current WG dynamics exist.
-There's no need to compromise when the working group is stacked.
+The worst part is that we still don't know why this requirement exists despite constant probing, making it extra impossible to argue against or provide alternatives. 
+There's no need to compromise or debate when the working group is stacked.
 
-The result so far can only be described as _obtuse_.
+The current protocol can only be described as _obtuse_.
 When a user asks how to use MoQ, I don't have an answer except for: "_it depends_".
 The [transport draft](https://www.ietf.org/archive/id/draft-ietf-moq-transport-06.html) has become so abstracted and optional, with few reliable properties.
 It's a Temo Swiss Army Knife; capable of doing everything badly instead of the one thing it should focus on: _live media_.
