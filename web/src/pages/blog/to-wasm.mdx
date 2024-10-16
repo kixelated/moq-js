@@ -1,0 +1,64 @@
+# To WASM, or not to WASM
+I'm losing sleep over whether the web client should be written in Rust or Typescript.
+This post is going to be a little bit different: I need your opinion.
+
+## Frontend
+But first I'm going to spew my own opinion.
+The UI layer will absolutely be written in Typescript using a flavor-of-the-month web framework.
+I'm not going to use Yew or any other React clone written in Rust.
+
+Why?
+It's pretty simple, I need frontend contributors.
+I don't think it's fair to ask a frontend savant to learn Rust and deal with the restrictions imposed by the language.
+Also, I've heard that the Rust frontend ecosystem still has a long way to go.
+
+My plan instead is create a custom element that abstracts away the underlying implementation; similar to the `<video>` tag.
+Use whatever frontend framework you want to interface with the UI-less `<moq>` element.
+
+## Contexts
+What is up for debate is the language used to power this custom element.
+It will need some code to function in three different contexts:
+
+1. Main Thread
+2. WebWorker
+3. AudioWorklet
+
+Unfortunately, the **main thread** needs to do some setup thanks to `AudioContext`.
+Something needs to initialize the worker and worklet of course.
+But the AudioContext also needs to be initialized on the main thread and configured with an specific frequency.
+
+The **WebWorker** will perform any networking, decoding/encoding, and rendering.
+These are done via `WebTransport`, `WebCodecs`, and `OffscreenCanvas` respectively.
+This is the bulk of the logic but most of the heavy processing is handled by Web APIs.
+
+The **AudioWorklet** is a nightmare.
+In order to render audio with minimal latency, you need to use an AudioWorklet that runs on the audio thread.
+This is completely sandboxed and triggers a callback every ~2ms to request the next 128 audio samples.
+
+## Main Thread 
+Let's cover the easiest decision first.
+
+The small amount of code backing the custom element can be written in Typescript.
+It will initialize the WebWorker, AudioContext, and AudioWorklet.
+The custom element API will be shimmed into a postMessage to the worker.
+
+However, one snag is that we don't know the frequency for the AudioContext until after loading the broadcast metadata (via MoQ).
+I also think we will eventually need a way to reinitialize the audio context, like when the frequency changes.
+The worker probably needs to drive that decision, posting a message when it wants to initialize audio.
+
+The benefit of Typescript here is that it's simple and avoids any blocking WASM load.
+In theory we could also start establishing the connection to MoQ server while the WASM module is loading, avoiding the annoying startup time.
+
+## WebWorker
+Now this decision is trickier.
+
+WASM in a WebWorker makes a lot of sense because the worker can be thought as a sandbox already.
+We don't want to block the main thread and are willing to use a separate thread and gross interface (`postMessage`) already.
+
+My biggest concern is the performance.
+WASM will undoubtedly be *slower* even when written in the crab language.
+
+
+
+
+
