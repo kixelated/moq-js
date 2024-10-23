@@ -16,37 +16,50 @@ export class Subscriber {
 		this.#quic = quic
 	}
 
-	async announced(prefix: string): Promise<Queue<Announced>> {
+	async announced(prefix: string[]): Promise<Queue<Announced>> {
 		const announced = new Queue<Announced>()
 
 		const msg = new Message.AnnounceInterest(prefix)
 		const stream = await Stream.open(this.#quic, msg)
 
-		this.runAnnounced(stream, announced)
+		this.runAnnounced(stream, announced, prefix)
 			.then(() => announced.close())
 			.catch((err) => announced.abort(err))
 
 		return announced
 	}
 
-	async runAnnounced(stream: Stream, announced: Queue<Announced>) {
-		const toggle: Map<string, Announced> = new Map()
+	async runAnnounced(stream: Stream, announced: Queue<Announced>, prefix: string[]) {
+		const toggle: Map<string[], Announced> = new Map()
 
-		for (;;) {
-			const announce = await Message.Announce.decode_maybe(stream.reader)
-			if (!announce) {
-				break
-			}
+		try {
+			for (;;) {
+				const announce = await Message.Announce.decode_maybe(stream.reader)
+				if (!announce) {
+					break
+				}
 
-			const existing = toggle.get(announce.broadcast)
-			if (existing) {
-				existing.close()
-				toggle.delete(announce.broadcast)
-			} else {
-				const item = new Announced(announce)
-				await announced.push(item)
-				toggle.set(announce.broadcast, item)
+				const existing = toggle.get(announce.suffix)
+				if (existing) {
+					if (announce.status == "active") {
+						throw new Error("duplicate announce")
+					}
+
+					existing.close()
+					toggle.delete(announce.suffix)
+				} else {
+					if (announce.status == "closed") {
+						throw new Error("unknown announce")
+					}
+
+					const path = prefix.concat(announce.suffix)
+					const item = new Announced(path)
+					await announced.push(item)
+					toggle.set(announce.suffix, item)
+				}
 			}
+		} finally {
+			toggle.forEach((item) => item.close())
 		}
 	}
 
@@ -100,12 +113,12 @@ export class Subscriber {
 }
 
 export class Announced {
-	readonly broadcast: string
+	readonly path: string[]
 
 	#closed = new Watch<Closed | undefined>(undefined)
 
-	constructor(msg: Message.Announce) {
-		this.broadcast = msg.broadcast
+	constructor(path: string[]) {
+		this.path = path
 	}
 
 	close(err = new Closed()) {

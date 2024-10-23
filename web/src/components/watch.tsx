@@ -4,10 +4,10 @@ import * as Catalog from "@kixelated/moq/karp/catalog"
 
 import Fail from "./fail"
 
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createSignal, onCleanup } from "solid-js"
 import { Client, Connection } from "@kixelated/moq/transfork"
 
-export default function Watch(props: { name: string }) {
+export default function Watch(props: { path: string[] }) {
 	// Use query params to allow overriding environment variables.
 	const urlSearchParams = new URLSearchParams(window.location.search)
 	const params = Object.fromEntries(urlSearchParams.entries())
@@ -40,7 +40,7 @@ export default function Watch(props: { name: string }) {
 		const connection = useConnection()
 		if (!connection) return
 
-		Catalog.fetch(connection, props.name)
+		Catalog.fetch(connection, props.path)
 			.then(setCatalog)
 			.catch((err) => setError(new Error(`failed to fetch catalog: ${err}`)))
 	})
@@ -62,7 +62,7 @@ export default function Watch(props: { name: string }) {
 	})
 
 	const play = () => {
-		usePlayer()?.play().catch(setError)
+		usePlayer()?.play()
 	}
 
 	// NOTE: The canvas automatically has width/height set to the decoded video size.

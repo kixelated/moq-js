@@ -7,11 +7,11 @@ export class Broadcast {
 	readers = 0
 	closed?: Closed
 
-	constructor(public name: string) {}
+	constructor(public path: string[]) {}
 
 	createTrack(name: string, priority: number): Track {
 		if (this.closed) throw this.closed
-		const track = new Track(this.name, name, priority)
+		const track = new Track(this.path, name, priority)
 		track.readers += 1 // Avoid closing the track when all readers are closed
 		this.tracks.set(track.name, track)
 		return track
@@ -41,8 +41,8 @@ export class BroadcastReader {
 		}
 	}
 
-	get name(): string {
-		return this.#broadcast.name
+	get path(): string[] {
+		return this.#broadcast.path
 	}
 
 	close() {
@@ -52,7 +52,7 @@ export class BroadcastReader {
 }
 
 export class Track {
-	readonly broadcast: string
+	readonly broadcast: string[]
 	readonly name: string
 	readonly priority: number
 	order = Order.Any
@@ -63,7 +63,7 @@ export class Track {
 	readers = 0
 	closed?: Closed
 
-	constructor(broadcast: string, name: string, priority: number) {
+	constructor(broadcast: string[], name: string, priority: number) {
 		this.broadcast = broadcast
 		this.name = name
 		this.priority = priority

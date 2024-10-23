@@ -145,7 +145,7 @@ export default function Publish() {
 		}
 
 		return new Broadcast({
-			name: name,
+			path: [name],
 			media: d,
 			audio: a,
 			video: v,

@@ -159,6 +159,17 @@ export class Reader {
 		return new TextDecoder().decode(buffer)
 	}
 
+	async path(): Promise<string[]> {
+		const parts = await this.u53()
+		const path = []
+
+		for (let i = 0; i < parts; i++) {
+			path.push(await this.string())
+		}
+
+		return path
+	}
+
 	async u8(): Promise<number> {
 		await this.#fillTo(1)
 		return this.#slice(1)[0]
@@ -298,6 +309,13 @@ export class Writer {
 		const data = new TextEncoder().encode(str)
 		await this.u53(data.byteLength)
 		await this.write(data)
+	}
+
+	async path(path: string[]) {
+		await this.u53(path.length)
+		for (const part of path) {
+			await this.string(part)
+		}
 	}
 
 	async close() {

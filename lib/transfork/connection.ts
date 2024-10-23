@@ -50,7 +50,7 @@ export class Connection {
 		this.#publisher.announce(broadcast)
 	}
 
-	async announced(prefix = ""): Promise<Queue<Announced>> {
+	async announced(prefix = []): Promise<Queue<Announced>> {
 		return this.#subscriber.announced(prefix)
 	}
 
