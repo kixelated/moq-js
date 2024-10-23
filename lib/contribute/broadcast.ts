@@ -6,7 +6,7 @@ import * as Video from "./video"
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
-	name: string
+	path: string[]
 	media: MediaStream
 
 	audio?: AudioEncoderConfig
@@ -24,11 +24,11 @@ export class Broadcast {
 
 	constructor(config: BroadcastConfig) {
 		this.#config = config
-		this.#broadcast = new Transfork.Broadcast(config.name)
+		this.#broadcast = new Transfork.Broadcast(config.path)
 	}
 
 	async publish(connection: Transfork.Connection) {
-		const broadcast: Catalog.Broadcast = { name: this.#config.name, audio: [], video: [] }
+		const broadcast: Catalog.Broadcast = { path: this.#config.path, audio: [], video: [] }
 
 		for (const media of this.#config.media.getTracks()) {
 			const settings = media.getSettings()

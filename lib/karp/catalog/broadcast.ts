@@ -3,7 +3,7 @@ import { decodeAudio, Audio } from "./audio"
 import { decodeVideo, Video } from "./video"
 
 export interface Broadcast {
-	name: string
+	path: string[]
 	video: Video[]
 	audio: Audio[]
 }
@@ -15,7 +15,7 @@ export function encode(catalog: Broadcast): Uint8Array {
 	return encoder.encode(str)
 }
 
-export function decode(broadcast: string, raw: Uint8Array): Broadcast {
+export function decode(path: string[], raw: Uint8Array): Broadcast {
 	const decoder = new TextDecoder()
 	const str = decoder.decode(raw)
 
@@ -24,12 +24,12 @@ export function decode(broadcast: string, raw: Uint8Array): Broadcast {
 		throw new Error("invalid catalog")
 	}
 
-	catalog.name = broadcast
+	catalog.path = path
 	return catalog
 }
 
-export async function fetch(connection: Transfork.Connection, broadcast: string): Promise<Broadcast> {
-	const track = new Transfork.Track(broadcast, "catalog.json", 0)
+export async function fetch(connection: Transfork.Connection, path: string[]): Promise<Broadcast> {
+	const track = new Transfork.Track(path, "catalog.json", 0)
 	const sub = await connection.subscribe(track)
 	try {
 		const segment = await sub.nextGroup()
@@ -39,7 +39,7 @@ export async function fetch(connection: Transfork.Connection, broadcast: string)
 		if (!frame) throw new Error("no catalog frame")
 
 		segment.close()
-		return decode(broadcast, frame)
+		return decode(path, frame)
 	} finally {
 		sub.close()
 	}

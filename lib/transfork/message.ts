@@ -141,19 +141,26 @@ export class SessionInfo {
 	}
 }
 
-export class Announce {
-	broadcast: string
+export type AnnounceStatus = "active" | "closed"
 
-	constructor(broadcast: string) {
-		this.broadcast = broadcast
+export class Announce {
+	suffix: string[]
+	status: AnnounceStatus
+
+	constructor(suffix: string[], status: AnnounceStatus) {
+		this.suffix = suffix
+		this.status = status
 	}
 
 	async encode(w: Writer) {
-		await w.string(this.broadcast)
+		await w.u53(this.status == "active" ? 1 : 0)
+		await w.path(this.suffix)
 	}
 
 	static async decode(r: Reader): Promise<Announce> {
-		return new Announce(await r.string())
+		const status = (await r.u53()) == 1 ? "active" : "closed"
+		const suffix = await r.path()
+		return new Announce(suffix, status)
 	}
 
 	static async decode_maybe(r: Reader): Promise<Announce | undefined> {
@@ -165,14 +172,15 @@ export class Announce {
 export class AnnounceInterest {
 	static StreamID = 0x1
 
-	constructor(public prefix: string) {}
+	constructor(public prefix: string[]) {}
 
 	async encode(w: Writer) {
-		await w.string(this.prefix)
+		await w.path(this.prefix)
 	}
 
 	static async decode(r: Reader): Promise<AnnounceInterest> {
-		return new AnnounceInterest(await r.string())
+		const prefix = await r.path()
+		return new AnnounceInterest(prefix)
 	}
 }
 
@@ -224,12 +232,12 @@ export class SubscribeUpdate {
 
 export class Subscribe extends SubscribeUpdate {
 	id: bigint
-	broadcast: string
+	broadcast: string[]
 	track: string
 
 	static StreamID = 0x2
 
-	constructor(id: bigint, broadcast: string, track: string, priority: number) {
+	constructor(id: bigint, broadcast: string[], track: string, priority: number) {
 		super(priority)
 
 		this.id = id
@@ -239,14 +247,14 @@ export class Subscribe extends SubscribeUpdate {
 
 	async encode(w: Writer) {
 		await w.u62(this.id)
-		await w.string(this.broadcast)
+		await w.path(this.broadcast)
 		await w.string(this.track)
 		await super.encode(w)
 	}
 
 	static async decode(r: Reader): Promise<Subscribe> {
 		const id = await r.u62()
-		const broadcast = await r.string()
+		const broadcast = await r.path()
 		const track = await r.string()
 		const update = await super.decode(r)
 
@@ -295,23 +303,25 @@ export class Info {
 }
 
 export class InfoRequest {
-	broadcast: string
+	broadcast: string[]
 	track: string
 
 	static StreamID = 0x5
 
-	constructor(broadcast: string, track: string) {
+	constructor(broadcast: string[], track: string) {
 		this.broadcast = broadcast
 		this.track = track
 	}
 
 	async encode(w: Writer) {
-		await w.string(this.broadcast)
+		await w.path(this.broadcast)
 		await w.string(this.track)
 	}
 
 	static async decode(r: Reader): Promise<InfoRequest> {
-		return new InfoRequest(await r.string(), await r.string())
+		const broadcast = await r.path()
+		const track = await r.string()
+		return new InfoRequest(broadcast, track)
 	}
 }
 

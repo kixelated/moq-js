@@ -8,7 +8,7 @@ export class Publisher {
 	#quic: WebTransport
 
 	// Our announced broadcasts.
-	#announce = new Map<string, Broadcast>()
+	#announce = new Map<string[], Broadcast>()
 
 	// Their subscribed tracks.
 	#subscribe = new Map<bigint, Subscribed>()
@@ -19,23 +19,28 @@ export class Publisher {
 
 	// Announce a track broadcast.
 	announce(broadcast: Broadcast) {
-		if (this.#announce.has(broadcast.name)) {
-			throw new Error(`already announced: ${broadcast.name}`)
+		if (this.#announce.has(broadcast.path)) {
+			throw new Error(`already announced: ${broadcast.path.toString()}`)
 		}
 
-		this.#announce.set(broadcast.name, broadcast)
+		this.#announce.set(broadcast.path, broadcast)
 	}
 
-	#get(msg: { broadcast: string; track: string }): TrackReader | undefined {
+	#get(msg: { broadcast: string[]; track: string }): TrackReader | undefined {
 		return this.#announce.get(msg.broadcast)?.reader().getTrack(msg.track)
 	}
 
 	async runAnnounce(msg: Message.AnnounceInterest, stream: Stream) {
 		for (const announce of this.#announce.values()) {
-			if (announce.name.startsWith(msg.prefix)) {
-				const msg = new Message.Announce(announce.name)
-				await msg.encode(stream.writer)
-			}
+			if (announce.path.length < msg.prefix.length) continue
+
+			const prefix = announce.path.slice(0, msg.prefix.length)
+			if (prefix != msg.prefix) continue
+
+			const suffix = announce.path.slice(msg.prefix.length)
+
+			const active = new Message.Announce(suffix, "active")
+			await active.encode(stream.writer)
 		}
 
 		// TODO support updates.
