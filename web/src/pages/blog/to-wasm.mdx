@@ -1,6 +1,6 @@
 # To WASM, or not to WASM
 I'm losing sleep over whether the web client should be written in Rust or Typescript.
-This post is going to be a little bit different: I need your opinion.
+I need your opinion, my beautiful little rubber duckies.
 
 ## Frontend
 But first I'm going to spew my own opinion.
@@ -10,10 +10,14 @@ I'm not going to use Yew or any other React clone written in Rust.
 Why?
 It's pretty simple, I need frontend contributors.
 I don't think it's fair to ask a frontend savant to learn Rust and deal with the restrictions imposed by the language.
-Also, I've heard that the Rust frontend ecosystem still has a long way to go.
 
-My plan instead is create a custom element that abstracts away the underlying implementation; similar to the `<video>` tag.
-Use whatever frontend framework you want to interface with the UI-less `<moq>` element.
+Additionally, the JavaScript web frameworks are more mature and used in production.
+I'm not suggesting that you can't use a Rust frontend library, just that they won't be nearly as polished or feature complete.
+
+"@kixelated ur dumb" if you disagree.
+
+My plan instead is create a custom `<moq-karp>` element that abstracts away the underlying implementation; similar to the `<video>` tag.
+Then you can use whatever frontend framework you want to interface with the UI-less element.
 
 ## Contexts
 What is up for debate is the language used to power this custom element.
@@ -38,27 +42,66 @@ This is completely sandboxed and triggers a callback every ~2ms to request the n
 ## Main Thread 
 Let's cover the easiest decision first.
 
-The small amount of code backing the custom element can be written in Typescript.
+The small amount of code backing the custom element should be written in Typescript.
 It will initialize the WebWorker, AudioContext, and AudioWorklet.
 The custom element API will be shimmed into a postMessage to the worker.
 
-However, one snag is that we don't know the frequency for the AudioContext until after loading the broadcast metadata (via MoQ).
-I also think we will eventually need a way to reinitialize the audio context, like when the frequency changes.
-The worker probably needs to drive that decision, posting a message when it wants to initialize audio.
-
 The benefit of Typescript here is that it's simple and avoids any blocking WASM load.
-In theory we could also start establishing the connection to MoQ server while the WASM module is loading, avoiding the annoying startup time.
+In theory we could also start establishing the connection to MoQ server while the WASM module is loading too, avoiding the annoying startup
 
 ## WebWorker
 Now this decision is trickier.
 
-WASM in a WebWorker makes a lot of sense because the worker can be thought as a sandbox already.
-We don't want to block the main thread and are willing to use a separate thread and gross interface (`postMessage`) already.
+WASM in a WebWorker makes a lot of sense because the worker is in a sandbox already.
+An API that you use to communicate with a WebWorker will be very similar to an API that you use to communicate with a WASM module.
 
 My biggest concern is the performance.
-WASM will undoubtedly be *slower* even when written in the crab language.
+WASM will undoubtedly be *slower* even when written in the 🦀 language.
 
+Why?
+Well one thing you can do with WebWorkers but can't do with WASM yet is a zero-copy (transferrable).
 
+That means every byte received over the network (WebTransport) would need to be copied to WASM and then immediately copied back to decode (WebCodecs).
+We might even need to perform *another* copy to and from in order to render each frame, although fortunately I think this can be avoided thanks to WebCodecs' hardware offload.
 
+Am I being paranoid and over-optimizing?
+Almost certainly.
+There are other reasons to keep the worker in Typescript, again for more contributions and faster startup times.
+Not to mention that interfacing with JavaScript from Rust is still pretty dreadful.
+There are just some things, like callbacks, that don't translate well to Rust and involve a ton of unchecked casts.
 
+But if written in Rust, then all of this code would be shareable with native apps.
+Surely there's justification for a more complicated but reusable web library?
 
+Another "@kixelated ur dumb" in chat please.
+
+## WebWorklet
+Finally, my least favorite component: *audio*.
+
+I barely understand how beeps and boops are encoded into bytes and samples.
+But I do know from experience that just outputing audio samples is difficult on the web.
+
+For minimum latency, you need to create an AudioWorklet that runs on a dedicated audio thread.
+You can think of it like an WebWorker but even more sandboxed.
+This worklet runs a callback every ~2ms to gather the next 128 audio samples.
+
+So we first need to get decoded audio samples to this AudioWorklet.
+There is a `postMessage` API but apparently the lowest latency approach is to code a ring buffer... in JavaScript.
+I'm not kidding, you use SharedArrayBuffer and Atomics in a language that doesn't have a dedicated integer type (`number` is secretly a `float64`, so math gets wonky above 2^53).
+
+Right now we render the samples unmodified.
+However, in the future, we'll need to perform some audio processing for features like echo cancellation and AI voice changers (gotta raise funding somehow).
+This part seems miserable to do in JavaScript.
+
+From my limited research, it does seem possible to run WASM inside of an AudioWorklet.
+However, SharedArrayBuffer and Atomics are not yet supported in WASM so some additional latency is unavoidable.
+But I imagine `postMessage` only incurs a few milliseconds at most.
+It probably doesn't matter when the network jitter buffer is already closer to 100ms.
+
+In fact, this might be a great problem turned solution, because SharedArrayBuffer requires some quite annoying CORS settings that would be nice to remove.
+It's also just a huge headache to interface with a fixed size buffer given the uneven arrival over the network.
+
+So I'm definitely leaning towards Rust here regardless of the WebWorker decision.
+"@kixelated ur dumb"
+
+## Decision Time
