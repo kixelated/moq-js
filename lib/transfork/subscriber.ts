@@ -66,7 +66,7 @@ export class Subscriber {
 	// TODO: Deduplicate identical subscribes
 	async subscribe(track: Track): Promise<TrackReader> {
 		const id = this.#subscribeNext++
-		const msg = new Message.Subscribe(id, track.broadcast, track.name, track.priority)
+		const msg = new Message.Subscribe(id, track.path, track.priority)
 
 		const stream = await Stream.open(this.#quic, msg)
 		const subscribe = new Subscribe(id, stream, track)

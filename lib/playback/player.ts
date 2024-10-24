@@ -62,8 +62,8 @@ export class Player {
 	}
 
 	async #runAudio(audio: Catalog.Audio) {
-		const track = new Track(this.#broadcast.path, audio.track.name, audio.track.priority)
-		const sub = await this.#connection.subscribe(new Track(this.#broadcast.path, track.name, track.priority))
+		const track = new Track(this.#broadcast.path.concat(audio.track.name), audio.track.priority)
+		const sub = await this.#connection.subscribe(track)
 
 		try {
 			for (;;) {
@@ -80,8 +80,8 @@ export class Player {
 	}
 
 	async #runVideo(video: Catalog.Video) {
-		const track = new Track(this.#broadcast.path, video.track.name, video.track.priority)
-		const sub = await this.#connection.subscribe(new Track(this.#broadcast.path, track.name, track.priority))
+		const track = new Track(this.#broadcast.path.concat(video.track.name), video.track.priority)
+		const sub = await this.#connection.subscribe(track)
 
 		try {
 			for (;;) {
