@@ -5,7 +5,6 @@ export interface Video {
 	track: Track
 	codec: string
 	description?: Uint8Array
-	timescale: number
 	bitrate?: number
 	frame_rate?: number
 	resolution: Dimensions
@@ -19,7 +18,6 @@ export interface Dimensions {
 export function decodeVideo(o: any): o is Video {
 	if (!decodeTrack(o.track)) return false
 	if (typeof o.codec !== "string") return false
-	if (typeof o.timescale !== "number") return false
 	if (typeof o.description !== "string") return false
 
 	o.description = Hex.decode(o.description)
