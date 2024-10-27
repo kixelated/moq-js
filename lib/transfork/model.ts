@@ -2,58 +2,8 @@ import { Watch } from "../common/async"
 import { Closed } from "./error"
 import { Order } from "./message"
 
-export class Broadcast {
-	tracks = new Map<string, Track>()
-	readers = 0
-	closed?: Closed
-
-	constructor(public path: string[]) {}
-
-	createTrack(name: string, priority: number): Track {
-		if (this.closed) throw this.closed
-		const track = new Track(this.path, name, priority)
-		track.readers += 1 // Avoid closing the track when all readers are closed
-		this.tracks.set(track.name, track)
-		return track
-	}
-
-	reader(): BroadcastReader {
-		this.readers += 1
-		return new BroadcastReader(this)
-	}
-
-	close(err = new Closed()) {
-		this.closed = err
-	}
-}
-
-export class BroadcastReader {
-	#broadcast: Broadcast
-
-	constructor(broadcast: Broadcast) {
-		this.#broadcast = broadcast
-	}
-
-	getTrack(name: string): TrackReader | undefined {
-		const track = this.#broadcast.tracks.get(name)
-		if (track) {
-			return new TrackReader(track)
-		}
-	}
-
-	get path(): string[] {
-		return this.#broadcast.path
-	}
-
-	close() {
-		this.#broadcast.readers -= 1
-		if (this.#broadcast.readers <= 0) this.#broadcast.close()
-	}
-}
-
 export class Track {
-	readonly broadcast: string[]
-	readonly name: string
+	readonly path: string[]
 	readonly priority: number
 	order = Order.Any
 
@@ -63,9 +13,8 @@ export class Track {
 	readers = 0
 	closed?: Closed
 
-	constructor(broadcast: string[], name: string, priority: number) {
-		this.broadcast = broadcast
-		this.name = name
+	constructor(path: string[], priority: number) {
+		this.path = path
 		this.priority = priority
 	}
 
@@ -126,8 +75,8 @@ export class TrackReader {
 		}
 	}
 
-	get name() {
-		return this.#track.name
+	get path() {
+		return this.#track.path
 	}
 
 	get order() {

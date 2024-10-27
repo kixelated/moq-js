@@ -20,6 +20,7 @@ export function decode(path: string[], raw: Uint8Array): Broadcast {
 	const str = decoder.decode(raw)
 
 	const catalog = JSON.parse(str)
+	console.log(catalog)
 	if (!decodeBroadcast(catalog)) {
 		throw new Error("invalid catalog")
 	}
@@ -29,7 +30,7 @@ export function decode(path: string[], raw: Uint8Array): Broadcast {
 }
 
 export async function fetch(connection: Transfork.Connection, path: string[]): Promise<Broadcast> {
-	const track = new Transfork.Track(path, "catalog.json", 0)
+	const track = new Transfork.Track(path.concat("catalog.json"), 0)
 	const sub = await connection.subscribe(track)
 	try {
 		const segment = await sub.nextGroup()
@@ -49,8 +50,10 @@ export function decodeBroadcast(catalog: any): catalog is Broadcast {
 	if (catalog.audio === undefined) catalog.audio = []
 	if (!Array.isArray(catalog.audio)) return false
 	if (!catalog.audio.every((track: any) => decodeAudio(track))) return false
+
 	if (catalog.video === undefined) catalog.video = []
 	if (!Array.isArray(catalog.video)) return false
 	if (!catalog.video.every((track: any) => decodeVideo(track))) return false
+
 	return true
 }

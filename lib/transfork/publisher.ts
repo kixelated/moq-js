@@ -2,13 +2,13 @@ import * as Message from "./message"
 import { Watch } from "../common/async"
 import { Stream, Writer } from "./stream"
 import { Closed } from "./error"
-import { Broadcast, GroupReader, TrackReader } from "./model"
+import { GroupReader, TrackReader } from "./model"
 
 export class Publisher {
 	#quic: WebTransport
 
 	// Our announced broadcasts.
-	#announce = new Map<string[], Broadcast>()
+	#announce = new Map<string[], TrackReader>()
 
 	// Their subscribed tracks.
 	#subscribe = new Map<bigint, Subscribed>()
@@ -17,17 +17,20 @@ export class Publisher {
 		this.#quic = quic
 	}
 
-	// Announce a track broadcast.
-	announce(broadcast: Broadcast) {
-		if (this.#announce.has(broadcast.path)) {
-			throw new Error(`already announced: ${broadcast.path.toString()}`)
+	// Publish a track
+	publish(track: TrackReader) {
+		if (this.#announce.has(track.path)) {
+			throw new Error(`already announced: ${track.path.toString()}`)
 		}
 
-		this.#announce.set(broadcast.path, broadcast)
+		this.#announce.set(track.path, track)
+
+		// TODO: clean up announcements
+		// track.closed().then(() => this.#announce.delete(track.path))
 	}
 
-	#get(msg: { broadcast: string[]; track: string }): TrackReader | undefined {
-		return this.#announce.get(msg.broadcast)?.reader().getTrack(msg.track)
+	#get(path: string[]): TrackReader | undefined {
+		return this.#announce.get(path)
 	}
 
 	async runAnnounce(msg: Message.AnnounceInterest, stream: Stream) {
@@ -53,7 +56,7 @@ export class Publisher {
 			throw new Error(`duplicate subscribe for id: ${msg.id}`)
 		}
 
-		const track = this.#get(msg)
+		const track = this.#get(msg.path)
 		if (!track) {
 			await stream.writer.reset(404)
 			return
@@ -96,7 +99,7 @@ export class Publisher {
 	}
 
 	async runInfo(msg: Message.InfoRequest, stream: Stream) {
-		const track = this.#get(msg)
+		const track = this.#get(msg.path)
 		if (!track) {
 			await stream.writer.reset(404)
 			return
@@ -109,34 +112,6 @@ export class Publisher {
 		await info.encode(stream.writer)
 
 		throw new Error("info not implemented")
-	}
-}
-
-export class Announce {
-	readonly broadcast: Broadcast
-	readonly stream: Stream
-
-	constructor(stream: Stream, broadcast: Broadcast) {
-		this.broadcast = broadcast
-		this.stream = stream
-	}
-
-	async run() {
-		try {
-			await this.closed()
-			await this.close()
-		} catch (err) {
-			await this.close(Closed.from(err))
-		}
-	}
-
-	async close(closed?: Closed) {
-		this.broadcast.close(closed)
-		await this.stream.close(closed?.code)
-	}
-
-	async closed() {
-		await this.stream.reader.closed()
 	}
 }
 

@@ -20,11 +20,11 @@ export interface BroadcastConfigTrack {
 
 export class Broadcast {
 	#config: BroadcastConfig
-	#broadcast: Transfork.Broadcast
+	#path: string[]
 
 	constructor(config: BroadcastConfig) {
 		this.#config = config
-		this.#broadcast = new Transfork.Broadcast(config.path)
+		this.#path = config.path
 	}
 
 	async publish(connection: Transfork.Connection) {
@@ -33,14 +33,12 @@ export class Broadcast {
 		for (const media of this.#config.media.getTracks()) {
 			const settings = media.getSettings()
 
-			const track: Catalog.Track = {
+			const info = {
 				name: media.id, // TODO way too verbose
 				priority: media.kind == "video" ? 1 : 2,
-				group_order: "desc",
-				group_expires: 0,
 			}
 
-			const data = this.#broadcast.createTrack(track.name, track.priority)
+			const track = new Transfork.Track(this.#config.path.concat(info.name), info.priority)
 
 			if (isVideoTrackSettings(settings)) {
 				if (!this.#config.video) {
@@ -48,7 +46,7 @@ export class Broadcast {
 				}
 
 				const encoder = new Video.Encoder(this.#config.video)
-				const packer = new Video.Packer(media as MediaStreamVideoTrack, encoder, data)
+				const packer = new Video.Packer(media as MediaStreamVideoTrack, encoder, track)
 
 				// TODO handle error
 				packer.run().catch((err) => console.error("failed to run video packer: ", err))
@@ -57,12 +55,11 @@ export class Broadcast {
 				const description = decoder.description ? new Uint8Array(decoder.description as ArrayBuffer) : undefined
 
 				const video: Catalog.Video = {
-					track: track,
+					track: info,
 					codec: decoder.codec,
 					description: description,
 					resolution: { width: settings.width, height: settings.height },
 					frame_rate: settings.frameRate,
-					timescale: 1000,
 					bitrate: this.#config.video.bitrate,
 				}
 
@@ -73,30 +70,31 @@ export class Broadcast {
 				}
 
 				const encoder = new Audio.Encoder(this.#config.audio)
-				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, data)
+				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, track)
 				packer.run().catch((err) => console.error("failed to run audio packer: ", err)) // TODO handle error
 
 				const decoder = await encoder.decoderConfig()
 
 				const audio: Catalog.Audio = {
-					track: track,
+					track: info,
 					codec: decoder.codec,
 					sample_rate: settings.sampleRate,
 					channel_count: settings.channelCount,
 					bitrate: this.#config.audio.bitrate,
-					timescale: 1000,
 				}
 
 				broadcast.audio.push(audio)
 			} else {
 				throw new Error(`unknown track type: ${media.kind}`)
 			}
+
+			connection.publish(track.reader())
 		}
 
-		const catalogTrack = this.#broadcast.createTrack("catalog.json", 0)
-		catalogTrack.appendGroup().writeFrames(Catalog.encode(broadcast))
+		const track = new Transfork.Track(this.#config.path.concat("catalog.json"), 0)
+		track.appendGroup().writeFrames(Catalog.encode(broadcast))
 
-		connection.publish(this.#broadcast)
+		connection.publish(track.reader())
 	}
 
 	close() {}

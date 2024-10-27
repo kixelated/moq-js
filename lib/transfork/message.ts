@@ -232,33 +232,29 @@ export class SubscribeUpdate {
 
 export class Subscribe extends SubscribeUpdate {
 	id: bigint
-	broadcast: string[]
-	track: string
+	path: string[]
 
 	static StreamID = 0x2
 
-	constructor(id: bigint, broadcast: string[], track: string, priority: number) {
+	constructor(id: bigint, path: string[], priority: number) {
 		super(priority)
 
 		this.id = id
-		this.broadcast = broadcast
-		this.track = track
+		this.path = path
 	}
 
 	async encode(w: Writer) {
 		await w.u62(this.id)
-		await w.path(this.broadcast)
-		await w.string(this.track)
+		await w.path(this.path)
 		await super.encode(w)
 	}
 
 	static async decode(r: Reader): Promise<Subscribe> {
 		const id = await r.u62()
-		const broadcast = await r.path()
-		const track = await r.string()
+		const path = await r.path()
 		const update = await super.decode(r)
 
-		const subscribe = new Subscribe(id, broadcast, track, update.priority)
+		const subscribe = new Subscribe(id, path, update.priority)
 		subscribe.order = update.order
 		subscribe.expires = update.expires
 		subscribe.start = update.start
@@ -303,25 +299,21 @@ export class Info {
 }
 
 export class InfoRequest {
-	broadcast: string[]
-	track: string
+	path: string[]
 
 	static StreamID = 0x5
 
-	constructor(broadcast: string[], track: string) {
-		this.broadcast = broadcast
-		this.track = track
+	constructor(path: string[]) {
+		this.path = path
 	}
 
 	async encode(w: Writer) {
-		await w.path(this.broadcast)
-		await w.string(this.track)
+		await w.path(this.path)
 	}
 
 	static async decode(r: Reader): Promise<InfoRequest> {
-		const broadcast = await r.path()
-		const track = await r.string()
-		return new InfoRequest(broadcast, track)
+		const path = await r.path()
+		return new InfoRequest(path)
 	}
 }
 
@@ -347,29 +339,25 @@ export class FetchUpdate {
 }
 
 export class Fetch extends FetchUpdate {
-	broadcast: string
-	track: string
+	path: string[]
 
 	static StreamID = 0x4
 
-	constructor(broadcast: string, track: string, priority: number) {
+	constructor(path: string[], priority: number) {
 		super(priority)
-		this.broadcast = broadcast
-		this.track = track
+		this.path = path
 	}
 
 	async encode(w: Writer) {
-		await w.string(this.broadcast)
-		await w.string(this.track)
+		await w.path(this.path)
 		await super.encode(w)
 	}
 
 	static async decode(r: Reader): Promise<Fetch> {
-		const broadcast = await r.string()
-		const track = await r.string()
+		const path = await r.path()
 		const update = await super.decode(r)
 
-		const fetch = new Fetch(broadcast, track, update.priority)
+		const fetch = new Fetch(path, update.priority)
 		return fetch
 	}
 }

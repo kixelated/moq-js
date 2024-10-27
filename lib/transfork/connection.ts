@@ -4,7 +4,7 @@ import { Stream, Reader } from "./stream"
 
 import { Publisher } from "./publisher"
 import { Announced, Subscriber } from "./subscriber"
-import { Broadcast, Track, TrackReader } from "./model"
+import { Track, TrackReader } from "./model"
 import { Closed } from "./error"
 import { Queue } from "../common/async"
 
@@ -46,8 +46,8 @@ export class Connection {
 		await Promise.all([session, bidis, unis])
 	}
 
-	publish(broadcast: Broadcast) {
-		this.#publisher.announce(broadcast)
+	publish(track: TrackReader) {
+		this.#publisher.publish(track)
 	}
 
 	async announced(prefix = []): Promise<Queue<Announced>> {
