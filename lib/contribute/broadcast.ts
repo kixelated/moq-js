@@ -60,7 +60,6 @@ export class Broadcast {
 					description: description,
 					resolution: { width: settings.width, height: settings.height },
 					frame_rate: settings.frameRate,
-					timescale: 1000,
 					bitrate: this.#config.video.bitrate,
 				}
 
@@ -82,7 +81,6 @@ export class Broadcast {
 					sample_rate: settings.sampleRate,
 					channel_count: settings.channelCount,
 					bitrate: this.#config.audio.bitrate,
-					timescale: 1000,
 				}
 
 				broadcast.audio.push(audio)
