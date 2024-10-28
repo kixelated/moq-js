@@ -107,7 +107,6 @@ export class Subscriber {
 			writer.writeFrame(frame)
 		}
 
-		console.trace("end of group", group)
 		writer.close()
 	}
 }

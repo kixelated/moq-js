@@ -1,6 +1,5 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
-import * as Catalog from "@kixelated/moq/karp/catalog"
 
 import Fail from "./fail"
 
@@ -17,9 +16,7 @@ export default function Watch(props: { path: string[] }) {
 
 	let canvas!: HTMLCanvasElement
 
-	const [useCatalog, setCatalog] = createSignal<Catalog.Broadcast | undefined>()
 	const [useConnection, setConnection] = createSignal<Connection | undefined>()
-
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
 
 	createEffect(() => {
@@ -38,19 +35,9 @@ export default function Watch(props: { path: string[] }) {
 
 	createEffect(() => {
 		const connection = useConnection()
-		if (!connection) return
+		if (!connection) return setPlayer(undefined)
 
-		Catalog.fetch(connection, props.path)
-			.then(setCatalog)
-			.catch((err) => setError(new Error(`failed to fetch catalog: ${err}`)))
-	})
-
-	createEffect(() => {
-		const connection = useConnection()
-		const catalog = useCatalog()
-		if (!connection || !catalog) return setPlayer(undefined)
-
-		setPlayer(new Player({ connection, catalog, canvas }))
+		setPlayer(new Player({ connection, path: props.path, canvas }))
 	})
 
 	createEffect(() => {
@@ -61,16 +48,12 @@ export default function Watch(props: { path: string[] }) {
 		player.closed().catch((err) => setError(new Error(`player closed: ${err}`)))
 	})
 
-	const play = () => {
-		usePlayer()?.play()
-	}
-
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
 			<Fail error={error()} />
-			<canvas ref={canvas} onClick={play} class="aspect-video w-full rounded-lg" />
+			<canvas ref={canvas} class="aspect-video w-full rounded-lg" />
 		</>
 	)
 }
