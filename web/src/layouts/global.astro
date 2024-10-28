@@ -7,6 +7,7 @@ interface Props {
 
 	frontmatter?: {
 		title: string
+		date: string
 	}
 }
 
@@ -49,6 +50,13 @@ if (frontmatter && frontmatter.title) title = frontmatter.title
 				</div>
 			</nav>
 			<article class="markdown">
+				{
+					frontmatter?.date && (
+						<p class="text-sm text-gray-400 text-right">
+							published {new Date(frontmatter.date).toLocaleDateString()}
+						</p>
+					)
+				}
 				<slot />
 			</article>
 		</div>
