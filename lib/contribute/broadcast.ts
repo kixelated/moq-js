@@ -8,6 +8,7 @@ import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 export interface BroadcastConfig {
 	path: string[]
 	media: MediaStream
+	id?: number
 
 	audio?: AudioEncoderConfig
 	video?: VideoEncoderConfig
@@ -23,8 +24,10 @@ export class Broadcast {
 	#path: string[]
 
 	constructor(config: BroadcastConfig) {
+		const id = config.id || new Date().getTime() / 1000
+
 		this.#config = config
-		this.#path = config.path
+		this.#path = config.path.concat(id.toString())
 	}
 
 	async publish(connection: Transfork.Connection) {
