@@ -1,0 +1,52 @@
+# Explaining MoQ
+wtf is moq
+
+## Layers
+We start our journey by slicing an onion.
+The most critical, and least documented, thing to understand is the layering.
+
+From bottom to top:
+- QUIC: The network layer
+- web-transport: 
+- moq-transfork
+- moq-karp
+
+
+
+## QUIC
+QUIC is that new protocol that powers HTTP/3.
+It's intended to be an generic improvement over TCP
+
+With TCP, an application has to decide how many connections to open, each involving an expensive TCP/TLS handshake.
+If you use multiple connections (like HTTP/1), they fight for bandwidth and you still can't drop messages without closing the connection.
+If you use a single connection (like HTTP/2), messages are delivered in order and cannot be dropped, causing head-of-line blocking.
+
+QUIC fixes this dilemma by providing a single connection with multiple streams.
+These streams can be created, delivered, and closed in parallel with minimal overhead.
+And crucially for MoQ, streams can be *prioritized* by the QUIC library so the most important data is transmitted (although not necessarily received) first.
+
+Note that QUIC uses UDP under the hood.
+This is frankly a necessity, as a new protocol over IP is difficult to support, as evidenced by SCTP.
+But it does cause some firewall and performance problems because the Internet is (currently) optimized for TCP.
+
+There's a LOT of little features so check out my QUIC POWERS blog post for more.
+
+## WebTransport 
+I just said QUIC was created for HTTP/3, what gives?
+
+Well you can totally use HTTP/3 to implement something like MoQ.
+However, the HTTP semantics add more hoops to jump through, for example long-polling to emulate a live stream.
+Somebody else can do Media over HTTP/3.
+
+What I am interested in is WebTransport.
+It's a browser API that exposes QUIC streams to a web application, similar to how WebSockets exposes TCP.
+There's not much else to say, it's basically the same thing as QUIC.
+
+...except that the underlying implementation is gross.
+WebTransport shares a QUIC connection with HTTP/3 and potentially other WebTransport sessions.
+This *pooling* feature is responsible for a ton of headaches but it's too late to argue against it any louder.
+There's also a TCP fallback in development (Http2Transport) but I would use WebSockets instead.
+
+Just use an exising WebTransport library (like mine!) and pretend that it's identical to QUIC.
+
+## MoqTransfork
