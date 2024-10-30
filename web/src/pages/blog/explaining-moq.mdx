@@ -11,7 +11,13 @@ From bottom to top:
 - moq-transfork
 - moq-karp
 
+This guide will also help explain the IETF drafts because while I forked them, the high level concepts are still very similar.
+Just gotta rename a few things:
 
+- transport -> transfork
+- warp -> karp
+
+Yes I only changed a few letters; your mental model will thank me.
 
 ## QUIC
 QUIC is that new protocol that powers HTTP/3.
@@ -50,3 +56,20 @@ There's also a TCP fallback in development (Http2Transport) but I would use WebS
 Just use an exising WebTransport library (like mine!) and pretend that it's identical to QUIC.
 
 ## MoqTransfork
+Finally, the good stuff.
+
+Remember the part where I said where don't want to use HTTP/3?
+It was literally in the previous section.
+Well, we do want some of the nice HTTP properties so it's time to make our own.
+
+One of the biggest headaches with WebRTC is the story around fan out.
+A broadcaster could establish a connection to all N viewers, but sending N copies of the data quickly becomes a problem especially on slow networks.
+Outside of 1:1 or niche peer-to-peer use-cases, WebRTC broadcasters instead connect to an SFU server and use the power of data centers to fan media out to all viewers.
+
+The problem with this approach is that it's surprisingly custom.
+There's no generic way for an application to signal *how* media should be forwarded, leading to divergent and usually proprietary SFU behavior.
+A (good) SFU is also very media specific, often parsing the payload on a per-codec basis to detect things like keyframes.
+All of this custom behavior deincentivises reuse and shrinks the available offerings.
+
+MoqTransfork is an ambitious attempt to learn from the succesess of HTTP and the affirmationed failures of WebRTC.
+But you know, for live content and not *hyper-text*.
