@@ -1,5 +1,5 @@
 # Explaining MoQ
-wtf is moq
+wtf is a moq
 
 ## Layers
 We start our journey by slicing an onion.
@@ -7,9 +7,10 @@ The most critical, and least documented, thing to understand is the layering.
 
 From bottom to top:
 - QUIC: The network layer
-- web-transport: 
-- moq-transfork
-- moq-karp
+- WebTransport: Browser compatibility 
+- MoqTransfork: Media-like pub/sub.
+- MoqKarp: The media layer.
+- UrApp: Your application.
 
 This guide will also help explain the IETF drafts because while I forked them, the high level concepts are still very similar.
 Just gotta rename a few things:
@@ -34,18 +35,26 @@ And crucially for MoQ, streams can be *prioritized* by the QUIC library so the m
 Note that QUIC uses UDP under the hood.
 This is frankly a necessity, as a new protocol over IP is difficult to support, as evidenced by SCTP.
 But it does cause some firewall and performance problems because the Internet is (currently) optimized for TCP.
+Also, QUIC currently doesn't support peer-to-peer, so the cloud haters are stuck with WebRTC for the meantime.
 
-There's a LOT of little features so check out my QUIC POWERS blog post for more.
+But why not build on top of UDP like scores of other, live media protocols?
+It's pretty simple actually:
+- QUIC is wicked smart: check out my QUIC POWERS blog post for more info.
+- QUIC benefits from economies of scale.
+
+We can build on the shoulders of smart individuals and smart (optimized) implementations.
+It's near perfect already.
 
 ## WebTransport 
-I just said QUIC was created for HTTP/3, what gives?
+I just said QUIC was created for HTTP/3... why not use it?
 
 Well you can totally use HTTP/3 to implement something like MoQ.
 However, the HTTP semantics add more hoops to jump through, for example long-polling to emulate a live stream.
-Somebody else can do Media over HTTP/3.
+Somebody else should and will make "Media over HTTP/3"
 
-What I am interested in is WebTransport.
+I'm interested in WebTransport instead.
 It's a browser API that exposes QUIC streams to a web application, similar to how WebSockets exposes TCP.
+The connection-oriented nature makes it significantly easier to push media without the HTTP request/response song and dance.
 There's not much else to say, it's basically the same thing as QUIC.
 
 ...except that the underlying implementation is gross.
@@ -73,3 +82,101 @@ All of this custom behavior deincentivises reuse and shrinks the available offer
 
 MoqTransfork is an ambitious attempt to learn from the succesess of HTTP and the affirmationed failures of WebRTC.
 But you know, for live content and not *hyper-text*.
+
+## MoqTransfork (explained)
+MoqTransfork is a pub/sub protocol loosely modeled after video encoding.
+However, it's generic and can be used to transport a wide variety of live content.
+
+The idea is that generic relays and CDNs implement MoqTransfork but no higher.
+There's enough information in the MoqTransfork headers to facilitate ideal caching and fanout out even in congested scenarios.
+The closest analogy is HTTP: a HTTP reverse proxy knows how to forward/cache requests based on HTTP headers and ignores the body.
+
+### Connection 
+A client establishes a QUIC/WebTransport connection to a remote server and negotiates the MoqTransfork version.
+
+Both the client and server can then publish or subscribe to tracks.
+Each subscription is scoped to a single track.
+The subscriber chooses the priority of each track, delegating to the publisher on a tie.
+
+A subscriber MUST initiate a subscription; you cannot push arbitrary tracks.
+However, the subscriber can (live) discover any tracks matching a provided prefix, making it easy to choose.
+
+
+### Track
+A track is a live series of independent groups.
+
+That's confusing so I'm spoiling the karp section: imagine tracks such as "480p", "audio", or "captions".
+A viewer might want "video" to be dropped in favor of "audio" during congestion so it's lower priority 
+A viewer might not want the "caption" track so it doesn't subscribe to it.
+
+Note that groups are *independent*.
+This means you could receive the latest group before receiving all of the prior group.
+In fact the subscriber can hint this behavior to the publisher: give me older, newer, or any groups first.
+More on that in the Karp section.
+
+### Group
+A group is a series of dependent frames.
+
+This one is easy: frames within a group usually dependent on prior frames.
+Another word for this is "delta encoded". There's no benefit in delivering these frames out of order because they cannot be decoded out of order.
+
+A MoqTransfork group maps 1:1 with a QUIC stream.
+This is the biggest difference between the IETF draft and my fork.
+I'm not even going to attempt to explain that draft's convoluted usage of QUIC.
+
+### Frame
+Literally just bytes.
+Well and an upfront size.
+
+## Karp
+Okay okay, so it's finally time for the big reveal.
+Karp is a layer on top of MoqTransfork that actually does the Media in MoQ.
+It's also the simplest.
+Wowee.
+
+Karp consists of a JSON "catalog" and a custom media container.
+The contents of both are actually modeled after the WebCodecs API; you have exactly the needed information to initialize the decoder and process each frame.
+
+### Catalog
+The catalog is a description of tracks within a broadcast.
+A viewer uses this metadata to decide if it wants a track and how to decode it.
+
+For example, a "480p" track:
+```
+```
+
+The catalog also contains the relationship between tracks.
+For example, two tracks could have the same content but different settings, like "480p" vs "1080p".
+A viewer should not subscribe to both of them and instead switch between them based on the indicated max bitrate.
+
+The catalog is very similar to a HLS/DASH playlist but it doesn't reek of Apple or XML.
+But it's also missing a ton of features and corresponding bloat.
+It's also similar to SDP from WebRTC but that format needs to be in hospice care already.
+
+The catalog itself is delivered as a MoqTransfork track.
+This might seem unnecessary until you realize that it now automatically supports *live updates*.
+Add or remove a track from the catalog and all subscribed viewers get the update free of charge.
+This is unironically a huge deal as it fixes a common frustration with the afformentioned playlist formats 
+
+Note that a catalog is not strictly required because track names are discoverable.
+But encoding information into the track name is extremely brittle and you should feel bad for doing it.
+The catalog is also a good place to include initialization information like the H.264 SPS/PPS instead of inline.
+
+### Media Container 
+Originally, Warp used fMP4 segments.
+This is great for a company like Twitch who already uses fMP4 (aka CMAF) for HLS/DASH delivery.
+
+Unfortunately, this container is not designed for live streaming.
+You can minimize latency by fragmenting (the f in fMP4) at each frame but this involves ~100 bytes of overhead. 
+In fact, half of that consists of kind/size pairs to construct the unnecessary XML-like boxes.
+This is nearly the size of OPUS audio packet and doubling our network usage for audio-only streams is unacceptable.
+
+So let's build our own container!
+It consists of:
+- A 1-8 byte presentation timestamp
+- A payload
+
+That's it.
+The rest of the information, like the track ID and if this is a keyframe, is part of the MoqTransfork layer.
+
+Obviously we'll need more information (ex. keying information) in the future so expect to see updates on this front.
