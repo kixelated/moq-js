@@ -29,16 +29,16 @@ And they have some bizarre requirements.
 
 A concrete example: **sequential IDs**.
 Every sane internet transport over lossy networks use sequential IDs: TCP, RTP, QUIC, etc.
-The idea is that receiver can detect gaps caused by loss by inspecting sequence numbers. 
+The idea is that receiver can detect gaps caused by loss by inspecting sequence numbers.
 For example, after receiving packets `7 8 10`, a receiver knows that packet `9` is still in flight, eventually giving up if it takes too long.
 
 However, the Cisco folks insist that sequence numbers are arbitrary application data that can have both implicit AND explicit gaps.
 To borrow Javascript terminology: packet 9 could be marked as `null` (exists but empty), `undefined` (never existed), or `pending` (still in flight).
 This is a problem because a player and CDN can't tell the difference between `undefined` and `pending`.
-In the previous example, if the application just decided to skip `9` for the luls (`undefined`), now every downstream (CDN and player) has to explicitly query "is there a hole in my buffer?" even when there is zero packet loss. 
+In the previous example, if the application just decided to skip `9` for the luls (`undefined`), now every downstream (CDN and player) has to explicitly query "is there a hole in my buffer?" even when there is zero packet loss.
 
 This may seem like a trivial transport detail, but it's one of many infuriating debates that have lasted years and will never be resolved while the current WG dynamics exist.
-The worst part is that we still don't know why this requirement exists despite constant probing, making it extra impossible to argue against or provide alternatives. 
+The worst part is that we still don't know why this requirement exists despite constant probing, making it extra impossible to argue against or provide alternatives.
 There's no need to compromise or debate when the working group is stacked.
 
 The current protocol can only be described as _obtuse_.
@@ -64,14 +64,14 @@ To this end, I've created:
 
 I swear there used to be [fork emoji](https://www.reddit.com/r/MandelaEffect/comments/16eq2nx/fork_emoji/).
 
-The demos on this site use both of course, but I still need to update a lot of documentation and fix any new bugs. 
+The demos on this site use both of course, but I still need to update a lot of documentation and fix any new bugs.
 
 ## New Release
 
 I've been working on this fork for a while now.
 I didn't want to release it until there was a critical mass of reasons to hard fork, so it's become a grab-bag of new features all getting merged at the same time.
 
--   [Experimental WASM player](https://github.com/kixelated/moq-wasm)
+-   [Experimental WASM player](https://github.com/kixelated/moq-web)
 -   New clustering protocol (using MoqTransfork!)
 -   CMAF -> Karp transmuxing
 -   Broadcast discovery
