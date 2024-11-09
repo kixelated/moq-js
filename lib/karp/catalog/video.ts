@@ -1,5 +1,5 @@
 import * as Hex from "../../common/hex"
-import { decodeTrack, Track } from "./track"
+import { decodeTrack, type Track } from "./track"
 
 export interface Video {
 	track: Track

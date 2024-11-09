@@ -1,4 +1,4 @@
-import { Reader, Writer } from "./stream"
+import type { Reader, Writer } from "./stream"
 
 export enum Version {
 	DRAFT_00 = 0xff000000,

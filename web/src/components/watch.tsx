@@ -3,7 +3,7 @@ import { Player } from "@kixelated/moq/playback"
 import Fail from "./fail"
 
 import { createEffect, createSignal, onCleanup } from "solid-js"
-import { Client, Connection } from "@kixelated/moq/transfork"
+import { Client, type Connection } from "@kixelated/moq/transfork"
 
 export default function Watch(props: { path: string[] }) {
 	// Use query params to allow overriding environment variables.

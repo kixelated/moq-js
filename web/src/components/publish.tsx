@@ -1,5 +1,5 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
-import { Client, Connection } from "@kixelated/moq/transfork"
+import { Client, type Connection } from "@kixelated/moq/transfork"
 import {
 	createSignal,
 	createEffect,
@@ -128,7 +128,7 @@ export default function Publish() {
 		client.connect().then(setConnection).catch(setError)
 	})
 
-	const createBroadcast = function () {
+	const createBroadcast = () => {
 		const d = device()
 		if (!d) {
 			throw new Error("no input selected")
@@ -197,7 +197,7 @@ export default function Publish() {
 	const isStatus = createSelector(status)
 
 	// Copy the link to the clipboard
-	const copyShare = function (event: MouseEvent) {
+	const copyShare = (event: MouseEvent) => {
 		event.preventDefault()
 
 		const target = event.currentTarget
@@ -337,7 +337,7 @@ function Device(props: {
 
 	let preview: HTMLVideoElement | undefined // undefined until mount
 
-	const loadUser = function () {
+	const loadUser = () => {
 		setMode("user")
 		setDevice(undefined)
 		props.setDeviceLoading(true)
@@ -349,7 +349,7 @@ function Device(props: {
 			.finally(() => props.setDeviceLoading(false))
 	}
 
-	const loadDisplay = function () {
+	const loadDisplay = () => {
 		setMode("display")
 		setDevice(undefined)
 		props.setDeviceLoading(true)
@@ -404,7 +404,7 @@ function Device(props: {
 		})
 	}
 
-	const updateDeviceInput = function (videoDevId: string, audioDevId: string) {
+	const updateDeviceInput = (videoDevId: string, audioDevId: string) => {
 		setVideoDeviceId(videoDevId)
 		setAudioDeviceId(audioDevId)
 		mediaDevices()
@@ -413,7 +413,7 @@ function Device(props: {
 			.catch(() => setMode("none"))
 	}
 
-	const deviceInputError = function (err: Error) {
+	const deviceInputError = (err: Error) => {
 		props.setError(err)
 		setMode("none")
 	}
@@ -494,11 +494,11 @@ function DeviceList(props: {
 		navigator.mediaDevices.enumerateDevices().then(setDevices).catch(props.onError)
 	})
 
-	const changeVideoDeviceId = function (videoDeviceId: string) {
+	const changeVideoDeviceId = (videoDeviceId: string) => {
 		props.onChange(videoDeviceId, props.audioDeviceId)
 	}
 
-	const changeAudioDeviceId = function (audioDeviceId: string) {
+	const changeAudioDeviceId = (audioDeviceId: string) => {
 		props.onChange(props.videoDeviceId, audioDeviceId)
 	}
 
@@ -724,7 +724,7 @@ function Video(props: {
 
 					<label>
 						Resolution
-						<select class="block w-64" name="resolution" onInput={(e) => setHeight(parseInt(e.target.value))}>
+						<select class="block w-64" name="resolution" onInput={(e) => setHeight(Number.parseInt(e.target.value))}>
 							<For each={supportedHeight()}>
 								{(value) => (
 									<option value={value} selected={value === height()}>
@@ -737,7 +737,7 @@ function Video(props: {
 
 					<label>
 						Frame Rate
-						<select name="fps" class="block w-64" onInput={(e) => setFps(parseInt(e.target.value))}>
+						<select name="fps" class="block w-64" onInput={(e) => setFps(Number.parseInt(e.target.value))}>
 							<For each={supportedFps()}>
 								{(value) => (
 									<option value={value} selected={value === fps()}>
@@ -758,7 +758,7 @@ function Video(props: {
 							max={4_000_000}
 							step={100_000}
 							value={bitrate()}
-							onInput={(e) => setBitrate(parseInt(e.target.value))}
+							onInput={(e) => setBitrate(Number.parseInt(e.target.value))}
 						/>
 					</label>
 				</div>
@@ -854,7 +854,7 @@ function Audio(props: {
 							max={256_000}
 							step={1_000}
 							value={bitrate()}
-							onInput={(e) => setBitrate(parseInt(e.target.value))}
+							onInput={(e) => setBitrate(Number.parseInt(e.target.value))}
 						/>
 					</label>
 				</div>

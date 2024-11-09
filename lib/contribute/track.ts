@@ -1,10 +1,10 @@
 import { Segment } from "./segment"
 import { Notify } from "../common/async"
-import { BroadcastConfig } from "./broadcast"
+import type { BroadcastConfig } from "./broadcast"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
-import { Frame } from "../karp/frame"
+import type { Frame } from "../karp/frame"
 
 export class Track {
 	name: string

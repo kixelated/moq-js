@@ -1,4 +1,4 @@
-import { Connection } from "../transfork/connection"
+import type { Connection } from "../transfork/connection"
 import * as Catalog from "../karp/catalog"
 import { Broadcast } from "./broadcast"
 
@@ -34,7 +34,7 @@ export class Player {
 
 			const path = announce.path.slice(0, this.#config.path.length + 1)
 
-			const id = parseInt(path[path.length - 1])
+			const id = Number.parseInt(path[path.length - 1])
 			if (id <= activeId) continue
 
 			const catalog = await Catalog.fetch(this.#config.connection, path)

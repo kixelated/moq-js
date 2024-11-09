@@ -1,4 +1,4 @@
-import { Group, GroupReader } from "../transfork/model"
+import type { Group, GroupReader } from "../transfork/model"
 import { setVint62 } from "../transfork/stream"
 
 export type FrameType = "key" | "delta"

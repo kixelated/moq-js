@@ -2,8 +2,8 @@ import { Queue, Watch } from "../common/async"
 import { Closed } from "./error"
 import * as Message from "./message"
 import { FrameReader } from "./frame"
-import { Stream, Reader } from "./stream"
-import { Track, TrackReader } from "./model"
+import { Stream, type Reader } from "./stream"
+import type { Track, TrackReader } from "./model"
 
 export class Subscriber {
 	#quic: WebTransport

@@ -1,12 +1,12 @@
-import { Connection } from "../transfork/connection"
-import * as Catalog from "../karp/catalog"
+import type { Connection } from "../transfork/connection"
+import type * as Catalog from "../karp/catalog"
 
 import { Track } from "../transfork"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
 import { Timeline } from "./timeline"
-import { GroupReader } from "../transfork/model"
+import type { GroupReader } from "../transfork/model"
 import { Frame } from "../karp/frame"
 
 // This class must be created on the main thread due to AudioContext.

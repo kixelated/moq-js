@@ -3,10 +3,10 @@ import { asError } from "../common/error"
 import { Stream, Reader } from "./stream"
 
 import { Publisher } from "./publisher"
-import { Announced, Subscriber } from "./subscriber"
-import { Track, TrackReader } from "./model"
+import { type Announced, Subscriber } from "./subscriber"
+import type { Track, TrackReader } from "./model"
 import { Closed } from "./error"
-import { Queue } from "../common/async"
+import type { Queue } from "../common/async"
 
 export class Connection {
 	// The established WebTransport session.

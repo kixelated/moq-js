@@ -2,8 +2,8 @@
 
 enum STATE {
 	READ_POS = 0, // The current read position
-	WRITE_POS, // The current write position
-	LENGTH, // Clever way of saving the total number of enums values.
+	WRITE_POS = 1, // The current write position
+	LENGTH = 2, // Clever way of saving the total number of enums values.
 }
 
 interface FrameCopyToOptions {

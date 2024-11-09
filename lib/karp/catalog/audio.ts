@@ -1,4 +1,4 @@
-import { decodeTrack, Track } from "./track"
+import { decodeTrack, type Track } from "./track"
 
 export interface Audio {
 	track: Track

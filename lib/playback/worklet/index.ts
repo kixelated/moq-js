@@ -1,6 +1,6 @@
 // TODO add support for @/ to avoid relative imports
 import { Ring } from "../../common/ring"
-import * as Message from "./message"
+import type * as Message from "./message"
 
 class Renderer extends AudioWorkletProcessor {
 	ring?: Ring

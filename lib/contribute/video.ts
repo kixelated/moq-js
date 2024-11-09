@@ -1,6 +1,6 @@
 import { Deferred } from "../common/async"
-import { Frame } from "../karp/frame"
-import { Group, Track } from "../transfork"
+import type { Frame } from "../karp/frame"
+import type { Group, Track } from "../transfork"
 import { Closed } from "../transfork/error"
 
 const SUPPORTED = [
