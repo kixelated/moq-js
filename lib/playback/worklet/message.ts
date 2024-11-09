@@ -1,4 +1,4 @@
-import { RingShared } from "../../common/ring"
+import type { RingShared } from "../../common/ring"
 
 export interface From {
 	config?: Config

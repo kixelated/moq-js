@@ -8,7 +8,7 @@ export default function Clock() {
 		let frame: number
 
 		const repaint = () => {
-			element.textContent = "browser: " + new Date().toISOString().split("T")[1].slice(0, 12)
+			element.textContent = `browser: ${new Date().toISOString().split("T")[1].slice(0, 12)}`
 			frame = requestAnimationFrame(repaint)
 		}
 

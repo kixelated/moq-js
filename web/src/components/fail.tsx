@@ -1,4 +1,4 @@
-import { createEffect, Show } from "solid-js"
+import { Show, createEffect } from "solid-js"
 
 export default function Fail(props: { error?: Error }) {
 	createEffect(() => {
