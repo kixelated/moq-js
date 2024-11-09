@@ -8,10 +8,12 @@ date: 2024-02-17
 ---
 
 # Forward? Error? Correction?
-So I absolutely *dunked* on datagrams in the [last blog post](/blog/never-use-datagrams).
+
+So I absolutely _dunked_ on datagrams in the [last blog post](/blog/never-use-datagrams).
 Now it's time to dunk on the last remaining hope for datagrams: [Forward Error Correction](https://www.techtarget.com/searchmobilecomputing/definition/forward-error-correction) (FEC).
 
 ## OPUS
+
 [Opus](https://opus-codec.org/) is an amazing audio codec.
 Full disclosure, I haven't had the opportunity to work with it directly;
 I was stuck in [AAC](https://en.wikipedia.org/wiki/Advanced_Audio_Coding) land at Twitch.
@@ -19,19 +21,20 @@ But that's not going to stop me from talking out of my ass.
 
 I want to rant about OPUS' built-in support for FEC.
 And to be clear, this isn't a rant specific to OPUS.
-Somebody *inevitably* asks for FEC in every networking protocol (like [MoQ](https://github.com/moq-wg/moq-transport/issues/320)) and you can link them this post now.
+Somebody _inevitably_ asks for FEC in every networking protocol (like [MoQ](https://github.com/moq-wg/moq-transport/issues/320)) and you can link them this post now.
 
 The general idea behind FEC is is to send redundant data so the receiver can paper over small amounts of packet loss.
 It's conceptually similar to [RAID](https://en.wikipedia.org/wiki/RAID) but for packets spread over time instead of hard drives.
 There are so many possible FEC schemes, many of which are patented, and I would do the subject a disservice if I even understood them.
 
 Conveniently, audio "frames" are so small that they fit into a single datagram.
-So rather than deal with retransmissions at the *disgusting* transport layer, the audio encoder can just encode redundancy via FEC.
+So rather than deal with retransmissions at the _disgusting_ transport layer, the audio encoder can just encode redundancy via FEC.
 🪦 RIP packet loss: 1983-2024 🪦
 
-But despite being a great idea on paper, there's *so* many things wrong with this.
+But despite being a great idea on paper, there's _so_ many things wrong with this.
 
 ## Networks are Complicated
+
 I worked with some very smart people at [Twitch](https://www.twitch.tv/).
 However, I will never forget a presentation maybe 4 years ago where a very smart codec engineer pitched using FEC.
 
@@ -42,34 +45,33 @@ It's a custom protocol using UDP+FEC and it's multiple times faster than TCP!
 
 <figure>
 	![Look at this graph](/blog/forward-error-correction/graph.jpeg)
-	<figcaption>
-		[Abridged recreation of the meeting](https://www.youtube.com/watch?v=sz2mmM-kN1I)
-	</figcaption>
+	<figcaption>[Abridged recreation of the meeting](https://www.youtube.com/watch?v=sz2mmM-kN1I)</figcaption>
 </figure>
 
 If somebody shows you any results based on simulated, random packet loss, you should politely tell them: **no, that's not how the internet works**.
 
 Networking is not quantum mechanics.
-There are no dice involved and packet loss is *not random*.
+There are no dice involved and packet loss is _not random_.
 It depends on the underlying transport.
 
-- Sometimes it occurs randomly due to signal interference.
-- Sometimes it occurs in bursts due to batching.
-- Sometimes it occurs due to congestion.
-- Sometimes it occurs because ???
+-   Sometimes it occurs randomly due to signal interference.
+-   Sometimes it occurs in bursts due to batching.
+-   Sometimes it occurs due to congestion.
+-   Sometimes it occurs because ???
 
 Unfortunately, there's no magic loophole on the internet.
 There's no one trick that has eluded TCP for 40 years, and yet the UDP geniuses have figured it out.
 You can't send 10x the data to mask packet loss.
 
 In fact, if you ever see a number like 30% packet loss in the real world (yikes), it's likely due to congestion.
-You're sending 30% *too much* and fully saturating a link.
-The solution is to send *less data*, not parity bits. 🤯
+You're sending 30% _too much_ and fully saturating a link.
+The solution is to send _less data_, not parity bits. 🤯
 
 **Fun-fact**: That's the fundamental difference between loss-based congestion control (ex. Reno, CUBIC) and delay-based congestion control (ex. BBR, COPA).
 BBRv1 doesn't even use packet loss as a signal; it's all about RTT.
 
 ## Expertise
+
 These packet loss misconceptions come up surprisingly often in the live video space.
 The hyperfocus on packet loss is a symptom of a larger problem: media experts suddenly have to become networking experts.
 
@@ -96,6 +98,7 @@ This is one of the many reasons why we need **Media over QUIC**.
 Let the network engineers handle the network and the media engineers handle the media.
 
 ## End-to-End
+
 But my beef with FEC in OPUS is more fundamental.
 
 When I speak into a microphone, the audio data is encoded into packets via a codec like OPUS.
@@ -111,14 +114,16 @@ By performing FEC in the application layer, specifically the audio codec, we're 
 It's suboptimal by definition because packet loss is a **hop-by-hop** property.
 
 ## Hop-by-Hop
+
 If not the audio codec, where should we perform FEC instead?
 
 In my ideal world, each hop uses a tailored loss recovery mechanism.
 This is based on the properties of the hop, and if they expect:
-- **burst loss**: delayed parity.
-- **random loss**: interleaved parity.
-- **low RTT**: retransmit packets.
-- **congestion**: drop packets.
+
+-   **burst loss**: delayed parity.
+-   **random loss**: interleaved parity.
+-   **low RTT**: retransmit packets.
+-   **congestion**: drop packets.
 
 But at which layer?
 A protocol like WiFi doesn't know the contents of each packet, especially if they're encrypted like every modern protocol.
@@ -133,6 +138,7 @@ If the transport layer knows the desired properties, then it can make the best d
 Not the audio codec.
 
 ## QUIC
+
 So I just dunked on FEC in OPUS.
 "Don't do FEC in the audio codec, do it in QUIC instead."
 
@@ -154,6 +160,7 @@ A QUIC library can send redundant [STREAM frames](https://www.rfc-editor.org/rfc
 It's wasteful but it's simple and might be good enough for some hops.
 
 ## In Defense of FEC
+
 This is a hot topic and I am quite ignorant.
 I don't to be too dismissive.
 
@@ -174,6 +181,7 @@ My point is that transport knows best.
 The audio encoder shouldn't know that there's a satellite link in the chain.
 
 ## Conclusion
+
 Audio is important. <br />
 Networks are complicated.<br />
 This is not haiku.
@@ -185,4 +193,5 @@ Do what works best for your users at whatever layer you control.
 Just please, never show me a graph based on random packet loss again.
 
 Written by [@kixelated](https://github.com/kixelated).
+
 <img src="/blog/kixelCat.png" class="inline w-16" />
