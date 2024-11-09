@@ -31,7 +31,11 @@ export class Broadcast {
 	}
 
 	async publish(connection: Transfork.Connection) {
-		const broadcast: Catalog.Broadcast = { path: this.#config.path, audio: [], video: [] }
+		const broadcast: Catalog.Broadcast = {
+			path: this.#config.path,
+			audio: [],
+			video: [],
+		}
 
 		for (const media of this.#config.media.getTracks()) {
 			const settings = media.getSettings()

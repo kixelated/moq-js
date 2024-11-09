@@ -2,10 +2,7 @@
 	"name": "moq-js",
 	"type": "module",
 	"private": true,
-	"workspaces": [
-		"lib",
-		"web"
-	],
+	"workspaces": ["lib", "web"],
 	"scripts": {
 		"dev": "npm run dev --workspace web",
 		"build": "npm run build --workspaces",

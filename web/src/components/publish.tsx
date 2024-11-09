@@ -228,15 +228,11 @@ export default function Publish() {
 				<Device setError={setError} setDevice={setDevice} setDeviceLoading={setDeviceLoading} />
 
 				<Show when={videoTrack()}>
-					{(track) => (
-						<Video setError={setError} setConfig={setVideo} track={track()} advanced={advanced()} />
-					)}
+					{(track) => <Video setError={setError} setConfig={setVideo} track={track()} advanced={advanced()} />}
 				</Show>
 
 				<Show when={audioTrack()}>
-					{(track) => (
-						<Audio setError={setError} setConfig={setAudio} track={track()} advanced={advanced()} />
-					)}
+					{(track) => <Audio setError={setError} setConfig={setAudio} track={track()} advanced={advanced()} />}
 				</Show>
 
 				<div class="h-12" />
@@ -403,7 +399,7 @@ function Device(props: {
 							},
 							sampleRate: { ideal: 48_000 },
 							deviceId: audioDeviceId(),
-					  },
+						},
 			video: videoDeviceId() === "disabled" ? false : videoTrackConstraints,
 		})
 	}
@@ -516,10 +512,7 @@ function DeviceList(props: {
 							return (
 								<option
 									value={device.deviceId}
-									selected={
-										(props.videoDeviceId === "" && i() === 0) ||
-										props.videoDeviceId === device.deviceId
-									}
+									selected={(props.videoDeviceId === "" && i() === 0) || props.videoDeviceId === device.deviceId}
 								>
 									{device.label}
 								</option>
@@ -540,10 +533,7 @@ function DeviceList(props: {
 							return (
 								<option
 									value={device.deviceId}
-									selected={
-										(props.videoDeviceId === "" && i() === 0) ||
-										props.audioDeviceId === device.deviceId
-									}
+									selected={(props.videoDeviceId === "" && i() === 0) || props.audioDeviceId === device.deviceId}
 								>
 									{device.label}
 								</option>
@@ -734,11 +724,7 @@ function Video(props: {
 
 					<label>
 						Resolution
-						<select
-							class="block w-64"
-							name="resolution"
-							onInput={(e) => setHeight(parseInt(e.target.value))}
-						>
+						<select class="block w-64" name="resolution" onInput={(e) => setHeight(parseInt(e.target.value))}>
 							<For each={supportedHeight()}>
 								{(value) => (
 									<option value={value} selected={value === height()}>
