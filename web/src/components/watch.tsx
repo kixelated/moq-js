@@ -4,7 +4,7 @@ import { Player } from "@kixelated/moq/playback"
 import Fail from "./fail"
 
 import { createEffect, createSignal, onCleanup } from "solid-js"
-import { Client, Connection } from "@kixelated/moq/transfork"
+import { Client, type Connection } from "@kixelated/moq/transfork"
 
 export default function Watch(props: { path: string[] }) {
 	// Use query params to allow overriding environment variables.
@@ -48,12 +48,19 @@ export default function Watch(props: { path: string[] }) {
 		player.closed().catch((err) => setError(new Error(`player closed: ${err}`)))
 	})
 
+	const unmute = () => {
+		const player = usePlayer()
+		if (!player) return
+
+		player.unmute()
+	}
+
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
 			<Fail error={error()} />
-			<canvas ref={canvas} class="aspect-video w-full rounded-lg" />
+			<canvas ref={canvas} class="aspect-video w-full rounded-lg" onClick={unmute} />
 		</>
 	)
 }

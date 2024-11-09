@@ -75,7 +75,6 @@ export class Subscriber {
 
 		try {
 			const ok = await Message.Info.decode(stream.reader)
-			console.log("subscribed", track, ok)
 
 			/*
 			for (;;) {

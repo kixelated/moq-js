@@ -1,12 +1,12 @@
-import { Connection } from "../transfork/connection"
-import * as Catalog from "../karp/catalog"
+import type { Connection } from "../transfork/connecion"
+import type * as Catalog from "../karp/catlog"
 
 import { Track } from "../transfork"
 
 import * as Audio from "./audio"
 import * as Video from "./video"
 import { Timeline } from "./timeline"
-import { GroupReader } from "../transfork/model"
+import type { GroupReader } from "../transfork/mdel"
 import { Frame } from "../karp/frame"
 
 // This class must be created on the main thread due to AudioContext.
@@ -134,6 +134,11 @@ export class Broadcast {
 
 		// We done.
 		await segment.close()
+	}
+
+	unmute() {
+		console.debug("unmuting audio")
+		this.#audio?.play()
 	}
 
 	close() {
