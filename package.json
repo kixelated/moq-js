@@ -6,8 +6,8 @@
 	"scripts": {
 		"dev": "npm run dev --workspace web",
 		"build": "npm run build --workspaces",
-		"lint": "npm run lint --workspaces",
-		"fmt": "npm run fmt --workspaces"
+		"check": "npm run check --workspaces",
+		"fix": "npm run fix --workspaces"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4"
