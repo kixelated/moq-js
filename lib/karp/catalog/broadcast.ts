@@ -46,14 +46,17 @@ export async function fetch(connection: Transfork.Connection, path: string[]): P
 	}
 }
 
-export function decodeBroadcast(catalog: any): catalog is Broadcast {
+export function decodeBroadcast(o: unknown): o is Broadcast {
+	if (typeof o !== "object" || o === null) return false
+
+	const catalog = o as Partial<Broadcast>
 	if (catalog.audio === undefined) catalog.audio = []
 	if (!Array.isArray(catalog.audio)) return false
-	if (!catalog.audio.every((track: any) => decodeAudio(track))) return false
+	if (!catalog.audio.every((track: unknown) => decodeAudio(track))) return false
 
 	if (catalog.video === undefined) catalog.video = []
 	if (!Array.isArray(catalog.video)) return false
-	if (!catalog.video.every((track: any) => decodeVideo(track))) return false
+	if (!catalog.video.every((track: unknown) => decodeVideo(track))) return false
 
 	return true
 }

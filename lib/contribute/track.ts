@@ -138,7 +138,8 @@ export class Track {
 					if (this.#error) {
 						controller.error(this.#error)
 						return
-					} else if (this.#closed) {
+					}
+					if (this.#closed) {
 						controller.close()
 						return
 					}

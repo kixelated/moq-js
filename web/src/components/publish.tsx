@@ -97,19 +97,19 @@ export default function Publish() {
 
 	const audioTrack = createMemo(() => {
 		const tracks = device()?.getAudioTracks()
-		if (!tracks || tracks.length == 0) return
+		if (!tracks || tracks.length === 0) return
 		return tracks[0].getSettings() as AudioTrackSettings
 	})
 
 	const videoTrack = createMemo(() => {
 		const tracks = device()?.getVideoTracks()
-		if (!tracks || tracks.length == 0) return
+		if (!tracks || tracks.length === 0) return
 		return tracks[0].getSettings() as VideoTrackSettings
 	})
 
 	const name = crypto.randomUUID()
 	let watchUrl = `/watch/${name}`
-	if (server != import.meta.env.PUBLIC_RELAY_HOST) {
+	if (server !== import.meta.env.PUBLIC_RELAY_HOST) {
 		watchUrl = `${watchUrl}?server=${server}`
 	}
 
@@ -273,6 +273,7 @@ export default function Publish() {
 									setAdvanced((toggle) => !toggle)
 									e.preventDefault()
 								}}
+								type = "button"
 							>
 								<Show when={advanced()} fallback="Show Advanced">
 									Hide Advanced
@@ -427,7 +428,9 @@ function Device(props: {
 		props.setDevice(d)
 
 		// Stop on cleanup
-		onCleanup(() => d.getTracks().forEach((track) => track.stop()))
+		onCleanup(() => {
+			for (const track of d.getTracks()) track.stop()
+		})
 	})
 
 	const isMode = createSelector(mode)
@@ -448,6 +451,7 @@ function Device(props: {
 					e.preventDefault()
 				}}
 				class="rounded-r-none border-r-2 border-r-slate-900"
+				type="button"
 			>
 				Camera
 			</button>
@@ -462,6 +466,7 @@ function Device(props: {
 					e.preventDefault()
 				}}
 				class="rounded-l-none"
+				type="button"
 			>
 				Window
 			</button>
@@ -559,7 +564,7 @@ function Video(props: {
 		const options = SUPPORTED_HEIGHT.filter((h) => h <= props.track.height)
 
 		// Use the device height by default
-		if (options.indexOf(props.track.height) == -1) {
+		if (options.indexOf(props.track.height) === -1) {
 			options.push(props.track.height)
 			options.sort()
 		}
@@ -571,7 +576,7 @@ function Video(props: {
 		const options = SUPPORTED_FPS.filter((f) => f <= props.track.frameRate)
 
 		// Use the device framerate by default
-		if (options.indexOf(props.track.frameRate) == -1) {
+		if (options.indexOf(props.track.frameRate) === -1) {
 			options.push(props.track.frameRate)
 			options.sort()
 		}
@@ -596,14 +601,14 @@ function Video(props: {
 	// Make sure the selected value is a supported height/fps
 	createEffect(() => {
 		const h = height()
-		if (supportedHeight().indexOf(h) == -1) {
+		if (supportedHeight().indexOf(h) === -1) {
 			setHeight(props.track.height)
 		}
 	})
 
 	createEffect(() => {
 		const f = fps()
-		if (supportedFps().indexOf(f) == -1) {
+		if (supportedFps().indexOf(f) === -1) {
 			setFps(props.track.frameRate)
 		}
 	})
@@ -655,7 +660,7 @@ function Video(props: {
 	const supportedCodecProfiles = createMemo(() => {
 		const unique = new Set<string>()
 		for (const valid of supported() || []) {
-			if (valid.name == codec() && !unique.has(valid.profile)) unique.add(valid.profile)
+			if (valid.name === codec() && !unique.has(valid.profile)) unique.add(valid.profile)
 		}
 		return [...unique]
 	})
@@ -666,7 +671,7 @@ function Video(props: {
 		if (!available) return
 
 		const valid = available.find((supported) => {
-			return supported.name == codec() && supported.profile == profile()
+			return supported.name === codec() && supported.profile === profile()
 		})
 
 		if (valid) {
@@ -808,7 +813,7 @@ function Audio(props: {
 		const available = supported()
 		if (!available) return
 
-		if (available.indexOf(codec()) != -1) {
+		if (available.indexOf(codec()) !== -1) {
 			// The selected codec is valid
 			return {
 				codec: codec(),

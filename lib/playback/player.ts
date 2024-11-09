@@ -28,7 +28,7 @@ export class Player {
 			const announce = await announced.next()
 			if (!announce) break
 
-			if (announce.path.length == this.#config.path.length) {
+			if (announce.path.length === this.#config.path.length) {
 				throw new Error("expected resumable broadcast")
 			}
 

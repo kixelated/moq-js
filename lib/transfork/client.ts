@@ -43,7 +43,7 @@ export class Client {
 
 		const server = await Message.SessionServer.decode(stream.reader)
 		console.log("received server setup: ", server)
-		if (server.version != Message.Version.FORK_02) {
+		if (server.version !== Message.Version.FORK_02) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
 

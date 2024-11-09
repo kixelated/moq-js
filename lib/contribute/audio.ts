@@ -46,7 +46,7 @@ export class Packer {
 		this.#current.writeFrame(frame.data)
 	}
 
-	#close(err?: any) {
+	#close(err?: unknown) {
 		const closed = Closed.from(err)
 		if (this.#current) {
 			this.#current.close(closed)

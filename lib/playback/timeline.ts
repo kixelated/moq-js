@@ -47,7 +47,7 @@ export class Component {
 			// Get the next segment to render.
 			const segments = this.#segments.readable.getReader()
 
-			let res
+			let res: ReadableStreamReadResult<Segment> | ReadableStreamReadResult<Frame>
 			if (this.#current) {
 				// Get the next frame to render.
 				const frames = this.#current.frames.getReader()
@@ -84,17 +84,17 @@ export class Component {
 					// Our segment is older than the current, abandon it.
 					await value.frames.cancel("skipping segment; too old")
 					continue
-				} else {
-					// Our segment is newer than the current, cancel the old one.
-					await this.#current.frames.cancel("skipping segment; too slow")
 				}
+
+				// Our segment is newer than the current, cancel the old one.
+				await this.#current.frames.cancel("skipping segment; too slow")
 			}
 
 			this.#current = value
 		}
 	}
 
-	async #cancel(reason: any) {
+	async #cancel(reason: Error) {
 		if (this.#current) {
 			await this.#current.frames.cancel(reason)
 		}

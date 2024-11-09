@@ -42,7 +42,7 @@ export class Broadcast {
 
 			const info = {
 				name: media.id, // TODO way too verbose
-				priority: media.kind == "video" ? 1 : 2,
+				priority: media.kind === "video" ? 1 : 2,
 			}
 
 			const track = new Transfork.Track(this.#config.path.concat(info.name), info.priority)

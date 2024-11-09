@@ -2,6 +2,7 @@
 	"recommendations": [
 		"astro-build.astro-vscode",
 		"ms-vscode.vscode-typescript-next",
-		"EditorConfig.EditorConfig"
-	],
+		"EditorConfig.EditorConfig",
+		"biomejs.biome"
+	]
 }

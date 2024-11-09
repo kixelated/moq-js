@@ -38,7 +38,7 @@ export class Publisher {
 			if (announce.path.length < msg.prefix.length) continue
 
 			const prefix = announce.path.slice(0, msg.prefix.length)
-			if (prefix != msg.prefix) continue
+			if (prefix !== msg.prefix) continue
 
 			const suffix = announce.path.slice(msg.prefix.length)
 
