@@ -1,7 +1,7 @@
-import { Stream } from "./stream"
-import * as Message from "./message"
-import { Connection } from "./connection"
 import * as Hex from "../common/hex"
+import { Connection } from "./connection"
+import * as Message from "./message"
+import { Stream } from "./stream"
 
 export interface ClientConfig {
 	url: string

@@ -1,12 +1,12 @@
-import * as Message from "./message"
 import { asError } from "../common/error"
-import { Stream, Reader } from "./stream"
+import * as Message from "./message"
+import { Reader, Stream } from "./stream"
 
+import type { Queue } from "../common/async"
+import { Closed } from "./error"
+import type { Track, TrackReader } from "./model"
 import { Publisher } from "./publisher"
 import { type Announced, Subscriber } from "./subscriber"
-import type { Track, TrackReader } from "./model"
-import { Closed } from "./error"
-import type { Queue } from "../common/async"
 
 export class Connection {
 	// The established WebTransport session.

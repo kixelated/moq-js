@@ -1,8 +1,8 @@
-import * as Message from "./message"
 import { Watch } from "../common/async"
-import { type Stream, Writer } from "./stream"
 import { Closed } from "./error"
+import * as Message from "./message"
 import type { GroupReader, TrackReader } from "./model"
+import { type Stream, Writer } from "./stream"
 
 export class Publisher {
 	#quic: WebTransport

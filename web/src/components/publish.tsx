@@ -1,15 +1,15 @@
-import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
+import { AudioEncoder, Broadcast, VideoEncoder } from "@kixelated/moq/contribute"
 import { Client, type Connection } from "@kixelated/moq/transfork"
 import {
-	createSignal,
-	createEffect,
-	onCleanup,
-	createMemo,
-	Show,
 	For,
-	createSelector,
-	Switch,
 	Match,
+	Show,
+	Switch,
+	createEffect,
+	createMemo,
+	createSelector,
+	createSignal,
+	onCleanup,
 	onMount,
 } from "solid-js"
 
@@ -273,7 +273,7 @@ export default function Publish() {
 									setAdvanced((toggle) => !toggle)
 									e.preventDefault()
 								}}
-								type = "button"
+								type="button"
 							>
 								<Show when={advanced()} fallback="Show Advanced">
 									Hide Advanced

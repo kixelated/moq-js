@@ -1,6 +1,6 @@
 import * as Transfork from "../../transfork"
-import { decodeAudio, type Audio } from "./audio"
-import { decodeVideo, type Video } from "./video"
+import { type Audio, decodeAudio } from "./audio"
+import { type Video, decodeVideo } from "./video"
 
 export interface Broadcast {
 	path: string[]

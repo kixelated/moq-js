@@ -1,5 +1,5 @@
-import type { Connection } from "../transfork/connection"
 import * as Catalog from "../karp/catalog"
+import type { Connection } from "../transfork/connection"
 import { Broadcast } from "./broadcast"
 
 export interface PlayerConfig {
