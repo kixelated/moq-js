@@ -47,12 +47,19 @@ export default function Watch(props: { path: string[] }) {
 		player.closed().catch((err) => setError(new Error(`player closed: ${err}`)))
 	})
 
+	const unmute = () => {
+		const player = usePlayer()
+		if (!player) return
+
+		player.unmute()
+	}
+
 	// NOTE: The canvas automatically has width/height set to the decoded video size.
 	// TODO shrink it if needed via CSS
 	return (
 		<>
 			<Fail error={error()} />
-			<canvas ref={canvas} class="aspect-video w-full rounded-lg" />
+			<canvas ref={canvas} class="aspect-video w-full rounded-lg" onClick={unmute} onKeyPress={unmute} />
 		</>
 	)
 }

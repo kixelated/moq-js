@@ -26,13 +26,13 @@ class Renderer extends AudioWorkletProcessor {
 	}
 
 	// Inputs and outputs in groups of 128 samples.
-	process(inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>): boolean {
+	process(_inputs: Float32Array[][], outputs: Float32Array[][], _parameters: Record<string, Float32Array>): boolean {
 		if (!this.ring) {
 			// Paused
 			return true
 		}
 
-		if (inputs.length !== 1 && outputs.length !== 1) {
+		if (outputs.length !== 1) {
 			throw new Error("only a single track is supported")
 		}
 

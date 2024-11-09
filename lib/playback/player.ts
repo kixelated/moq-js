@@ -12,6 +12,7 @@ export interface PlayerConfig {
 export class Player {
 	#config: PlayerConfig
 	#running: Promise<void>
+	#active?: Broadcast
 
 	constructor(config: PlayerConfig) {
 		this.#config = config
@@ -21,7 +22,6 @@ export class Player {
 	async #run() {
 		const announced = await this.#config.connection.announced(this.#config.path)
 
-		let active = undefined
 		let activeId = -1
 
 		for (;;) {
@@ -39,19 +39,25 @@ export class Player {
 
 			const catalog = await Catalog.fetch(this.#config.connection, path)
 
-			active?.close()
-			active = new Broadcast(this.#config.connection, catalog, this.#config.canvas)
+			this.#active?.close()
+			this.#active = new Broadcast(this.#config.connection, catalog, this.#config.canvas)
 			activeId = id
 		}
 
-		active?.close()
+		this.#active?.close()
 	}
 
 	close() {
 		this.#config.connection.close()
+		this.#active?.close()
+		this.#active = undefined
 	}
 
 	async closed() {
 		await Promise.any([this.#running, this.#config.connection.closed()])
+	}
+
+	unmute() {
+		this.#active?.unmute()
 	}
 }

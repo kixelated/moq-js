@@ -7,6 +7,5 @@ export interface From {
 export interface Config {
 	channels: number
 	sampleRate: number
-
 	ring: RingShared
 }

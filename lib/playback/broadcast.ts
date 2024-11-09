@@ -136,6 +136,11 @@ export class Broadcast {
 		await segment.close()
 	}
 
+	unmute() {
+		console.debug("unmuting audio")
+		this.#audio?.play()
+	}
+
 	close() {
 		this.#audio?.close()
 		this.#video?.close()

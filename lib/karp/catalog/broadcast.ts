@@ -20,8 +20,8 @@ export function decode(path: string[], raw: Uint8Array): Broadcast {
 	const str = decoder.decode(raw)
 
 	const catalog = JSON.parse(str)
-	console.log(catalog)
 	if (!decodeBroadcast(catalog)) {
+		console.error("invalid catalog", catalog)
 		throw new Error("invalid catalog")
 	}
 
