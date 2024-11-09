@@ -1,15 +1,15 @@
-import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
-import { Client, Connection } from "@kixelated/moq/transfork"
+import { AudioEncoder, Broadcast, VideoEncoder } from "@kixelated/moq/contribute"
+import { Client, type Connection } from "@kixelated/moq/transfork"
 import {
-	createSignal,
-	createEffect,
-	onCleanup,
-	createMemo,
-	Show,
 	For,
-	createSelector,
-	Switch,
 	Match,
+	Show,
+	Switch,
+	createEffect,
+	createMemo,
+	createSelector,
+	createSignal,
+	onCleanup,
 	onMount,
 } from "solid-js"
 
@@ -97,19 +97,19 @@ export default function Publish() {
 
 	const audioTrack = createMemo(() => {
 		const tracks = device()?.getAudioTracks()
-		if (!tracks || tracks.length == 0) return
+		if (!tracks || tracks.length === 0) return
 		return tracks[0].getSettings() as AudioTrackSettings
 	})
 
 	const videoTrack = createMemo(() => {
 		const tracks = device()?.getVideoTracks()
-		if (!tracks || tracks.length == 0) return
+		if (!tracks || tracks.length === 0) return
 		return tracks[0].getSettings() as VideoTrackSettings
 	})
 
 	const name = crypto.randomUUID()
 	let watchUrl = `/watch/${name}`
-	if (server != import.meta.env.PUBLIC_RELAY_HOST) {
+	if (server !== import.meta.env.PUBLIC_RELAY_HOST) {
 		watchUrl = `${watchUrl}?server=${server}`
 	}
 
@@ -128,7 +128,7 @@ export default function Publish() {
 		client.connect().then(setConnection).catch(setError)
 	})
 
-	const createBroadcast = function () {
+	const createBroadcast = () => {
 		const d = device()
 		if (!d) {
 			throw new Error("no input selected")
@@ -197,7 +197,7 @@ export default function Publish() {
 	const isStatus = createSelector(status)
 
 	// Copy the link to the clipboard
-	const copyShare = function (event: MouseEvent) {
+	const copyShare = (event: MouseEvent) => {
 		event.preventDefault()
 
 		const target = event.currentTarget
@@ -228,15 +228,11 @@ export default function Publish() {
 				<Device setError={setError} setDevice={setDevice} setDeviceLoading={setDeviceLoading} />
 
 				<Show when={videoTrack()}>
-					{(track) => (
-						<Video setError={setError} setConfig={setVideo} track={track()} advanced={advanced()} />
-					)}
+					{(track) => <Video setError={setError} setConfig={setVideo} track={track()} advanced={advanced()} />}
 				</Show>
 
 				<Show when={audioTrack()}>
-					{(track) => (
-						<Audio setError={setError} setConfig={setAudio} track={track()} advanced={advanced()} />
-					)}
+					{(track) => <Audio setError={setError} setConfig={setAudio} track={track()} advanced={advanced()} />}
 				</Show>
 
 				<div class="h-12" />
@@ -277,6 +273,7 @@ export default function Publish() {
 									setAdvanced((toggle) => !toggle)
 									e.preventDefault()
 								}}
+								type="button"
 							>
 								<Show when={advanced()} fallback="Show Advanced">
 									Hide Advanced
@@ -341,7 +338,7 @@ function Device(props: {
 
 	let preview: HTMLVideoElement | undefined // undefined until mount
 
-	const loadUser = function () {
+	const loadUser = () => {
 		setMode("user")
 		setDevice(undefined)
 		props.setDeviceLoading(true)
@@ -353,7 +350,7 @@ function Device(props: {
 			.finally(() => props.setDeviceLoading(false))
 	}
 
-	const loadDisplay = function () {
+	const loadDisplay = () => {
 		setMode("display")
 		setDevice(undefined)
 		props.setDeviceLoading(true)
@@ -403,12 +400,12 @@ function Device(props: {
 							},
 							sampleRate: { ideal: 48_000 },
 							deviceId: audioDeviceId(),
-					  },
+						},
 			video: videoDeviceId() === "disabled" ? false : videoTrackConstraints,
 		})
 	}
 
-	const updateDeviceInput = function (videoDevId: string, audioDevId: string) {
+	const updateDeviceInput = (videoDevId: string, audioDevId: string) => {
 		setVideoDeviceId(videoDevId)
 		setAudioDeviceId(audioDevId)
 		mediaDevices()
@@ -417,7 +414,7 @@ function Device(props: {
 			.catch(() => setMode("none"))
 	}
 
-	const deviceInputError = function (err: Error) {
+	const deviceInputError = (err: Error) => {
 		props.setError(err)
 		setMode("none")
 	}
@@ -431,7 +428,9 @@ function Device(props: {
 		props.setDevice(d)
 
 		// Stop on cleanup
-		onCleanup(() => d.getTracks().forEach((track) => track.stop()))
+		onCleanup(() => {
+			for (const track of d.getTracks()) track.stop()
+		})
 	})
 
 	const isMode = createSelector(mode)
@@ -452,6 +451,7 @@ function Device(props: {
 					e.preventDefault()
 				}}
 				class="rounded-r-none border-r-2 border-r-slate-900"
+				type="button"
 			>
 				Camera
 			</button>
@@ -466,6 +466,7 @@ function Device(props: {
 					e.preventDefault()
 				}}
 				class="rounded-l-none"
+				type="button"
 			>
 				Window
 			</button>
@@ -498,11 +499,11 @@ function DeviceList(props: {
 		navigator.mediaDevices.enumerateDevices().then(setDevices).catch(props.onError)
 	})
 
-	const changeVideoDeviceId = function (videoDeviceId: string) {
+	const changeVideoDeviceId = (videoDeviceId: string) => {
 		props.onChange(videoDeviceId, props.audioDeviceId)
 	}
 
-	const changeAudioDeviceId = function (audioDeviceId: string) {
+	const changeAudioDeviceId = (audioDeviceId: string) => {
 		props.onChange(props.videoDeviceId, audioDeviceId)
 	}
 
@@ -516,10 +517,7 @@ function DeviceList(props: {
 							return (
 								<option
 									value={device.deviceId}
-									selected={
-										(props.videoDeviceId === "" && i() === 0) ||
-										props.videoDeviceId === device.deviceId
-									}
+									selected={(props.videoDeviceId === "" && i() === 0) || props.videoDeviceId === device.deviceId}
 								>
 									{device.label}
 								</option>
@@ -540,10 +538,7 @@ function DeviceList(props: {
 							return (
 								<option
 									value={device.deviceId}
-									selected={
-										(props.videoDeviceId === "" && i() === 0) ||
-										props.audioDeviceId === device.deviceId
-									}
+									selected={(props.videoDeviceId === "" && i() === 0) || props.audioDeviceId === device.deviceId}
 								>
 									{device.label}
 								</option>
@@ -569,7 +564,7 @@ function Video(props: {
 		const options = SUPPORTED_HEIGHT.filter((h) => h <= props.track.height)
 
 		// Use the device height by default
-		if (options.indexOf(props.track.height) == -1) {
+		if (options.indexOf(props.track.height) === -1) {
 			options.push(props.track.height)
 			options.sort()
 		}
@@ -581,7 +576,7 @@ function Video(props: {
 		const options = SUPPORTED_FPS.filter((f) => f <= props.track.frameRate)
 
 		// Use the device framerate by default
-		if (options.indexOf(props.track.frameRate) == -1) {
+		if (options.indexOf(props.track.frameRate) === -1) {
 			options.push(props.track.frameRate)
 			options.sort()
 		}
@@ -606,14 +601,14 @@ function Video(props: {
 	// Make sure the selected value is a supported height/fps
 	createEffect(() => {
 		const h = height()
-		if (supportedHeight().indexOf(h) == -1) {
+		if (supportedHeight().indexOf(h) === -1) {
 			setHeight(props.track.height)
 		}
 	})
 
 	createEffect(() => {
 		const f = fps()
-		if (supportedFps().indexOf(f) == -1) {
+		if (supportedFps().indexOf(f) === -1) {
 			setFps(props.track.frameRate)
 		}
 	})
@@ -665,7 +660,7 @@ function Video(props: {
 	const supportedCodecProfiles = createMemo(() => {
 		const unique = new Set<string>()
 		for (const valid of supported() || []) {
-			if (valid.name == codec() && !unique.has(valid.profile)) unique.add(valid.profile)
+			if (valid.name === codec() && !unique.has(valid.profile)) unique.add(valid.profile)
 		}
 		return [...unique]
 	})
@@ -676,7 +671,7 @@ function Video(props: {
 		if (!available) return
 
 		const valid = available.find((supported) => {
-			return supported.name == codec() && supported.profile == profile()
+			return supported.name === codec() && supported.profile === profile()
 		})
 
 		if (valid) {
@@ -734,11 +729,7 @@ function Video(props: {
 
 					<label>
 						Resolution
-						<select
-							class="block w-64"
-							name="resolution"
-							onInput={(e) => setHeight(parseInt(e.target.value))}
-						>
+						<select class="block w-64" name="resolution" onInput={(e) => setHeight(Number.parseInt(e.target.value))}>
 							<For each={supportedHeight()}>
 								{(value) => (
 									<option value={value} selected={value === height()}>
@@ -751,7 +742,7 @@ function Video(props: {
 
 					<label>
 						Frame Rate
-						<select name="fps" class="block w-64" onInput={(e) => setFps(parseInt(e.target.value))}>
+						<select name="fps" class="block w-64" onInput={(e) => setFps(Number.parseInt(e.target.value))}>
 							<For each={supportedFps()}>
 								{(value) => (
 									<option value={value} selected={value === fps()}>
@@ -772,7 +763,7 @@ function Video(props: {
 							max={4_000_000}
 							step={100_000}
 							value={bitrate()}
-							onInput={(e) => setBitrate(parseInt(e.target.value))}
+							onInput={(e) => setBitrate(Number.parseInt(e.target.value))}
 						/>
 					</label>
 				</div>
@@ -822,7 +813,7 @@ function Audio(props: {
 		const available = supported()
 		if (!available) return
 
-		if (available.indexOf(codec()) != -1) {
+		if (available.indexOf(codec()) !== -1) {
 			// The selected codec is valid
 			return {
 				codec: codec(),
@@ -868,7 +859,7 @@ function Audio(props: {
 							max={256_000}
 							step={1_000}
 							value={bitrate()}
-							onInput={(e) => setBitrate(parseInt(e.target.value))}
+							onInput={(e) => setBitrate(Number.parseInt(e.target.value))}
 						/>
 					</label>
 				</div>
