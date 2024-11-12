@@ -2,7 +2,7 @@
 wtf is a moq
 
 ## Layers
-We start our journey by slicing an onion.
+We start our journey by slicing the onion.
 The most critical, and least documented, thing to understand is the layering.
 
 From bottom to top:
@@ -169,6 +169,7 @@ This is great for a company like Twitch who already uses fMP4 (aka CMAF) for HLS
 Unfortunately, this container is not designed for live streaming.
 You can minimize latency by fragmenting (the f in fMP4) at each frame but this involves ~100 bytes of overhead. 
 In fact, half of that consists of kind/size pairs to construct the unnecessary XML-like boxes.
+ 
 This is nearly the size of OPUS audio packet and doubling our network usage for audio-only streams is unacceptable.
 
 So let's build our own container!
@@ -180,3 +181,26 @@ That's it.
 The rest of the information, like the track ID and if this is a keyframe, is part of the MoqTransfork layer.
 
 Obviously we'll need more information (ex. keying information) in the future so expect to see updates on this front.
+
+
+## Application 
+Stop.
+Don't hit that "New Issue" button.
+
+Karp is not intended to support every feature for every application for the end of time.
+It's meant to be the base functionality for generic applications (ex. OBS, VLC) to interface with generic services (ex. YouTube, Twitch).
+
+So you're on your own now.
+There's no standard 
+
+But it's pointless to build a generic application.
+
+
+That's where extensibility comes into play.
+And there's a few easy options:
+
+1. Create new tracks. ex. `controller` or `chat`.
+2. Create new catalog fields. ex. `"rot": 13`.
+
+They don't have to be good extensions, but the very ability to extend the protocol is why layers are crucial.
+Adding a field to a JSON blob does not break 3rd party clients or CDNs.
