@@ -5,18 +5,20 @@ wtf is a moq
 We start our journey by slicing the onion.
 The most critical, and least documented, thing to understand is the layering.
 
-From bottom to top:
+Without further introduction, from the bottom to top:
 - QUIC: The network layer
 - WebTransport: Browser compatibility 
 - MoqTransfork: Media-like pub/sub.
 - MoqKarp: The media layer.
 - UrApp: Your application.
 
-This guide will also help explain the IETF drafts because while I forked them, the high level concepts are still very similar.
+This guide will also help explain the IETF drafts.
+I forked them to simplify the implementation, but the high level concepts are still very similar.
 Just gotta rename a few things:
 
-- transport -> transfork
-- warp -> karp
+- Transfork -> Transport
+- Karp -> Warp
+- Frame -> Object*
 
 Yes I only changed a few letters; your mental model will thank me.
 
@@ -24,29 +26,51 @@ Yes I only changed a few letters; your mental model will thank me.
 QUIC is that new protocol that powers HTTP/3.
 It's intended to be an generic improvement over TCP
 
-With TCP, an application has to decide how many connections to open, each involving an expensive TCP/TLS handshake.
-If you use multiple connections (like HTTP/1), they fight for bandwidth and you still can't drop messages without closing the connection.
-If you use a single connection (like HTTP/2), messages are delivered in order and cannot be dropped, causing head-of-line blocking.
+If you've used TCP before (you have, don't lie) then you'll know that it's fully reliable and ordered.
+It's a FIFO over the internet.
 
-QUIC fixes this dilemma by providing a single connection with multiple streams.
+But the internet is full of rough seas.
+Step outside and you'll encounter a swirling typhoon in the form of a 🌀 loading 🌀 animation.
+Sometimes we don't want to wait for everything; sometimes we want to skip.
+
+There have been many approaches fix head-of-line in HTTP:
+
+- With HTTP/1, browsers would utilize multiple TCP connections.
+However, each connection involves a relatively expensive TCP/TLS handshake and these connections then fight with each other for resources.
+
+- With HTTP/2, browsers utilize a single, shared TCP connection to each host.
+However, despite the illusion of independent requests, everything is interleaved and head-of-line blocking runs rampant.
+
+- With HTTP/3, QUIC fixes it.
+
+What?
+How?
+QUIC by provides a single connection with multiple streams.
 These streams can be created, delivered, and closed in parallel with minimal overhead.
-And crucially for MoQ, streams can be *prioritized* by the QUIC library so the most important data is transmitted (although not necessarily received) first.
+The important transport stuff is shared, like encryption, congestion control, and flow control.
+
+Crucially for MoQ, QUIC streams are cooperative.
+They don't block each other, so the order that streams are transmitted can be determined by the QUIC library.
+We utilize this *prioritization* so the most important media (ex. new audio > old video) is transmitted first during congestion, although not necessarily received first.
 
 Note that QUIC uses UDP under the hood.
-This is frankly a necessity, as a new protocol over IP is difficult to support, as evidenced by SCTP.
-But it does cause some firewall and performance problems because the Internet is (currently) optimized for TCP.
+It can't use TCP because of head-of-line blocking (duh) and it can't use IP because it hurts adoption (ex. SCTP).
+This is mostly an implementation detail, but does cause some firewall and performance problems because the Internet is (currently) optimized for TCP.
+
 Also, QUIC currently doesn't support peer-to-peer, so the cloud haters are stuck with WebRTC for the meantime.
+Somebody else should layer QUIC on top of ICE; not me.
 
 But why not build on top of UDP like scores of other, live media protocols?
 It's pretty simple actually:
 - QUIC is wicked smart: check out my QUIC POWERS blog post for more info.
 - QUIC benefits from economies of scale.
 
-We can build on the shoulders of smart individuals and smart (optimized) implementations.
+We should tp build on the shoulders of smart individuals and smart (optimized) implementations.
 It's near perfect already.
 
 ## WebTransport 
-I just said QUIC was created for HTTP/3... why not use it?
+I just said QUIC was created for HTTP/3... why not use HTTP/3?
+That's QUIC right?
 
 Well you can totally use HTTP/3 to implement something like MoQ.
 However, the HTTP semantics add more hoops to jump through, for example long-polling to emulate a live stream.
@@ -134,6 +158,10 @@ Karp is a layer on top of MoqTransfork that actually does the Media in MoQ.
 It's also the simplest.
 Wowee.
 
+Karp is not intended to support every feature for every application for the end of time.
+It's meant to be the base functionality for generic applications (ex. OBS, VLC) to interface with generic services (ex. YouTube, Twitch).
+The point of standards, and layering in general, is reusability and we *should* be selective about what makes the cut.
+
 Karp consists of a JSON "catalog" and a custom media container.
 The contents of both are actually modeled after the WebCodecs API; you have exactly the needed information to initialize the decoder and process each frame.
 
@@ -183,24 +211,37 @@ The rest of the information, like the track ID and if this is a keyframe, is par
 Obviously we'll need more information (ex. keying information) in the future so expect to see updates on this front.
 
 
-## Application 
-Stop.
-Don't hit that "New Issue" button.
+## UrApp 
+You're on your own now.
+Fly free little developer.
 
-Karp is not intended to support every feature for every application for the end of time.
-It's meant to be the base functionality for generic applications (ex. OBS, VLC) to interface with generic services (ex. YouTube, Twitch).
+Of course there are libraries to help the transition.
+Nobody is expecting you to write your own QUIC, Transfork, or Karp implementation.
+But you could, and you should, if extensibility is more important for your application than compatibility.
 
-So you're on your own now.
-There's no standard 
+But how do you extend MoQ?
+Well of course it depends on the layer, perhaps:
 
-But it's pointless to build a generic application.
+- A QUIC extension.
+- A WebTransport extension.
+- A MoqTransfork extension.
+- A MoqTransfork track.
+- A MoqKarp extension.
 
+One of those in particular should stick out: you can create arbitrary tracks.
+For example, `controller` or `chat`.
+You do need to figure out how to delta encode your content into Groups and Frames but that can be straightforward.
 
-That's where extensibility comes into play.
-And there's a few easy options:
+This functionality is key because your application might not have control of other layers in the stack.
+If you're using a browser or QUIC LB, you can't exactly make your own QUIC extension.
+If you're using a 3rd party MoQ CDN (one day...), you can't exactly change MoqTransfork.
+But you should always be able to create your own tracks that live alongside your media.
 
-1. Create new tracks. ex. `controller` or `chat`.
-2. Create new catalog fields. ex. `"rot": 13`.
+## Forewarning 
+MoQ is evolving rapidly.
+The core concepts are stable but everything else keeps evolving, even the terminology.
 
-They don't have to be good extensions, but the very ability to extend the protocol is why layers are crucial.
-Adding a field to a JSON blob does not break 3rd party clients or CDNs.
+Evolve with me.
+Platonically of course.
+
+@kixelated
