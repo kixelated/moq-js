@@ -1,7 +1,7 @@
-import { Stream } from "./stream"
-import * as Message from "./message"
-import { Connection } from "./connection"
 import * as Hex from "../common/hex"
+import { Connection } from "./connection"
+import * as Message from "./message"
+import { Stream } from "./stream"
 
 export interface ClientConfig {
 	url: string
@@ -36,14 +36,10 @@ export class Client {
 		await quic.ready
 
 		const client = new Message.SessionClient([Message.Version.FORK_02])
-		console.log("sending client setup: ", client)
 		const stream = await Stream.open(quic, client)
 
-		console.log("waiting for server setup")
-
 		const server = await Message.SessionServer.decode(stream.reader)
-		console.log("received server setup: ", server)
-		if (server.version != Message.Version.FORK_02) {
+		if (server.version !== Message.Version.FORK_02) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
 

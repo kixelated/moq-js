@@ -1,10 +1,10 @@
-import { defineConfig } from "astro/config"
-import tailwind from "@astrojs/tailwind"
 import mdx from "@astrojs/mdx"
-import solidJs from "@astrojs/solid-js"
 import nodejs from "@astrojs/node"
-import mkcert from "vite-plugin-mkcert"
+import solidJs from "@astrojs/solid-js"
+import tailwind from "@astrojs/tailwind"
+import { defineConfig } from "astro/config"
 import crossOriginIsolation from "vite-plugin-cross-origin-isolation"
+import mkcert from "vite-plugin-mkcert"
 
 // https://astro.build/config
 export default defineConfig({

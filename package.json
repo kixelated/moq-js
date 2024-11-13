@@ -2,14 +2,14 @@
 	"name": "moq-js",
 	"type": "module",
 	"private": true,
-	"workspaces": [
-		"lib",
-		"web"
-	],
+	"workspaces": ["lib", "web"],
 	"scripts": {
 		"dev": "npm run dev --workspace web",
 		"build": "npm run build --workspaces",
-		"lint": "npm run lint --workspaces",
-		"fmt": "npm run fmt --workspaces"
+		"check": "biome check",
+		"fix": "biome check --write"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "1.9.4"
 	}
 }
