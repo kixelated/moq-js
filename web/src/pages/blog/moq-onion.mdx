@@ -1,13 +1,13 @@
 ---
 layout: "@/layouts/global.astro"
-title: MoQ is an onion
+title: The MoQ Onion
 author: kixelated
 description: Media over Transfork over WebTransport over QUIC over UDP over IP over Ethernet over Fiber over Light over Space over Time
 cover: "/blog/forward-error-correction/mfw.jpeg"
 date: 2024-11-13
 ---
 
-# MoQ Layers
+# The MoQ Onion
 Today we slice the onion.
 The most critical, and least documented, thing to understand is the layering behind MoQ.
 
@@ -18,7 +18,7 @@ Without further blabbering, from the bottom to top:
 - **MoQ Karp**: A media playlist and container.
 - **Ur App**: Your application.
 
-This layering is the most crucial concept behind MoQ, believe it or not.
+This layering is the most crucial concept behind MoQ.
 We explicitly want to avoid building yet another monolithic and inflexible media protocol built directly on top of UDP.
 Sorry SRT, you're not invited to this party.
 
@@ -33,56 +33,54 @@ Yes, I used unoriginal names on purpose.
 Your mental model should thank me.
 
 ## QUIC
-QUIC is that new protocol that powers HTTP/3.
-It’s designed as a general improvement over TCP.
-
-If you've used TCP before (you have, don't lie) then you'll know that it's fully reliable and ordered.
+If you've used TCP before (and you have), you'll know that it's fully reliable and ordered.
 It's a FIFO over the internet.
 But the internet is full of rough seas.
 Step outside and you'll encounter a swirling typhoon in the form of a 🌀 loading 🌀 animation.
 Sometimes we don't want to wait for everything; sometimes we want to skip.
 
-There have been many attempts to fix head-of-line in HTTP:
+This is not a new problem.
+There have been many attempts to fix the head-of-line blocking with HTTP:
 
-- With HTTP/1, browsers would utilize multiple TCP connections.
-However, each connection involves a relatively expensive TCP/TLS handshake.
-These connections will then fight with each other for resources, creating a delicate balancing act if you want to prioritize requests.
+- With **HTTP/1**, browsers would utilize multiple TCP connections to each host.
+However, each connection involves a relatively expensive TCP/TLS handshake and these connections would compete for resources.
 
-- With HTTP/2, browsers utilize a single, shared TCP connection to each host.
+- With **HTTP/2**, browsers would utilize a single, shared TCP connection to each host.
 However, despite the illusion of independent requests and a complex prioritization scheme, it all gets interleaved into a single pipe.
-The result is rampant head-of-line blocking.
 
-- With HTTP/3, QUIC fixes it.
+- With **HTTP/3**, TCP was replaced with QUIC.
+Head-of-line blocking is no more\*.
 What?
 How?
 
 QUIC combines the two approaches by sharing some state (like HTTP/2) while providing independent streams (like HTTP/1).
-Each HTTP request is a QUIC stream, which can be created, delivered, and closed in parallel with minimal overhead.
+Each HTTP request is a QUIC stream that can be created, delivered, and closed in parallel with minimal overhead.
 All of the encryption, congestion control, and flow control is shared at the connection level.
 
-But we're not using QUIC for HTTP.
-We're using QUIC because crucially, QUIC streams are cooperative.
-The order that streams are transmitted can be determined by the QUIC library since they don't block each other.
-We utilize this *prioritization* such the most important media (ex. new audio > old video) is transmitted first during congestion, although not necessarily received first.
-
-But why not build on top of UDP like scores of other, live media protocols?
+But hang on, why not build on top of UDP like scores of other, live media protocols?
 It's pretty simple actually:
-- QUIC is wicked smart: check out my QUIC POWERS blog post for more info.
-- QUIC benefits from economies of scale.
+- QUIC is wicked smart: check out my [QUIC POWERS](./quic-powers) post for more info.
+- QUIC is available in the browser.
+- QUIC benefits from economies of scale (many implementations).
 
-We should tp build on the shoulders of smart individuals and smart (optimized) implementations.
-[It's near perfect already](./quic-powers).
+The point of MoQ is to fully utilize QUIC's features to deliver live media.
+We're not reinventing the wheel nor are we checking a box for marketing reasons.
 
 ## Web Transport
-I just said QUIC was created for HTTP/3... why not use HTTP/3?
+I just said QUIC was created for HTTP/3... so why not use HTTP/3?
 That's QUIC right?
 
-Well you can totally use HTTP/3 to implement something like MoQ.
-However, the HTTP semantics add more hoops to jump through, for example long-polling to emulate a live stream.
-Somebody else should and will make "Media over HTTP/3"
+Well you can totally use HTTP/3 to implement something like MoQ, but the HTTP semantics add more hoops to jump through.
+
+My main gripe with HTTP is that it's not designed for live content.
+The client has to know what content to request, which is kind of a problem when that content doesn't exist yet.
+You end up relying on everybody's favorite hacks: **polling** and **_long_-polling**.
+Also, the client/server model means that contribution (client->server) and distribution (server->client) must be handled separately.
+
+Somebody else should and will make "Media over HTTP/3" (hit up my DMs @pantos).
 
 I'm interested in [WebTransport](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport_API) instead.
-It's a browser API that exposes QUIC streams to a web application, similar to how WebSockets exposes TCP.
+It's a browser API that exposes QUIC browser applications, similar to how WebSockets exposes TCP\*.
 The connection-oriented nature makes it significantly easier to push media without the HTTP request/response song and dance.
 There's not much else to say, it's basically the same thing as QUIC.
 
@@ -91,128 +89,171 @@ A WebTransport session shares a QUIC connection with HTTP/3 requests and potenti
 This *pooling* feature is responsible for a ton of headaches but the IETF went ahead and standardized it anyway (despite my best efforts).
 
 So we use WebTransport for WebSupport.
+That's why this layer exists; we're forced to use it.
 Choose a WebTransport library ([like mine!](https://docs.rs/web-transport-quinn/latest/web_transport_quinn/)) and pretend it's just QUIC.
 
-Note: There is a [HTTP/2 variant of WebTransport](https://datatracker.ietf.org/doc/draft-ietf-webtrans-http2/) intended as a fallback, but it's unsupported as of late and is going to suffer from head-of-line blocking.
-IMO just use WebSockets instead.
+## WebRTC
+Before we get into the good stuff (my protocol ofc), it's best to learn from the failures of other protocols.
 
-## Learnings
-Instead of explaining my favorite protocol, sometimes it's easier to learn from other protocols.
+One of the biggest headaches with WebRTC is _scale_.
+WebRTC supports peer-to-peer communication, but this requires the broadcaster sends a copy of each packet to all viewers.
+Obviously this falls down as the number of participants grows, so the usual solution is to have all participants send to a central server instead: a **Selective Forwarding Unit** (SFU).
+Our server can then use the power of DATA CENTERS and PEERING to fan the content out to viewers.
 
-Specifically, one of the biggest headaches with WebRTC is how to handle 1:N fanout.
-It's something you take for granted with HTTP: just throw a CDN in front of it.
+Unfortunately, WebRTC does a poor job of facilitating this.
+The network transport (RTP) is tightly coupled to the application (also RTP).
+Without going into too much detail, an SFU has to pretend to be another participant, performing hacks along the way to stay compliant with the standard.
+Ultimately, every major service makes a custom SFU implementation to handle the quirks of their application.
+If you want a longer rant, check out my [Replacing WebRTC](./replacing-webrtc).
 
-The naive WebRTC approach is to have a broadcaster establish a connection to all N viewers, sending N copies of the media.
-This can work for low-bitrate applications (ie. audio) but obviously doesn't scale and is not used outside of 1:1 or peer-to-peer scenarios.
+My bold claim:
+**WebRTC doesn't scale because it's not generic**.
 
-Instead, the participants connect to an server (called an "SFU") and use the power of data centers to distribute the media.
-Sure our cloud bill is higher but now we can have more viewers than fingers.
-We also benefit from peering agreements and other CDN magic, because it turns out that ISPs really don't like globally dispersed P2P traffic (aka bittorrent).
+For those with a HTTP background, this is something we take for granted.
+Want to scale your application?
+Throw nginx in front of it.
+Still doesn't scale?
+Throw a CDN in front of it.
+Still doesn't scale?
+Throw more money at it.
 
-The problem with this approach is that it's unfortunately custom.
-There's no generic way for an application to signal *how* media should be forwarded, leading to divergent and proprietary behavior.
-Every service has it's own priopritary SFU and the line between application and transport is extremely blurry.
-For example, a good SFU will parse each packet on a per-codec basis to detect things like keyframes, but most won't.
+But HTTP is a pain for live content.
+It's totally possible, but like mentioned in the previous section, you're jumping through hoops.
+What we really want are the great HTTP cache/fanout semantics but with the ability to PUSH.
 
-## Transfork
-So let's fix it.
-MoqTransfork is an ambitious attempt to learn from the succesess of HTTP and the aforementioned failures of WebRTC.
+## MoqTransfork
+So here were are.
+[MoQ Transfork](https://datatracker.ietf.org/doc/draft-lcurley-moq-transfork/) is an ambitious attempt to learn from the succesess of HTTP and the aforementioned failures of WebRTC.
 But you know, for live content and not *hyper-text*.
 
-Specifically, we want a distinct transport layer that can be reused across applications.
-This layer should have the appropriate semantics and metadata to facilitate caching and fanout.
-And it should also be generic enough to support a wide variety of live content.
+The idea is that generic relays and CDNs implement Transfork _but not the media layer_.
+The Transfork headers contain enough information to facilitate optimal caching and fanout even in congested scenarios.
+The application can encode whatever it wants into the payload; it doesn't need to be media and it could even be encrypted.
 
-The idea is that generic relays and CDNs implement [MoQ Transfork](https://datatracker.ietf.org/doc/draft-lcurley-moq-transfork/) but no higher.
-There's enough information in the MoqTransfork headers to facilitate ideal caching and fanout out even in congested scenarios.
-The closest analogy is HTTP: a HTTP reverse proxy knows how to forward/cache requests based on HTTP headers and ignores the body.
+Here's the general flow:
+- A client establishes a **Session** to a server.
+- Both sides can **Announce** available tracks by name.
+- Both sides can **Subscribe** to a live tracks by name with a priority.
+- A **Track** is broken into groups, each delivered independently with a priority.
+- A **Group** consists of ordered frames, delivered reliably unless cancelled.
+- A **Frame** is a sized chunk of data.
 
-But how does it work?
-MoqTransfork allows a client to publish or subscribe to live "tracks" by name.
-A track is a series of independent groups, which are a series of dependent frames.
-That probably went over your head so let me explain.
+---
 
-Video encoding is a form of delta encoding.
-The simplest encoding involves a periodic I-frame (basically a static image) followed by a series of P-frames, each encoded as differences from the prior frame(s).
-There are more complicated encoding schemes but let's stick with this for now.
+The most crucial concept is how live media is mapped to Transfork.
+This is main reason why I forked the IETF draft; it needed to be done right.
 
-To avoid artifacts, we explicitly don't want to decode a frame without all of its dependencies.
-And yet we also want the ability to skip ahead to the newest frames during congestion (avoiding the typhoon).
-So we have but one option, to split the live stream at I-frame boundaries and deliver P-frames in order.
+You see, video encoding is a form of delta encoding.
+To over-simplify, a video stream involves a periodic I-frame (static image) followed by P-frames (delta).
+If we lose a frame, then our diffs get out sync and there's ugly artifacts until the next I-frame.
+You've probably seen this before; it looks like you're tripping balls.
 
-This is known as a "Group of Pictures" aka a "GOP" aka a "HLS/DASH segment".
-It's called a "Group" in Transfork just to throw one more word into the salad.
-Each Group is delivered over a dedicated QUIC stream so each Frame is delivered reliably an in order, unless the QUIC stream is cancelled.
-A subscriber will SUBSCRIBE to a track and ask the publisher to prioritize newer groups/streams, dropping older ones in the process.
+And yet we also need a plan for congestion.
+We don't want to ⏸️ pause ⏸️ and 🌀 buffer 🌀 during a conference call so we need to drop _something_.
+This is a contentious subject but I think there's only one option: skip frames until the next I-frame.
+In order to do that, we need to split up the live stream and deliver it in pieces.
 
-And just like that we have a generic, live media transport layer that can match WebRTC in terms of latency.
-Obviously there's more to it than that (see other blog posts) but the high level concept is surprisingly simple.
+These are known as a [Group of Pictures](https://en.wikipedia.org/wiki/Group_of_pictures) aka a __GoP__ aka a [HLS/DASH segment](https://en.wikipedia.org/wiki/Dynamic_Adaptive_Streaming_over_HTTP) aka a __Transfork Group__.
+Unlike the IETF draft, Transfork maps a GoP _directly_ to a __QUIC Stream__ which provides reliability and ordering.
+There's no need for a reassembly buffer in our application; QUIC will make sure that every frame is delivered and in the correct order.
+
+And crucially, QUIC streams can be prioritized.
+We tell the QUIC layer to transmit packets according to a (deterministic) priority when bandwidth is limited.
+The most important groups are delivered (ex. newer audio) while the least important groups will be starved (ex. older video).
+And if any group is starved for too long, either side can explicitly cancel it and move on.
+
+And just like that, we can achieve latency close to WebRTC levels with limited complexity.
+We still need to improve QUIC's congestion control to reach parity with WebRTC, but that's a problem for another day.
+
+---
+
+One last ~~thing~~ rant.
+I think the IETF is overfixated on the "generic" angle.
+MoqTransport has become a solution in search of a problem (more use-cases).
+Unfortunately, the core live media use-case has been neglected in favor of convoluted abstractions and useless features.
+
+I think this stems from a misunderstanding of the layering.
+Transfork _SHOULD NOT_ be thought of as a generic HTTP replacement.
+Instead, Transfork is a clear layer in the sand: it's **the bare minimum that a live media client/server _need_ to support**.
+
+The server doesn't care about the media encoding which is why it's delegated to a higher layer (spoilers).
+It's a side-benefit that the transport is generic, not the explicit goal.
+I think Transfork could become less generic, for example by adding timestamps to each frame, but only if this information would be useful for the server.
 
 ## Karp
-Okay okay, so it's finally time for the big reveal: the M in MoQ.
-Karp is a layer on top of MoqTransfork that actually does the Media stuff.
+Okay okay, so it's finally time for the big reveal: the __M__ in MoQ.
+__Karp__ is a layer on top of MoqTransfork that actually does the **M**edia stuff.
 It's also the simplest.
 Wowee.
 
-Karp is not intended to support every feature for every application for the end of time.
-It's meant to be the base functionality for generic applications (ex. OBS, VLC) to interface with generic services (ex. YouTube, Twitch).
-The point of standards, and layering in general, is to promote reusability.
-We *should* be selective about what makes the cut lest the standard becomes a burden.
-
 Karp is modeled after the [WebCodecs API](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API).
-The application has exactly the needed information to initialize the decoder and process each frame.
+It's just enough metadata to initialize a decoder and render a frame.
+It's not a on-disk media container like MP4 or MKV, instead it's optimized for low overhead live streaming.
 
 Karp consists of:
 - A **catalog**: A JSON blob describing the tracks.
-- A **container**: A simple header in front of each frame (codec bitstream).
+- A **container**: A simple header in front of the codec data.
 
-The catalog is delivered over a Transfork track, commonly named `catalog.json`.
-It contains metadata a viewer will use to select desired tracks and initialize the decoder.
-Let's just dive into an example, here's a fragment that describes a video track:
+---
 
-```JSON
+The __Catalog__ is delivered over a Transfork track, commonly named `catalog.json`.
+It contains available tracks within a broadcast and metadata about them.
+The viewer subscribes to this catalog, determines if a track is desired/decodable, and then subscribes to individual media tracks.
+
+Let's just dive into an example because it explains itself:
+
+```json
 {
-	"track": {
-		"name": "480p",
-		"priority": 2
-	},
-	"codec": "avc1.64001f",
-	"description": "<SPS/PPS>",
-	"resolution": {
-		"width": 1280,
-		"height": 720
-	},
-	"bitrate": 3000000
+	"video": [{
+		// Transfork information
+		"track": {
+			"name": "480p",
+			"priority": 2
+		},
+		// The codec in use.
+		"codec": "avc1.64001f",
+		//  The resolution of the video
+		"resolution": {
+			"width": 1280,
+			"height": 720
+		},
+		// The maximum bitrate (3Mb/s)
+		"bitrate": 3000000
+		// etc
+	}],
 }
 ```
 
-If you've had to parse a SDP, DASH, or HLS manifest before, you'll know that this is a breath of fresh air.
-And what's even cooler, this catalog is *live* and can be updated it on the fly unlike the crummy, afformentioned formats.
+Of course, the catalog can contain multiple tracks, audio and video but also alternative renditions.
+For example, two tracks could have the same content but different settings, like `480p` vs `1080p`.
+A viewer can choose which one it wants based on the indicated bitrate and resolution.
 
-The catalog can contain multiple tracks, audio and video of course but also alternative renditions.
-For example, two tracks could have the same content but different settings, like "480p" vs "1080p".
-A viewer should not subscribe to both of them and instead switch between them based on the indicated max bitrate.
+The concept is similar to a HLS/DASH playlist or SDP monstrosity, but it's a strongly-typed JSON schema.
+But the unlike those crummy afformentioned formats, this catalog can be updated; it's a live track itself!
+Viewers will **Subscribe** to the catalog and receive updates via **Groups** or delta **Frames**.
+Just like that, you can add or remove tracks on the fly.
 
-The media container is even less interesting.
-Originally, Warp used fMP4 segments.
+---
+
+The __Container__ is even less interesting.
+Originally, Warp used fMP4.
 This is great for a company like Twitch who already uses fMP4 (aka CMAF) for HLS/DASH delivery.
 
 Unfortunately, this container is not designed for live streaming.
 You can minimize latency by fragmenting (the f in fMP4) at each frame but this involves ~100 bytes of overhead.
-In fact, half of that consists of kind/size pairs to construct the unnecessary XML-like boxes.
-This is nearly the size of OPUS audio packet and doubling our network usage for audio-only streams is unacceptable.
+This is nearly the size of OPUS audio packet; doubling our network usage for audio-only streams is unacceptable.
 
 So we're not using fMP4, we're using our own container.
 It consists of:
-- A 1-8 byte presentation timestamp
-- A payload
+- A 1-8 byte presentation timestamp.
+- A payload.
 
 That's it.
 That's it!
 
 Obviously we'll need more functionality in the future so expect to see updates on Karp.
 For example, keying information used for encryption or DRM (not the same thing lul).
-But our goal is to keep it simple.
+But the goal is to keep it simple.
 
 ## UrApp
 MoQ can provide video and audio delivery.
@@ -224,8 +265,11 @@ Nobody is expecting you to write your own QUIC, Transfork, or Karp implementatio
 Likewise I expect there will be other layers on top of MoqTransfork, for example a chat protocol.
 
 But ultimately, you're responsible for your application.
-It shouldn't be generic and neither should MoQ be one-size-fits-all.
-You will inevitably need to extend MoQ to fit your needs and I don't want that to involve clicking the "Feature Request" button.
+It shouldn't be generic, it's yours!
+
+But neither should MoQ be one-size-fits-all.
+You will inevitably need to extend MoQ to fit your needs.
+I don't want that to involve clicking the "Feature Request" button.
 
 But how do you extend MoQ?
 Well of course it depends on the layer, perhaps:
@@ -237,13 +281,14 @@ Well of course it depends on the layer, perhaps:
 - A MoqKarp extension?
 
 One of those in particular should stick out: you can create arbitrary tracks.
-For example, could create a custom `controller` or `chat` track alongside the Karp tracks.
+
+For example, you could create a custom `controller` or `chat` track alongside the Karp tracks.
 You get all of the benefits of MoqTransfork, like prioritization and caching, without having to reinvent the wheel.
-But you do need to figure out how to delta encode your content into Groups and Frames.
+But you do need to figure out how to delta encode your content into **Groups** and **Frames**.
 
 For example, the MoQ relays tracks to gossip available broadcasts and routes.
 Each node creates a `cluster.<node>` track and subscribes to all other `cluster.*` tracks.
-The track is just a series of +1 or -1 deltas, indicating when a broadcast was started or stopped.
+The track is just a series of + or - deltas indicating when a broadcast has started or stopped.
 Dog fooding to the max.
 
 You too can abuse MoQ to deliver non-media content.
