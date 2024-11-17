@@ -3,8 +3,8 @@ layout: "@/layouts/global.astro"
 title: The MoQ Onion
 author: kixelated
 description: Media over Transfork over WebTransport over QUIC over UDP over IP over Ethernet over Fiber over Light over Space over Time
-cover: "/blog/forward-error-correction/mfw.jpeg"
-date: 2024-11-13
+cover: "/blog/moq-onion/onion.png"
+date: 2024-11-17
 ---
 
 # The MoQ Onion
@@ -53,6 +53,11 @@ Head-of-line blocking is no more\*.
 What?
 How?
 
+<figure>
+	![TCP is dead](/blog/quic-powers/tcp.png)
+	<figcaption>Rage-bait stolen from another blog stolen from another presentation.</figcaption>
+</figure>
+
 QUIC combines the two approaches by sharing some state (like HTTP/2) while providing independent streams (like HTTP/1).
 Each HTTP request is a QUIC stream that can be created, delivered, and closed in parallel with minimal overhead.
 All of the encryption, congestion control, and flow control is shared at the connection level.
@@ -99,6 +104,11 @@ One of the biggest headaches with WebRTC is _scale_.
 WebRTC supports peer-to-peer communication, but this requires the broadcaster sends a copy of each packet to all viewers.
 Obviously this falls down as the number of participants grows, so the usual solution is to have all participants send to a central server instead: a **Selective Forwarding Unit** (SFU).
 Our server can then use the power of DATA CENTERS and PEERING to fan the content out to viewers.
+
+<figure>
+	![P2P SFUs](/blog/moq-onion/sfu.png)
+	<figcaption>A comprehensive diagram of the differences between P2P and SFU.</figcaption>
+</figure>
 
 Unfortunately, WebRTC does a poor job of facilitating this.
 The network transport (RTP) is tightly coupled to the application (also RTP).
@@ -157,13 +167,32 @@ These are known as a [Group of Pictures](https://en.wikipedia.org/wiki/Group_of_
 Unlike the IETF draft, Transfork maps a GoP _directly_ to a __QUIC Stream__ which provides reliability and ordering.
 There's no need for a reassembly buffer in our application; QUIC will make sure that every frame is delivered and in the correct order.
 
+<figure>
+	![track of groups of frames](/blog/moq-onion/track.png)
+	<figcaption>Some visuals always help.</figcaption>
+</figure>
+
 And crucially, QUIC streams can be prioritized.
 We tell the QUIC layer to transmit packets according to a (deterministic) priority when bandwidth is limited.
 The most important groups are delivered (ex. newer audio) while the least important groups will be starved (ex. older video).
 And if any group is starved for too long, either side can explicitly cancel it and move on.
 
+<figure>
+	![track of groups of frames during congestion](/blog/moq-onion/cancel.png)
+	<figcaption>Some visuals might help?</figcaption>
+</figure>
+
 And just like that, we can achieve latency close to WebRTC levels with limited complexity.
 We still need to improve QUIC's congestion control to reach parity with WebRTC, but that's a problem for another day.
+
+But what about other latency targets?
+Well this is why I very specifically said we _starve_ streams, not _drop_ them.
+If a viewer is willing to accept higher latency to avoid stalls, they do so by having a larger buffer.
+A larger buffer means more time for network starvation to recover, and thus group starvation to recover.
+We only cancel a QUIC stream after the viewer decides to skip ahead, if that every happens (ex. VOD).
+
+__Prioritization__ is a superset of __dropping__.
+We don't need no stinking UDP.
 
 ---
 
@@ -185,6 +214,11 @@ Okay okay, so it's finally time for the big reveal: the __M__ in MoQ.
 __Karp__ is a layer on top of MoqTransfork that actually does the **M**edia stuff.
 It's also the simplest.
 Wowee.
+
+<figure>
+	![fish](/blog/moq-onion/karp.png)
+	<figcaption>WIP Logo</figcaption>
+</figure>
 
 Karp is modeled after the [WebCodecs API](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API).
 It's just enough metadata to initialize a decoder and render a frame.
