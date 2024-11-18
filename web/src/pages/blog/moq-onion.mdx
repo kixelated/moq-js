@@ -23,7 +23,7 @@ We explicitly want to avoid building yet another monolithic and inflexible media
 Sorry SRT, you're not invited to this party.
 
 This guide will also help explain the IETF drafts.
-Of course I decided to [fork them](./transfork), but the high level concepts are still very similar.
+Of course I decided to [fork them](/blog/transfork), but the high level concepts are still very similar.
 Just gotta rename a few things:
 
 - [Transfork](https://datatracker.ietf.org/doc/draft-lcurley-moq-transfork/) -> [Transport](https://datatracker.ietf.org/doc/draft-ietf-moq-transport/)
@@ -64,7 +64,7 @@ All of the encryption, congestion control, and flow control is shared at the con
 
 But hang on, why not build on top of UDP like scores of other, live media protocols?
 It's pretty simple actually:
-- QUIC is wicked smart: check out my [QUIC POWERS](./quic-powers) post for more info.
+- QUIC is wicked smart: check out my [QUIC POWERS](/blog/quic-powers) post for more info.
 - QUIC is available in the browser.
 - QUIC benefits from economies of scale (many implementations).
 
@@ -114,7 +114,7 @@ Unfortunately, WebRTC does a poor job of facilitating this.
 The network transport (RTP) is tightly coupled to the application (also RTP).
 Without going into too much detail, an SFU has to pretend to be another participant, performing hacks along the way to stay compliant with the standard.
 Ultimately, every major service makes a custom SFU implementation to handle the quirks of their application.
-If you want a longer rant, check out my [Replacing WebRTC](./replacing-webrtc).
+If you want a longer rant, check out my [Replacing WebRTC](/blog/replacing-webrtc).
 
 My bold claim:
 **WebRTC doesn't scale because it's not generic**.
