@@ -21,9 +21,8 @@ export function decodeVideo(o: unknown): o is Video {
 	const obj = o as Partial<Video>
 	if (!decodeTrack(obj.track)) return false
 	if (typeof obj.codec !== "string") return false
-	if (typeof obj.description !== "string") return false
 
-	obj.description = Hex.decode(obj.description)
+	obj.description = obj.description && typeof obj.description === "string" ? Hex.decode(obj.description) : undefined
 
 	return true
 }
