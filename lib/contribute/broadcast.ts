@@ -98,7 +98,7 @@ export class Broadcast {
 			connection.publish(track.reader())
 		}
 
-		const track = new Transfork.Track(this.#config.path, 0)
+		const track = new Transfork.Track(this.#config.path.concat("catalog.json"), 0)
 		track.appendGroup().writeFrames(Catalog.encode(broadcast))
 
 		connection.publish(track.reader())
