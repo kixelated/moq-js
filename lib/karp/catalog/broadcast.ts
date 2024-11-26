@@ -30,7 +30,7 @@ export function decode(path: string[], raw: Uint8Array): Broadcast {
 }
 
 export async function fetch(connection: Transfork.Connection, path: string[]): Promise<Broadcast> {
-	const track = new Transfork.Track(path.concat("catalog.json"), 0)
+	const track = new Transfork.Track(path, 0)
 	const sub = await connection.subscribe(track)
 	try {
 		const segment = await sub.nextGroup()
