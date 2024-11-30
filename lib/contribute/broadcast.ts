@@ -3,8 +3,8 @@ import * as Transfork from "../transfork"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
-import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 import * as Hex from "../common/hex"
+import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
 	path: string[]

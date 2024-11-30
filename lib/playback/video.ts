@@ -1,7 +1,7 @@
+import * as Hex from "../common/hex"
 import type * as Catalog from "../karp/catalog"
 import type { Frame } from "../karp/frame"
 import type { Component } from "./timeline"
-import * as Hex from "../common/hex"
 
 export class Renderer {
 	#track: Catalog.Video
