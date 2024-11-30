@@ -1,6 +1,7 @@
 import type * as Catalog from "../karp/catalog"
 import type { Frame } from "../karp/frame"
 import type { Component } from "./timeline"
+import * as Hex from "../common/hex"
 
 export class Renderer {
 	#track: Catalog.Video
@@ -58,7 +59,7 @@ export class Renderer {
 			codec: this.#track.codec,
 			codedHeight: this.#track.resolution.height,
 			codedWidth: this.#track.resolution.width,
-			description: this.#track.description,
+			description: this.#track.description ? Hex.decode(this.#track.description) : undefined,
 			optimizeForLatency: true,
 		})
 	}

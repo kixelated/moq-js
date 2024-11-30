@@ -6,6 +6,8 @@ export function decode(str: string): Uint8Array {
 	return bytes
 }
 
-export function encode(_bytes: Uint8Array): string {
-	throw "todo"
+export function encode(bytes: Uint8Array): string {
+	return Array.from(bytes)
+		.map((byte) => byte.toString(16).padStart(2, "0"))
+		.join("")
 }

@@ -326,7 +326,6 @@ function Device(props: {
 			gamma: typedEvent.gamma,
 		}
 		setOrientation(orient)
-		//console.log(orient)
 	}
 
 	onMount(() => {

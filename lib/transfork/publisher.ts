@@ -1,4 +1,4 @@
-import { Watch } from "../common/async"
+import { Watch, type WatchNext } from "../common/async"
 import { Closed } from "./error"
 import * as Message from "./message"
 import type { GroupReader, TrackReader } from "./model"
@@ -8,7 +8,8 @@ export class Publisher {
 	#quic: WebTransport
 
 	// Our announced broadcasts.
-	#announce = new Map<string[], TrackReader>()
+	// NOTE: Because Javascript is dumb, we have to JSON.stringify the path.
+	#announce = new Watch(new Map<string, TrackReader>())
 
 	// Their subscribed tracks.
 	#subscribe = new Map<bigint, Subscribed>()
@@ -19,36 +20,68 @@ export class Publisher {
 
 	// Publish a track
 	publish(track: TrackReader) {
-		if (this.#announce.has(track.path)) {
-			throw new Error(`already announced: ${track.path.toString()}`)
-		}
+		this.#announce.update((current) => {
+			const key = JSON.stringify(track.path)
+			if (current.has(key)) {
+				throw new Error(`already announced: ${track.path.toString()}`)
+			}
 
-		this.#announce.set(track.path, track)
+			current.set(key, track)
+			return current
+		})
 
 		// TODO: clean up announcements
 		// track.closed().then(() => this.#announce.delete(track.path))
 	}
 
 	#get(path: string[]): TrackReader | undefined {
-		return this.#announce.get(path)
+		const key = JSON.stringify(path)
+		return this.#announce.value()[0].get(key)
 	}
 
 	async runAnnounce(msg: Message.AnnounceInterest, stream: Stream) {
-		for (const announce of this.#announce.values()) {
-			if (announce.path.length < msg.prefix.length) continue
+		let current = this.#announce.value()
+		let seen = new Map<string, TrackReader>()
 
-			const prefix = announce.path.slice(0, msg.prefix.length)
-			if (prefix !== msg.prefix) continue
+		while (current) {
+			const newSeen = new Map<string, TrackReader>()
 
-			const suffix = announce.path.slice(msg.prefix.length)
+			for (const [key, announce] of current[0]) {
+				if (announce.path.length < msg.prefix.length) {
+					continue
+				}
 
-			const active = new Message.Announce(suffix, "active")
-			await active.encode(stream.writer)
+				const prefix = announce.path.slice(0, msg.prefix.length)
+				if (!prefix.every((v, i) => v === msg.prefix[i])) {
+					continue
+				}
+
+				newSeen.set(key, announce)
+
+				if (seen.delete(key)) {
+					// Already exists
+					continue
+				}
+
+				// Add a new track
+				const suffix = announce.path.slice(msg.prefix.length)
+				const active = new Message.Announce(suffix, "active")
+				await active.encode(stream.writer)
+			}
+
+			// Remove any closed tracks
+			for (const announce of seen.values()) {
+				const suffix = announce.path.slice(msg.prefix.length)
+				const ended = new Message.Announce(suffix, "closed")
+				await ended.encode(stream.writer)
+			}
+
+			seen = newSeen
+
+			const next = await current[1]
+			if (!next) return
+			current = next
 		}
-
-		// TODO support updates.
-		// Until then, just keep the stream open.
-		await stream.reader.closed()
 	}
 
 	async runSubscribe(msg: Message.Subscribe, stream: Stream) {
@@ -132,8 +165,12 @@ class Subscribed {
 		const closed = this.closed()
 
 		for (;;) {
-			const [group, done] = await Promise.all([this.#track.nextGroup(), closed])
-			if (done) return
+			const group = await Promise.any([this.#track.nextGroup(), closed])
+			if (group instanceof Closed) {
+				this.close(group)
+				return
+			}
+
 			if (!group) break
 
 			this.#runGroup(group).catch((err) => console.warn("failed to run group: ", err))
@@ -154,6 +191,8 @@ class Subscribed {
 			await stream.u53(frame.byteLength)
 			await stream.write(frame)
 		}
+
+		await stream.close()
 	}
 
 	close(err = new Closed()) {

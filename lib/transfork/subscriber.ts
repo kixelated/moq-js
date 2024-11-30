@@ -39,6 +39,8 @@ export class Subscriber {
 					break
 				}
 
+				const path = prefix.concat(announce.suffix)
+
 				const existing = toggle.get(announce.suffix)
 				if (existing) {
 					if (announce.status === "active") {
@@ -52,7 +54,6 @@ export class Subscriber {
 						throw new Error("unknown announce")
 					}
 
-					const path = prefix.concat(announce.suffix)
 					const item = new Announced(path)
 					await announced.push(item)
 					toggle.set(announce.suffix, item)
@@ -72,6 +73,7 @@ export class Subscriber {
 
 		const stream = await Stream.open(this.#quic, msg)
 		const subscribe = new Subscribe(id, stream, track)
+		subscribe.run().catch((err) => console.warn("failed to run subscribe: ", err))
 
 		this.#subscribe.set(subscribe.id, subscribe)
 

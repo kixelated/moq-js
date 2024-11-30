@@ -75,7 +75,9 @@ export class Connection {
 			}
 
 			const [msg, stream] = next
-			this.#runBidi(msg, stream).catch((err) => stream.writer.reset(Closed.extract(err)))
+			this.#runBidi(msg, stream)
+				.catch((err) => stream.writer.reset(Closed.extract(err)))
+				.finally(() => stream.writer.close())
 		}
 	}
 
@@ -131,7 +133,9 @@ export class Connection {
 			}
 
 			const [msg, stream] = next
-			this.#runUni(msg, stream).catch((err) => stream.stop(Closed.extract(err)))
+			this.#runUni(msg, stream)
+				.catch((err) => stream.stop(Closed.extract(err)))
+				.finally(() => stream.stop(0))
 		}
 	}
 

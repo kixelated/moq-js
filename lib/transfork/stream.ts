@@ -347,6 +347,8 @@ export class Writer {
 			throw new Error("invalid message type")
 		}
 
+		await msg.encode(stream)
+
 		return stream
 	}
 }
