@@ -3,6 +3,7 @@ import * as Transfork from "../transfork"
 import * as Audio from "./audio"
 import * as Video from "./video"
 
+import * as Hex from "../common/hex"
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
@@ -24,7 +25,7 @@ export class Broadcast {
 	#path: string[]
 
 	constructor(config: BroadcastConfig) {
-		const id = config.id || new Date().getTime() / 1000
+		const id = config.id || (new Date().getTime() / 1000).toFixed(0)
 
 		this.#config = config
 		this.#path = config.path.concat(id.toString())
@@ -32,7 +33,7 @@ export class Broadcast {
 
 	async publish(connection: Transfork.Connection) {
 		const broadcast: Catalog.Broadcast = {
-			path: this.#config.path,
+			path: this.#path,
 			audio: [],
 			video: [],
 		}
@@ -45,7 +46,7 @@ export class Broadcast {
 				priority: media.kind === "video" ? 1 : 2,
 			}
 
-			const track = new Transfork.Track(this.#config.path.concat(info.name), info.priority)
+			const track = new Transfork.Track(this.#path.concat(info.name), info.priority)
 
 			if (isVideoTrackSettings(settings)) {
 				if (!this.#config.video) {
@@ -64,7 +65,7 @@ export class Broadcast {
 				const video: Catalog.Video = {
 					track: info,
 					codec: decoder.codec,
-					description: description,
+					description: description ? Hex.encode(description) : undefined,
 					resolution: { width: settings.width, height: settings.height },
 					frame_rate: settings.frameRate,
 					bitrate: this.#config.video.bitrate,
@@ -80,7 +81,7 @@ export class Broadcast {
 				const packer = new Audio.Packer(media as MediaStreamAudioTrack, encoder, track)
 				packer.run().catch((err) => console.error("failed to run audio packer: ", err)) // TODO handle error
 
-				const decoder = await encoder.decoderConfig()
+				const decoder = encoder.decoderConfig()
 
 				const audio: Catalog.Audio = {
 					track: info,
@@ -98,7 +99,7 @@ export class Broadcast {
 			connection.publish(track.reader())
 		}
 
-		const track = new Transfork.Track(this.#config.path, 0)
+		const track = new Transfork.Track(this.#path, 0)
 		track.appendGroup().writeFrames(Catalog.encode(broadcast))
 
 		connection.publish(track.reader())

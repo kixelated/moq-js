@@ -32,12 +32,18 @@ export class Player {
 				throw new Error("expected resumable broadcast")
 			}
 
-			const path = announce.path.slice(0, this.#config.path.length + 1)
+			if (announce.path.length !== this.#config.path.length + 1) {
+				// Ignore subtracks
+				continue
+			}
 
-			const id = Number.parseInt(path[path.length - 1])
-			if (id <= activeId) continue
+			const id = Number.parseInt(announce.path[announce.path.length - 1])
+			if (id <= activeId) {
+				console.warn("skipping old broadcast", announce.path)
+				continue
+			}
 
-			const catalog = await Catalog.fetch(this.#config.connection, path)
+			const catalog = await Catalog.fetch(this.#config.connection, announce.path)
 
 			this.#active?.close()
 			this.#active = new Broadcast(this.#config.connection, catalog, this.#config.canvas)

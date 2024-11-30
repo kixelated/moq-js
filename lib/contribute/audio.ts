@@ -59,12 +59,17 @@ export class Packer {
 export class Encoder {
 	#encoder!: AudioEncoder
 	#encoderConfig: AudioEncoderConfig
-	#decoderConfig = new Deferred<AudioDecoderConfig>()
+	#decoderConfig: AudioDecoderConfig
 
 	frames: TransformStream<AudioData, EncodedAudioChunk>
 
 	constructor(config: AudioEncoderConfig) {
 		this.#encoderConfig = config
+		this.#decoderConfig = {
+			codec: config.codec,
+			numberOfChannels: config.numberOfChannels,
+			sampleRate: config.sampleRate,
+		}
 
 		this.frames = new TransformStream({
 			start: this.#start.bind(this),
@@ -76,7 +81,7 @@ export class Encoder {
 	#start(controller: TransformStreamDefaultController<EncodedAudioChunk>) {
 		this.#encoder = new AudioEncoder({
 			output: (frame, metadata) => {
-				this.#enqueue(controller, frame, metadata)
+				controller.enqueue(frame)
 			},
 			error: (err) => {
 				throw err
@@ -89,22 +94,6 @@ export class Encoder {
 	#transform(frame: AudioData) {
 		this.#encoder.encode(frame)
 		frame.close()
-	}
-
-	#enqueue(
-		controller: TransformStreamDefaultController<EncodedAudioChunk>,
-		frame: EncodedAudioChunk,
-		metadata?: EncodedAudioChunkMetadata,
-	) {
-		const config = metadata?.decoderConfig
-		if (config && !this.#decoderConfig.pending) {
-			const config = metadata.decoderConfig
-			if (!config) throw new Error("missing decoder config")
-
-			this.#decoderConfig.resolve(config)
-		}
-
-		controller.enqueue(frame)
 	}
 
 	#flush() {
@@ -124,7 +113,7 @@ export class Encoder {
 		return this.#encoderConfig
 	}
 
-	async decoderConfig(): Promise<AudioDecoderConfig> {
-		return await this.#decoderConfig.promise
+	decoderConfig(): AudioDecoderConfig {
+		return this.#decoderConfig
 	}
 }

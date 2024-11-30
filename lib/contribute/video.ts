@@ -1,5 +1,5 @@
 import { Deferred } from "../common/async"
-import type { Frame } from "../karp/frame"
+import { Frame } from "../karp/frame"
 import type { Group, Track } from "../transfork"
 import { Closed } from "../transfork/error"
 
@@ -27,7 +27,7 @@ export class Packer {
 	}
 
 	async run() {
-		const output = new WritableStream({
+		const output = new WritableStream<EncodedVideoChunk>({
 			write: (chunk) => this.#write(chunk),
 			close: () => this.#close(),
 			abort: (e) => this.#close(e),
@@ -36,7 +36,7 @@ export class Packer {
 		return this.#source.readable.pipeThrough(this.#encoder.frames).pipeTo(output)
 	}
 
-	#write(frame: Frame) {
+	#write(frame: EncodedVideoChunk) {
 		if (!this.#current || frame.type === "key") {
 			if (this.#current) {
 				this.#current.close()
@@ -45,7 +45,11 @@ export class Packer {
 			this.#current = this.#data.appendGroup()
 		}
 
-		frame.encode(this.#current)
+		const buffer = new Uint8Array(frame.byteLength)
+		frame.copyTo(buffer)
+
+		const karp = new Frame(frame.type, frame.timestamp, buffer)
+		karp.encode(this.#current)
 	}
 
 	#close(err?: unknown) {

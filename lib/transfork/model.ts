@@ -1,5 +1,5 @@
 import { Watch } from "../common/async"
-import { Closed } from "./error"
+import type { Closed } from "./error"
 import { Order } from "./message"
 
 export class Track {
@@ -38,7 +38,7 @@ export class Track {
 		return group
 	}
 
-	close(closed = new Closed()) {
+	close(closed?: Closed) {
 		if (this.closed) return
 		this.closed = closed
 		this.latest.close()
@@ -124,7 +124,7 @@ export class Group {
 		return this.chunks.value()[0].length
 	}
 
-	close(closed = new Closed()) {
+	close(closed?: Closed) {
 		if (this.closed) return
 		this.closed = closed
 		this.chunks.close()
@@ -148,7 +148,9 @@ export class GroupReader {
 				return chunks[this.#index - 1]
 			}
 
-			if (this.#group.closed) throw this.#group.closed
+			if (this.#group.closed) {
+				throw this.#group.closed
+			}
 
 			if (!next) return
 			;[chunks, next] = await next
