@@ -1,0 +1,39 @@
+# Architecting for Live at Scale
+
+It's time to get that Staff Engineer promotion.
+That's right, we're talking about distributed systems design.
+
+I'm going to walk through a few designs for the same system with increasing complexity.
+There's no right answer, just pros and cons, but I'd love to hear your favorites.
+Or @me with an alternative because you're super smart and I used to eat paste in school (true story).
+
+
+## Requirements 
+But first, a message from our sponsor: __requirements__
+
+We're going to build a real-time media application.
+There will be N broadcasters and M viewers in a room, some performing both roles.
+Think Discord or Google Meet or Zoom or _your least favorite app here_.
+
+Additional considerations:
+- Some users will have poor networks.
+- Some broadcasters will want higher quality/latency (ex. screen share) 
+- Some users might be geo-dispersed. ex. some in Europe and some in ~~freedom land~~ North America.
+- Some customers might be willing to pay for better connectivity/quality.
+
+Got that?
+Basically just make a conferencing application.
+
+## Design 0 - Peer to Peer 
+We start with both the least complicated and yet somehow most complex design: __peer-to-peer__.
+That's right, boot up your favorite game from the 2000s and enter your friend's IP address manually.
+
+The design is very simple.
+Users connect directly to each other without pesky intermediate servers (unless you count routers).
+There should still be _some_ central server to exchange user details, like a "lobby" service, or else discovery becomes very difficult.
+Sorry, we're not going to build "Media over Blockchain" or something like BitTorrent sans trackers.
+
+The very first problem with P2P hits us immediately: how do you connect?
+In a client/client protocol, one of the two peers needs to act like a server using a public IP/port.
+But this is not always an option because IPv4 addresses are expensive and IPv6 addresses are somehow still unavailable.
+Instead, the internet consists of NATs that generate IP/port pairs for outgoing connections (client) but critically, reject incoming connections (server) unless configured to forward ports.
