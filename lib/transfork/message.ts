@@ -8,6 +8,8 @@ export enum Version {
 	FORK_00 = 0xff0bad00,
 	FORK_01 = 0xff0bad01,
 	FORK_02 = 0xff0bad02,
+	FORK_03 = 0xff0bad03,
+	FORK_04 = 0xff0bad04,
 }
 
 export class Extensions {
@@ -187,7 +189,6 @@ export class AnnounceInterest {
 export class SubscribeUpdate {
 	priority: number
 	order = Order.Any
-	expires = 0 // ms
 
 	start?: bigint
 	end?: bigint
@@ -199,7 +200,6 @@ export class SubscribeUpdate {
 	async encode(w: Writer) {
 		await w.u53(this.priority)
 		await w.u53(this.order)
-		await w.u53(this.expires)
 		await w.u62(this.start ? this.start + 1n : 0n)
 		await w.u62(this.end ? this.end + 1n : 0n)
 	}
@@ -211,13 +211,11 @@ export class SubscribeUpdate {
 			throw new Error(`invalid order: ${order}`)
 		}
 
-		const expires = await r.u53()
 		const start = await r.u62()
 		const end = await r.u62()
 
 		const update = new SubscribeUpdate(priority)
 		update.order = order
-		update.expires = expires
 		update.start = start === 0n ? undefined : start - 1n
 		update.end = end === 0n ? undefined : end - 1n
 
@@ -256,7 +254,6 @@ export class Subscribe extends SubscribeUpdate {
 
 		const subscribe = new Subscribe(id, path, update.priority)
 		subscribe.order = update.order
-		subscribe.expires = update.expires
 		subscribe.start = update.start
 		subscribe.end = update.end
 
@@ -271,7 +268,6 @@ export class Datagrams extends Subscribe {
 export class Info {
 	priority: number
 	order = Order.Descending
-	expires = 0
 	latest?: number
 
 	constructor(priority: number) {
@@ -281,7 +277,6 @@ export class Info {
 	async encode(w: Writer) {
 		await w.u53(this.priority)
 		await w.u53(this.order)
-		await w.u53(this.expires)
 		await w.u53(this.latest ? this.latest + 1 : 0)
 	}
 
