@@ -35,11 +35,11 @@ export class Client {
 		const quic = new WebTransport(this.config.url, options)
 		await quic.ready
 
-		const client = new Message.SessionClient([Message.Version.FORK_02])
+		const client = new Message.SessionClient([Message.Version.FORK_04])
 		const stream = await Stream.open(quic, client)
 
 		const server = await Message.SessionServer.decode(stream.reader)
-		if (server.version !== Message.Version.FORK_02) {
+		if (server.version !== Message.Version.FORK_04) {
 			throw new Error(`unsupported server version: ${server.version}`)
 		}
 
